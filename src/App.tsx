@@ -4,6 +4,7 @@ import { buildAiAuditJson, buildAudit } from './domain/audit'
 import type { AuditItem, SourceArea, UploadedFile } from './domain/types'
 import { processClientMotor, type CanonicalClient } from './domain/clientMotor'
 import { processProductMotor, type CanonicalProduct, type ProductIndicators } from './domain/productMotor'
+import { processHistoryMotor, type CanonicalHistory, type HistoryIndicators } from './domain/historyMotor'
 import { classifyProduct } from './domain/productGrouping'
 import { loadPersisted, savePersisted } from './domain/persistence'
 
@@ -23,9 +24,13 @@ const clientSources = [
 const productSources = [
   { id: 'internal', label: 'Cadastro interno' }, { id: 'industry', label: 'Lista da indústria' }, { id: 'stock', label: 'Estoque atual' }, { id: 'price', label: 'Preço de venda' }, { id: 'transit', label: 'Carteira em trânsito' }, { id: 'check', label: 'Conferência de estoque' },
 ] as const
+const historySources = [
+  { id: 'sales', label: 'Vendas detalhadas do legado' }, { id: 'summary', label: 'Consolidado por cliente' },
+] as const
 type ClientIndicators = { totalClients: number; internal: number; portfolio: number; premises: number; complete: number }
 type SavedClientMotor = { base: CanonicalClient[]; audit: AuditItem[]; indicators: ClientIndicators | null; slots: Partial<Record<(typeof clientSources)[number]['id'], UploadedFile>> }
 type SavedProductMotor = { base: CanonicalProduct[]; audit: AuditItem[]; indicators: ProductIndicators | null; slots: Partial<Record<(typeof productSources)[number]['id'], UploadedFile>> }
+type SavedHistoryMotor = { base: CanonicalHistory[]; audit: AuditItem[]; indicators: HistoryIndicators | null; slots: Partial<Record<(typeof historySources)[number]['id'], UploadedFile[]>> }
 
 function fileSize(size: number) { return size < 1_000_000 ? `${Math.max(1, Math.round(size / 1024))} KB` : `${(size / 1_000_000).toFixed(1)} MB` }
 
@@ -47,9 +52,15 @@ export function App() {
   const [productIndicators, setProductIndicators] = useState<ProductIndicators | null>(null)
   const [productProcessing, setProductProcessing] = useState(false)
   const [productStateLoaded, setProductStateLoaded] = useState(false)
+  const [historyAudit, setHistoryAudit] = useState<AuditItem[]>([])
+  const [historyBase, setHistoryBase] = useState<CanonicalHistory[]>([])
+  const [historySlots, setHistorySlots] = useState<Partial<Record<(typeof historySources)[number]['id'], UploadedFile[]>>>({})
+  const [historyIndicators, setHistoryIndicators] = useState<HistoryIndicators | null>(null)
+  const [historyProcessing, setHistoryProcessing] = useState(false)
+  const [historyStateLoaded, setHistoryStateLoaded] = useState(false)
   const dailyInput = useRef<HTMLInputElement>(null)
   const motorInputs = useRef<Record<string, HTMLInputElement | null>>({})
-  const audit = useMemo(() => [...buildAudit(files).filter(item => (item.area !== 'clientes' || clientBase.length === 0) && (item.area !== 'produtos' || productBase.length === 0)), ...clientAudit, ...productAudit], [files, clientAudit, clientBase.length, productAudit, productBase.length])
+  const audit = useMemo(() => [...buildAudit(files).filter(item => (item.area !== 'clientes' || clientBase.length === 0) && (item.area !== 'produtos' || productBase.length === 0) && (item.area !== 'historico' || historyBase.length === 0)), ...clientAudit, ...productAudit, ...historyAudit], [files, clientAudit, clientBase.length, productAudit, productBase.length, historyAudit, historyBase.length])
 
   useEffect(() => {
     let active = true
@@ -65,6 +76,8 @@ export function App() {
   }, [clientStateLoaded, clientBase, clientAudit, clientIndicators, clientSlots])
   useEffect(() => { let active = true; void loadPersisted<SavedProductMotor>('produtos').then(saved => { if (!active || !saved) return; const base = saved.base.map(product => { const grouping = classifyProduct(product); return { ...product, groupCode: grouping.group?.code, groupName: grouping.group?.name, groupFamily: grouping.group?.family, groupStatus: grouping.status } }); setProductBase(base); setProductAudit(saved.audit); setProductIndicators(saved.indicators); setProductSlots(saved.slots) }).finally(() => { if (active) setProductStateLoaded(true) }); return () => { active = false } }, [])
   useEffect(() => { if (productStateLoaded) void savePersisted<SavedProductMotor>('produtos', { base: productBase, audit: productAudit, indicators: productIndicators, slots: productSlots }) }, [productStateLoaded, productBase, productAudit, productIndicators, productSlots])
+  useEffect(() => { let active = true; void loadPersisted<SavedHistoryMotor>('historico').then(saved => { if (!active || !saved) return; setHistoryBase(saved.base); setHistoryAudit(saved.audit); setHistoryIndicators(saved.indicators); setHistorySlots(saved.slots) }).finally(() => { if (active) setHistoryStateLoaded(true) }); return () => { active = false } }, [])
+  useEffect(() => { if (historyStateLoaded) void savePersisted<SavedHistoryMotor>('historico', { base: historyBase, audit: historyAudit, indicators: historyIndicators, slots: historySlots }) }, [historyStateLoaded, historyBase, historyAudit, historyIndicators, historySlots])
 
   function addFiles(area: SourceArea, incoming: FileList | File[]) {
     const next = Array.from(incoming).map(file => ({ id: `${file.name}-${file.size}-${crypto.randomUUID()}`, name: file.name, size: file.size, area, receivedAt: new Date().toLocaleString('pt-BR'), lastModified: file.lastModified }))
@@ -85,8 +98,17 @@ export function App() {
     const uploaded: UploadedFile = { id: `${file.name}-${file.size}-${crypto.randomUUID()}`, name: file.name, size: file.size, area: 'produtos', receivedAt: new Date().toLocaleString('pt-BR'), lastModified: file.lastModified }
     setFiles(current => [...current.filter(item => item.id !== productSlots[source]?.id), uploaded]); setRawFiles(current => ({ ...current, [uploaded.id]: file })); setProductSlots(current => ({ ...current, [source]: uploaded }))
   }
+  function historySourceChange(source: (typeof historySources)[number]['id'], event: ChangeEvent<HTMLInputElement>) {
+    const incoming = Array.from(event.target.files ?? []); event.target.value = ''
+    if (!incoming.length) return
+    const uploaded = incoming.map(file => ({ id: `${file.name}-${file.size}-${crypto.randomUUID()}`, name: file.name, size: file.size, area: 'historico' as const, receivedAt: new Date().toLocaleString('pt-BR'), lastModified: file.lastModified }))
+    setFiles(current => [...current, ...uploaded])
+    setRawFiles(current => ({ ...current, ...Object.fromEntries(uploaded.map((item, index) => [item.id, incoming[index]])) }))
+    setHistorySlots(current => ({ ...current, [source]: [...(current[source] ?? []), ...uploaded] }))
+  }
   function drop(area: SourceArea, event: DragEvent<HTMLDivElement>) { event.preventDefault(); addFiles(area, event.dataTransfer.files) }
   function removeFile(id: string) { setFiles(current => current.filter(file => file.id !== id)); setRawFiles(current => { const next = { ...current }; delete next[id]; return next }) }
+  function removeHistoryFile(id: string) { removeFile(id); setHistorySlots(current => Object.fromEntries(Object.entries(current).map(([source, files]) => [source, files?.filter(file => file.id !== id)]))) }
   async function processClients() {
     const selected = Object.values(clientSlots).map(file => file && rawFiles[file.id]).filter((file): file is File => Boolean(file))
     if (!selected.length) return
@@ -101,6 +123,13 @@ export function App() {
     try { const result = await processProductMotor(selected); setProductBase(result.canonicalBase); setProductAudit(result.audit); setProductIndicators(result.indicators) }
     catch { setProductAudit([{ id: 'product-read-error', level: 'action', title: 'Não foi possível ler os arquivos', instruction: 'Confira os arquivos e tente novamente.', detail: 'A base de produtos não foi alterada.', area: 'produtos' }]); setProductBase([]); setProductIndicators(null) }
     finally { setProductProcessing(false) }
+  }
+  async function processHistory() {
+    const selected = Object.values(historySlots).flat().map(file => rawFiles[file.id]).filter((file): file is File => Boolean(file)); if (!selected.length) return
+    setHistoryProcessing(true); setHistoryAudit([])
+    try { const result = await processHistoryMotor(selected); setHistoryBase(result.canonicalBase); setHistoryAudit(result.audit); setHistoryIndicators(result.indicators) }
+    catch { setHistoryAudit([{ id: 'history-read-error', level: 'action', title: 'Não foi possível ler os arquivos', instruction: 'Confira os arquivos e tente novamente.', detail: 'A base histórica não foi alterada.', area: 'historico' }]); setHistoryBase([]); setHistoryIndicators(null) }
+    finally { setHistoryProcessing(false) }
   }
   function downloadClientBase() { const url = URL.createObjectURL(new Blob([JSON.stringify(clientBase, null, 2)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = 'base-canonica-clientes.json'; link.click(); URL.revokeObjectURL(url) }
   function downloadClientExcel() {
@@ -124,6 +153,12 @@ export function App() {
     const sheet = XLSX.utils.json_to_sheet(records.map(record => Object.fromEntries(columns.map(column => [column, record[column as keyof typeof record]]))))
     const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, sheet, 'Produtos'); XLSX.writeFile(book, 'base-canonica-produtos.xlsx')
   }
+  function downloadHistoryBase() { const url = URL.createObjectURL(new Blob([JSON.stringify(historyBase, null, 2)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = 'base-canonica-historico.json'; link.click(); URL.revokeObjectURL(url) }
+  function downloadHistoryExcel() {
+    const rows = historyBase.map(record => ({ Competência: record.competence, 'Fechamento disponível': record.closingDate, Sistema: 'Legado', Cliente: record.customerCode, Produto: record.productCode, Quantidade: record.quantity, Valor: record.salesValue, Desconto: record.discount, 'Valor líquido': record.netValue, 'Linhas de venda': record.salesLines }))
+    const sheet = XLSX.utils.json_to_sheet(rows); sheet['!cols'] = Object.keys(rows[0] ?? {}).map(header => ({ wch: Math.max(14, header.length + 4) }))
+    const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, sheet, 'Histórico'); XLSX.writeFile(book, 'base-canonica-historico.xlsx')
+  }
   function downloadAiJson() {
     const body = JSON.stringify(buildAiAuditJson(files, audit), null, 2)
     const url = URL.createObjectURL(new Blob([body], { type: 'application/json' }))
@@ -140,7 +175,7 @@ export function App() {
         <div className="quick-upload" role="button" tabIndex={0} onClick={() => dailyInput.current?.click()} onDragOver={event => event.preventDefault()} onDrop={event => drop('diario', event)}><strong>Solte todos os arquivos aqui</strong><span>ou escolha os arquivos</span><input ref={dailyInput} aria-label="Adicionar arquivos diários" type="file" multiple onChange={event => fileChange('diario', event)} /></div>
         <FileList files={filesIn('diario')} onRemove={removeFile} />
         <h2 className="section-title">MOTORES</h2>
-        <div className="motor-grid">{motors.map(motor => <article className="motor-card" key={motor.id}><h3>{motor.name}</h3>{motor.id === 'produtos' ? <><div className="client-source-list">{productSources.map(source => { const uploaded = productSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong><small>{uploaded ? `Atualizado em ${new Date(uploaded.lastModified ?? Date.now()).toLocaleDateString('pt-BR')}` : source.id === 'check' ? 'Opcional' : 'Ainda não enviado'}</small></span><label className="source-upload">{uploaded ? 'Trocar arquivo' : 'Adicionar arquivo'}<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => productSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={productProcessing || !Object.values(productSlots).some(file => file && rawFiles[file.id])} onClick={processProducts}>{productProcessing ? 'Conferindo arquivos' : 'Criar base de produtos'}</button>{productIndicators ? <div className="indicators"><span>{productIndicators.total.toLocaleString('pt-BR')} produtos</span><span>{productIndicators.inTransit.toLocaleString('pt-BR')} em trânsito</span><button type="button" onClick={downloadProductBase}>Baixar JSON</button><button type="button" onClick={downloadProductExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'clientes' ? <><div className="client-source-list">{clientSources.map(source => { const uploaded = clientSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong><small>{uploaded ? `Atualizado em ${new Date(uploaded.lastModified ?? Date.now()).toLocaleDateString('pt-BR')}` : 'Ainda não enviado'}</small></span><label className="source-upload">{uploaded ? 'Trocar arquivo' : 'Adicionar arquivo'}<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => clientSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={clientProcessing || !Object.values(clientSlots).some(file => file && rawFiles[file.id])} onClick={processClients}>{clientProcessing ? 'Conferindo arquivos' : 'Criar base de clientes'}</button>{clientIndicators ? <div className="indicators"><span>{clientIndicators.totalClients.toLocaleString('pt-BR')} clientes</span><span>{clientIndicators.complete.toLocaleString('pt-BR')} completos</span><button type="button" onClick={downloadClientBase}>Baixar JSON</button><button type="button" onClick={downloadClientExcel}>Baixar Excel</button></div> : null}</> : <><button type="button" className="add-button" onClick={() => motorInputs.current[motor.id]?.click()}>Adicionar arquivos</button><input ref={element => { motorInputs.current[motor.id] = element }} aria-label={`Adicionar arquivos de ${motor.name}`} type="file" multiple onChange={event => fileChange(motor.id, event)} /><FileList files={filesIn(motor.id)} onRemove={removeFile} compact /></>}</article>)}</div>
+        <div className="motor-grid">{motors.map(motor => <article className="motor-card" key={motor.id}><h3>{motor.name}</h3>{motor.id === 'produtos' ? <><div className="client-source-list">{productSources.map(source => { const uploaded = productSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong><small>{uploaded ? `Atualizado em ${new Date(uploaded.lastModified ?? Date.now()).toLocaleDateString('pt-BR')}` : source.id === 'check' ? 'Opcional' : 'Ainda não enviado'}</small></span><label className="source-upload">{uploaded ? 'Trocar arquivo' : 'Adicionar arquivo'}<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => productSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={productProcessing || !Object.values(productSlots).some(file => file && rawFiles[file.id])} onClick={processProducts}>{productProcessing ? 'Conferindo arquivos' : 'Criar base de produtos'}</button>{productIndicators ? <div className="indicators"><span>{productIndicators.total.toLocaleString('pt-BR')} produtos</span><span>{productIndicators.inTransit.toLocaleString('pt-BR')} em trânsito</span><button type="button" onClick={downloadProductBase}>Baixar JSON</button><button type="button" onClick={downloadProductExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'clientes' ? <><div className="client-source-list">{clientSources.map(source => { const uploaded = clientSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong><small>{uploaded ? `Atualizado em ${new Date(uploaded.lastModified ?? Date.now()).toLocaleDateString('pt-BR')}` : 'Ainda não enviado'}</small></span><label className="source-upload">{uploaded ? 'Trocar arquivo' : 'Adicionar arquivo'}<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => clientSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={clientProcessing || !Object.values(clientSlots).some(file => file && rawFiles[file.id])} onClick={processClients}>{clientProcessing ? 'Conferindo arquivos' : 'Criar base de clientes'}</button>{clientIndicators ? <div className="indicators"><span>{clientIndicators.totalClients.toLocaleString('pt-BR')} clientes</span><span>{clientIndicators.complete.toLocaleString('pt-BR')} completos</span><button type="button" onClick={downloadClientBase}>Baixar JSON</button><button type="button" onClick={downloadClientExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'historico' ? <><div className="client-source-list">{historySources.map(source => { const uploaded = historySlots[source.id] ?? []; const newest = uploaded.map(file => file.lastModified ?? 0).reduce((latest, value) => Math.max(latest, value), 0); return <div className="client-source" key={source.id}><span><strong>{source.label}</strong><small>{uploaded.length ? `${uploaded.length} arquivo(s) · atualizado em ${new Date(newest).toLocaleDateString('pt-BR')}` : source.id === 'summary' ? 'Opcional' : 'Ainda não enviado'}</small></span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".txt" multiple onChange={event => historySourceChange(source.id, event)} /></label></div> })}</div><FileList files={filesIn('historico')} onRemove={removeHistoryFile} compact /><button className="process-button" type="button" disabled={historyProcessing || !Object.values(historySlots).flat().some(file => rawFiles[file.id])} onClick={processHistory}>{historyProcessing ? 'Conferindo arquivos' : 'Criar base histórica'}</button>{historyIndicators ? <div className="indicators"><span>{historyIndicators.competencies.toLocaleString('pt-BR')} competências</span><span>{historyIndicators.salesLines.toLocaleString('pt-BR')} vendas</span><button type="button" onClick={downloadHistoryBase}>Baixar JSON</button><button type="button" onClick={downloadHistoryExcel}>Baixar Excel</button></div> : null}</> : <><button type="button" className="add-button" onClick={() => motorInputs.current[motor.id]?.click()}>Adicionar arquivos</button><input ref={element => { motorInputs.current[motor.id] = element }} aria-label={`Adicionar arquivos de ${motor.name}`} type="file" multiple onChange={event => fileChange(motor.id, event)} /><FileList files={filesIn(motor.id)} onRemove={removeFile} compact /></>}</article>)}</div>
       </section> : <section className="content">
         <div className="audit-heading"><h2>AUDITORIA</h2><button className="secondary-button" type="button" onClick={downloadAiJson}>Gerar resumo para IA</button></div>
         <div className="notice-list">{audit.map(item => <button className={`notice ${item.level}`} key={item.id} type="button" onClick={() => setActiveNotice(item)}><span>{item.title}</span><small>{item.instruction}</small></button>)}</div>
