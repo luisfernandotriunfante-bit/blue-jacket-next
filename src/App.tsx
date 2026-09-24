@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx'
 import { buildAiAuditJson, buildAudit } from './domain/audit'
 import type { AuditItem, SourceArea, UploadedFile } from './domain/types'
 import { processClientMotor, type CanonicalClient } from './domain/clientMotor'
+import { processProductMotor, type CanonicalProduct, type ProductIndicators } from './domain/productMotor'
 import { loadPersisted, savePersisted } from './domain/persistence'
 
 const motors: Array<{ id: Exclude<SourceArea, 'diario'>; name: string }> = [
@@ -18,8 +19,12 @@ const clientSources = [
   { id: 'portfolio', label: 'Carteira' },
   { id: 'premises', label: 'Premissas' },
 ] as const
+const productSources = [
+  { id: 'internal', label: 'Cadastro interno' }, { id: 'industry', label: 'Lista da indústria' }, { id: 'stock', label: 'Estoque atual' }, { id: 'price', label: 'Preço de venda' }, { id: 'transit', label: 'Carteira em trânsito' }, { id: 'check', label: 'Conferência de estoque' },
+] as const
 type ClientIndicators = { totalClients: number; internal: number; portfolio: number; premises: number; complete: number }
 type SavedClientMotor = { base: CanonicalClient[]; audit: AuditItem[]; indicators: ClientIndicators | null; slots: Partial<Record<(typeof clientSources)[number]['id'], UploadedFile>> }
+type SavedProductMotor = { base: CanonicalProduct[]; audit: AuditItem[]; indicators: ProductIndicators | null; slots: Partial<Record<(typeof productSources)[number]['id'], UploadedFile>> }
 
 function fileSize(size: number) { return size < 1_000_000 ? `${Math.max(1, Math.round(size / 1024))} KB` : `${(size / 1_000_000).toFixed(1)} MB` }
 
@@ -35,9 +40,15 @@ export function App() {
   const [clientIndicators, setClientIndicators] = useState<ClientIndicators | null>(null)
   const [clientProcessing, setClientProcessing] = useState(false)
   const [clientStateLoaded, setClientStateLoaded] = useState(false)
+  const [productAudit, setProductAudit] = useState<AuditItem[]>([])
+  const [productBase, setProductBase] = useState<CanonicalProduct[]>([])
+  const [productSlots, setProductSlots] = useState<Partial<Record<(typeof productSources)[number]['id'], UploadedFile>>>({})
+  const [productIndicators, setProductIndicators] = useState<ProductIndicators | null>(null)
+  const [productProcessing, setProductProcessing] = useState(false)
+  const [productStateLoaded, setProductStateLoaded] = useState(false)
   const dailyInput = useRef<HTMLInputElement>(null)
   const motorInputs = useRef<Record<string, HTMLInputElement | null>>({})
-  const audit = useMemo(() => [...buildAudit(files).filter(item => item.area !== 'clientes' || clientBase.length === 0), ...clientAudit], [files, clientAudit, clientBase.length])
+  const audit = useMemo(() => [...buildAudit(files).filter(item => (item.area !== 'clientes' || clientBase.length === 0) && (item.area !== 'produtos' || productBase.length === 0)), ...clientAudit, ...productAudit], [files, clientAudit, clientBase.length, productAudit, productBase.length])
 
   useEffect(() => {
     let active = true
@@ -51,6 +62,8 @@ export function App() {
     if (!clientStateLoaded) return
     void savePersisted<SavedClientMotor>('clientes', { base: clientBase, audit: clientAudit, indicators: clientIndicators, slots: clientSlots })
   }, [clientStateLoaded, clientBase, clientAudit, clientIndicators, clientSlots])
+  useEffect(() => { let active = true; void loadPersisted<SavedProductMotor>('produtos').then(saved => { if (!active || !saved) return; setProductBase(saved.base); setProductAudit(saved.audit); setProductIndicators(saved.indicators); setProductSlots(saved.slots) }).finally(() => { if (active) setProductStateLoaded(true) }); return () => { active = false } }, [])
+  useEffect(() => { if (productStateLoaded) void savePersisted<SavedProductMotor>('produtos', { base: productBase, audit: productAudit, indicators: productIndicators, slots: productSlots }) }, [productStateLoaded, productBase, productAudit, productIndicators, productSlots])
 
   function addFiles(area: SourceArea, incoming: FileList | File[]) {
     const next = Array.from(incoming).map(file => ({ id: `${file.name}-${file.size}-${crypto.randomUUID()}`, name: file.name, size: file.size, area, receivedAt: new Date().toLocaleString('pt-BR'), lastModified: file.lastModified }))
@@ -66,6 +79,11 @@ export function App() {
     setRawFiles(current => ({ ...current, [uploaded.id]: file }))
     setClientSlots(current => ({ ...current, [source]: uploaded }))
   }
+  function productSourceChange(source: (typeof productSources)[number]['id'], event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]; event.target.value = ''; if (!file) return
+    const uploaded: UploadedFile = { id: `${file.name}-${file.size}-${crypto.randomUUID()}`, name: file.name, size: file.size, area: 'produtos', receivedAt: new Date().toLocaleString('pt-BR'), lastModified: file.lastModified }
+    setFiles(current => [...current.filter(item => item.id !== productSlots[source]?.id), uploaded]); setRawFiles(current => ({ ...current, [uploaded.id]: file })); setProductSlots(current => ({ ...current, [source]: uploaded }))
+  }
   function drop(area: SourceArea, event: DragEvent<HTMLDivElement>) { event.preventDefault(); addFiles(area, event.dataTransfer.files) }
   function removeFile(id: string) { setFiles(current => current.filter(file => file.id !== id)); setRawFiles(current => { const next = { ...current }; delete next[id]; return next }) }
   async function processClients() {
@@ -75,6 +93,13 @@ export function App() {
     try { const result = await processClientMotor(selected); setClientAudit(result.audit); setClientBase(result.canonicalBase); setClientIndicators(result.indicators) }
     catch { setClientAudit([{ id: 'client-read-error', level: 'action', title: 'Não foi possível ler os arquivos', instruction: 'Confira os arquivos e tente novamente.', detail: 'A base de clientes não foi alterada.', area: 'clientes' }]); setClientBase([]); setClientIndicators(null) }
     finally { setClientProcessing(false) }
+  }
+  async function processProducts() {
+    const selected = Object.values(productSlots).map(file => file && rawFiles[file.id]).filter((file): file is File => Boolean(file)); if (!selected.length) return
+    setProductProcessing(true); setProductAudit([])
+    try { const result = await processProductMotor(selected); setProductBase(result.canonicalBase); setProductAudit(result.audit); setProductIndicators(result.indicators) }
+    catch { setProductAudit([{ id: 'product-read-error', level: 'action', title: 'Não foi possível ler os arquivos', instruction: 'Confira os arquivos e tente novamente.', detail: 'A base de produtos não foi alterada.', area: 'produtos' }]); setProductBase([]); setProductIndicators(null) }
+    finally { setProductProcessing(false) }
   }
   function downloadClientBase() { const url = URL.createObjectURL(new Blob([JSON.stringify(clientBase, null, 2)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = 'base-canonica-clientes.json'; link.click(); URL.revokeObjectURL(url) }
   function downloadClientExcel() {
@@ -89,6 +114,8 @@ export function App() {
     sheet['!cols'] = Object.keys(rows[0] ?? {}).map(header => ({ wch: Math.max(14, Math.min(36, header.length + 7)) }))
     const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, sheet, 'Clientes'); XLSX.writeFile(book, 'base-canonica-clientes.xlsx')
   }
+  function downloadProductBase() { const url = URL.createObjectURL(new Blob([JSON.stringify(productBase, null, 2)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = 'base-canonica-produtos.json'; link.click(); URL.revokeObjectURL(url) }
+  function downloadProductExcel() { const sheet = XLSX.utils.json_to_sheet(productBase.map(product => ({ Código: product.internalCode ?? '', 'Código fabricante': product.manufacturerCode ?? '', EAN: product.ean ?? '', Descrição: product.description ?? '', Embalagem: product.package ?? '', Marca: product.brand ?? '', Categoria: product.category ?? '', 'Unidades por caixa': product.unitsPerBox ?? '', Disponível: product.availableStock ?? '', Estoque: product.totalStock ?? '', Reservado: product.reservedStock ?? '', Bloqueado: product.blockedStock ?? '', Avariado: product.damagedStock ?? '', 'Preço de venda': product.sellerPrice ?? '', 'Em trânsito': product.inTransitQuantity ?? '', Status: product.status }))); const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, sheet, 'Produtos'); XLSX.writeFile(book, 'base-canonica-produtos.xlsx') }
   function downloadAiJson() {
     const body = JSON.stringify(buildAiAuditJson(files, audit), null, 2)
     const url = URL.createObjectURL(new Blob([body], { type: 'application/json' }))
@@ -105,7 +132,7 @@ export function App() {
         <div className="quick-upload" role="button" tabIndex={0} onClick={() => dailyInput.current?.click()} onDragOver={event => event.preventDefault()} onDrop={event => drop('diario', event)}><strong>Solte todos os arquivos aqui</strong><span>ou escolha os arquivos</span><input ref={dailyInput} aria-label="Adicionar arquivos diários" type="file" multiple onChange={event => fileChange('diario', event)} /></div>
         <FileList files={filesIn('diario')} onRemove={removeFile} />
         <h2 className="section-title">MOTORES</h2>
-        <div className="motor-grid">{motors.map(motor => <article className="motor-card" key={motor.id}><h3>{motor.name}</h3>{motor.id === 'clientes' ? <><div className="client-source-list">{clientSources.map(source => { const uploaded = clientSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong><small>{uploaded ? `Atualizado em ${new Date(uploaded.lastModified ?? Date.now()).toLocaleDateString('pt-BR')}` : 'Ainda não enviado'}</small></span><label className="source-upload">{uploaded ? 'Trocar arquivo' : 'Adicionar arquivo'}<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => clientSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={clientProcessing || !Object.values(clientSlots).some(file => file && rawFiles[file.id])} onClick={processClients}>{clientProcessing ? 'Conferindo arquivos' : 'Criar base de clientes'}</button>{clientIndicators ? <div className="indicators"><span>{clientIndicators.totalClients.toLocaleString('pt-BR')} clientes</span><span>{clientIndicators.complete.toLocaleString('pt-BR')} completos</span><button type="button" onClick={downloadClientBase}>Baixar JSON</button><button type="button" onClick={downloadClientExcel}>Baixar Excel</button></div> : null}</> : <><button type="button" className="add-button" onClick={() => motorInputs.current[motor.id]?.click()}>Adicionar arquivos</button><input ref={element => { motorInputs.current[motor.id] = element }} aria-label={`Adicionar arquivos de ${motor.name}`} type="file" multiple onChange={event => fileChange(motor.id, event)} /><FileList files={filesIn(motor.id)} onRemove={removeFile} compact /></>}</article>)}</div>
+        <div className="motor-grid">{motors.map(motor => <article className="motor-card" key={motor.id}><h3>{motor.name}</h3>{motor.id === 'produtos' ? <><div className="client-source-list">{productSources.map(source => { const uploaded = productSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong><small>{uploaded ? `Atualizado em ${new Date(uploaded.lastModified ?? Date.now()).toLocaleDateString('pt-BR')}` : source.id === 'check' ? 'Opcional' : 'Ainda não enviado'}</small></span><label className="source-upload">{uploaded ? 'Trocar arquivo' : 'Adicionar arquivo'}<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => productSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={productProcessing || !Object.values(productSlots).some(file => file && rawFiles[file.id])} onClick={processProducts}>{productProcessing ? 'Conferindo arquivos' : 'Criar base de produtos'}</button>{productIndicators ? <div className="indicators"><span>{productIndicators.total.toLocaleString('pt-BR')} produtos</span><span>{productIndicators.inTransit.toLocaleString('pt-BR')} em trânsito</span><button type="button" onClick={downloadProductBase}>Baixar JSON</button><button type="button" onClick={downloadProductExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'clientes' ? <><div className="client-source-list">{clientSources.map(source => { const uploaded = clientSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong><small>{uploaded ? `Atualizado em ${new Date(uploaded.lastModified ?? Date.now()).toLocaleDateString('pt-BR')}` : 'Ainda não enviado'}</small></span><label className="source-upload">{uploaded ? 'Trocar arquivo' : 'Adicionar arquivo'}<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => clientSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={clientProcessing || !Object.values(clientSlots).some(file => file && rawFiles[file.id])} onClick={processClients}>{clientProcessing ? 'Conferindo arquivos' : 'Criar base de clientes'}</button>{clientIndicators ? <div className="indicators"><span>{clientIndicators.totalClients.toLocaleString('pt-BR')} clientes</span><span>{clientIndicators.complete.toLocaleString('pt-BR')} completos</span><button type="button" onClick={downloadClientBase}>Baixar JSON</button><button type="button" onClick={downloadClientExcel}>Baixar Excel</button></div> : null}</> : <><button type="button" className="add-button" onClick={() => motorInputs.current[motor.id]?.click()}>Adicionar arquivos</button><input ref={element => { motorInputs.current[motor.id] = element }} aria-label={`Adicionar arquivos de ${motor.name}`} type="file" multiple onChange={event => fileChange(motor.id, event)} /><FileList files={filesIn(motor.id)} onRemove={removeFile} compact /></>}</article>)}</div>
       </section> : <section className="content">
         <div className="audit-heading"><h2>AUDITORIA</h2><button className="secondary-button" type="button" onClick={downloadAiJson}>Gerar resumo para IA</button></div>
         <div className="notice-list">{audit.map(item => <button className={`notice ${item.level}`} key={item.id} type="button" onClick={() => setActiveNotice(item)}><span>{item.title}</span><small>{item.instruction}</small></button>)}</div>
