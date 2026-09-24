@@ -29,11 +29,6 @@ export type CanonicalClient = {
   premiseProfile?: string
   premiseNetwork?: string
   sources: string[]
-  sourceData: {
-    internal?: Record<string, unknown>
-    premises?: Record<string, unknown>
-    portfolio?: Record<string, unknown>
-  }
 }
 
 export type ClientMotorResult = {
@@ -98,7 +93,7 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
         for (const row of rows.slice(start)) {
           const key = documentKey(at(row, 1)); if (!hasDocument(key)) continue
           if (portfolio.has(key)) continue
-          portfolio.set(key, { document: key, winthorCode: text(at(row, 0)), legalName: text(at(row, 2)), tradeName: text(at(row, 3)), commercialActivity: text(at(row, 4)), city: text(at(row, 5)), district: text(at(row, 6)), address: text(at(row, 7)), latitude: text(at(row, 8)), longitude: text(at(row, 9)), visitFrequency: text(at(row, 12)), visitDay: text(at(row, 13)), daysWithoutPurchase: text(at(row, 14)), representative: text(at(row, 15)), sources: ['Carteira de clientes'] }); accepted++
+          portfolio.set(key, { document: key, winthorCode: text(at(row, 0)), legalName: text(at(row, 2)), tradeName: text(at(row, 3)), commercialActivity: text(at(row, 4)), city: text(at(row, 5)), district: text(at(row, 6)), address: text(at(row, 7)), latitude: text(at(row, 8)), longitude: text(at(row, 9)), visitFrequency: text(at(row, 12)), visitDay: text(at(row, 13)), daysWithoutPurchase: text(at(row, 14)), representative: text(at(row, 15)), rcaCode: text(at(row, 15)), sources: ['Carteira de clientes'] }); accepted++
         }
         audit.push({ id: `portfolio-ok-${audit.length}`, level: 'ok', title: 'Carteira de clientes reconhecida', instruction: `${accepted.toLocaleString('pt-BR')} clientes prontos para juntar.`, detail: 'Os dados de endereço, frequência e visita foram lidos.', area: 'clientes' }); continue
       }
@@ -120,13 +115,15 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
   if (!internal.size && !portfolio.size && !premises.size) audit.push({ id: 'no-client-source', level: 'action', title: 'Nenhum arquivo de clientes foi reconhecido', instruction: 'Envie o cadastro interno, a carteira ou as premissas.', detail: 'O sistema não encontrou a estrutura esperada nos arquivos enviados. Nenhum dado foi usado.', area: 'clientes' })
   const allKeys = new Set([...internal.keys(), ...portfolio.keys(), ...premises.keys()])
   const canonicalBase = [...allKeys].map(document => {
-    const current: CanonicalClient = { document, sources: [], sourceData: {} }
-    const merge = (input?: Partial<CanonicalClient>, fallback = false) => { if (!input) return; for (const [key, value] of Object.entries(input)) { if (key === 'sources') continue; if (value !== undefined && (!fallback || (current as Record<string, unknown>)[key] === undefined)) (current as Record<string, unknown>)[key] = value }; for (const source of input.sources ?? []) if (!current.sources.includes(source)) current.sources.push(source) }
+    const current: CanonicalClient = { document, sources: [] }
+    const merge = (input?: Partial<CanonicalClient>) => { if (!input) return; for (const [key, value] of Object.entries(input)) { if (key === 'sources') continue; if (value !== undefined && (current as Record<string, unknown>)[key] === undefined) (current as Record<string, unknown>)[key] = value }; for (const source of input.sources ?? []) if (!current.sources.includes(source)) current.sources.push(source) }
     const internalData = internal.get(document); const portfolioData = portfolio.get(document); const premisesData = premises.get(document)
     merge(internalData); merge(portfolioData); merge(premisesData)
-    if (internalData) current.sourceData.internal = internalData as Record<string, unknown>
-    if (portfolioData) current.sourceData.portfolio = portfolioData as Record<string, unknown>
-    if (premisesData) current.sourceData.premises = premisesData as Record<string, unknown>
+    // Hierarquia padrão: 1203, Carteira e Premissas. RCA é a única exceção:
+    // a Carteira define o responsável atual; o nome do 1203 não é preservado
+    // para não associar um nome antigo ao código atual.
+    current.rcaCode = portfolioData?.rcaCode
+    delete current.rcaName
     return current
   }).sort((a, b) => a.document.localeCompare(b.document))
   const indicators = { totalClients: canonicalBase.length, internal: internal.size, portfolio: portfolio.size, premises: premises.size, complete: canonicalBase.filter(client => client.sources.length >= 3).length }
