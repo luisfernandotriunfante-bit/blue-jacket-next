@@ -22,7 +22,7 @@ export function App() {
   const [activeNotice, setActiveNotice] = useState<AuditItem | null>(null)
   const [clientAudit, setClientAudit] = useState<AuditItem[]>([])
   const [clientBase, setClientBase] = useState<CanonicalClient[]>([])
-  const [clientIndicators, setClientIndicators] = useState<{ totalClients: number; internal: number; premises: number; complete: number } | null>(null)
+  const [clientIndicators, setClientIndicators] = useState<{ totalClients: number; internal: number; portfolio: number; premises: number; complete: number } | null>(null)
   const [clientProcessing, setClientProcessing] = useState(false)
   const dailyInput = useRef<HTMLInputElement>(null)
   const motorInputs = useRef<Record<string, HTMLInputElement | null>>({})
