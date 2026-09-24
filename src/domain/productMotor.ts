@@ -63,10 +63,15 @@ export async function processProductMotor(files: File[]): Promise<ProductMotorRe
   const merge = (product: CanonicalProduct, source?: Partial<CanonicalProduct>) => { if (!source) return; for (const [field, value] of Object.entries(source)) if (field !== 'id' && field !== 'sources' && value !== undefined && (product as Record<string, unknown>)[field] === undefined) (product as Record<string, unknown>)[field] = value; for (const origin of source.sources ?? []) if (!product.sources.includes(origin)) product.sources.push(origin) }
   for (const [key, source] of internal) { const product = ensure(`WINTHOR:${key}`, source); product.status = 'active'; if (source.manufacturerCode) byManufacturer.set(source.manufacturerCode, product.id); if (source.ean) byEan.set(source.ean, product.id) }
   const resolve = (source: Partial<CanonicalProduct>, fallback: string) => byManufacturer.get(source.manufacturerCode ?? '') ?? byEan.get(source.ean ?? '') ?? fallback
-  for (const [key, source] of industry) { const product = ensure(resolve(source, `INDUSTRIA:${key}`), source); merge(product, source); if (source.manufacturerCode) byManufacturer.set(source.manufacturerCode, product.id); if (source.ean) byEan.set(source.ean, product.id) }
+  // A lista da indústria apenas complementa um produto já reconhecido no
+  // cadastro interno. Ela não cria catálogo paralelo por conta própria.
+  for (const [, source] of industry) { const productId = byManufacturer.get(source.manufacturerCode ?? '') ?? byEan.get(source.ean ?? ''); if (!productId) continue; const product = ensure(productId); merge(product, source) }
   for (const [key, source] of stock) { const product = ensure(`WINTHOR:${key}`, source); merge(product, source); product.status = 'active'; if (source.manufacturerCode) byManufacturer.set(source.manufacturerCode, product.id) }
-  for (const [key, source] of prices) { const product = ensure(`WINTHOR:${key}`, source); merge(product, source) }
-  for (const [key, source] of transit) { const product = ensure(resolve(source, `TRANSITO:${key}`), source); merge(product, source); if (product.status !== 'active') product.status = 'in_transit' }
+  // Preço de venda não cadastra item: só atualiza produto que já existe.
+  for (const [key, source] of prices) { const product = products.get(`WINTHOR:${key}`); if (product) merge(product, source) }
+  // A Carteira é a única exceção: pode criar um produto novo, mas somente
+  // quando ele realmente está em trânsito. A lista da indústria o enriquece.
+  for (const [key, source] of transit) { const product = ensure(resolve(source, `TRANSITO:${key}`), source); merge(product, source); merge(product, industry.get(key)); if (product.status !== 'active') product.status = 'in_transit' }
   const canonicalBase = [...products.values()].sort((a, b) => (a.description ?? '').localeCompare(b.description ?? ''))
   let differences = 0; for (const [key, value] of check105) if (stock.has(key) && Math.abs((stock.get(key)?.totalStock ?? 0) - value) > .01) differences++
   if (differences) results.push(audit('prod-stock-diff', 'Há diferenças na conferência de estoque', 'Revise o estoque antes de usar os saldos.', `${differences.toLocaleString('pt-BR')} itens possuem saldo diferente entre os dois relatórios.`, 'attention'))
