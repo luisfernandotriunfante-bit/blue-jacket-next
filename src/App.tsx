@@ -1,4 +1,5 @@
 import { ChangeEvent, DragEvent, useMemo, useRef, useState } from 'react'
+import * as XLSX from 'xlsx'
 import { buildAiAuditJson, buildAudit } from './domain/audit'
 import type { AuditItem, SourceArea, UploadedFile } from './domain/types'
 import { processClientMotor, type CanonicalClient } from './domain/clientMotor'
@@ -59,6 +60,19 @@ export function App() {
     finally { setClientProcessing(false) }
   }
   function downloadClientBase() { const url = URL.createObjectURL(new Blob([JSON.stringify(clientBase, null, 2)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = 'base-canonica-clientes.json'; link.click(); URL.revokeObjectURL(url) }
+  function downloadClientExcel() {
+    const rows = clientBase.map(client => ({
+      Documento: client.document, Código: client.winthorCode ?? '', Cliente: client.legalName ?? '', Fantasia: client.tradeName ?? '', Cidade: client.city ?? '',
+      'Código RCA': client.rcaCode ?? '', RCA: client.rcaName ?? '', Supervisor: client.supervisor ?? '', Atividade: client.commercialActivity ?? '',
+      Bairro: client.district ?? '', Endereço: client.address ?? '', Latitude: client.latitude ?? '', Longitude: client.longitude ?? '',
+      Frequência: client.visitFrequency ?? '', Visita: client.visitDay ?? '', 'Dias sem comprar': client.daysWithoutPurchase ?? '',
+      Premissa: client.premiseSemester ?? '', Ambiente: client.premiseEnvironment ?? '', Faixa: client.premiseRange ?? '', Estado: client.premiseState ?? '',
+      Cluster: client.premiseCluster ?? '', 'Média 12 meses': client.premiseAverage12Months ?? '', Perfil: client.premiseProfile ?? '', Rede: client.premiseNetwork ?? '', Fontes: client.sources.join(', '),
+    }))
+    const sheet = XLSX.utils.json_to_sheet(rows)
+    sheet['!cols'] = [{ wch: 16 }, { wch: 13 }, { wch: 38 }, { wch: 28 }, { wch: 18 }, ...Array(19).fill({ wch: 18 })]
+    const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, sheet, 'Clientes'); XLSX.writeFile(book, 'base-canonica-clientes.xlsx')
+  }
   function downloadAiJson() {
     const body = JSON.stringify(buildAiAuditJson(files, audit), null, 2)
     const url = URL.createObjectURL(new Blob([body], { type: 'application/json' }))
@@ -75,7 +89,7 @@ export function App() {
         <div className="quick-upload" role="button" tabIndex={0} onClick={() => dailyInput.current?.click()} onDragOver={event => event.preventDefault()} onDrop={event => drop('diario', event)}><strong>Solte todos os arquivos aqui</strong><span>ou escolha os arquivos</span><input ref={dailyInput} aria-label="Adicionar arquivos diários" type="file" multiple onChange={event => fileChange('diario', event)} /></div>
         <FileList files={filesIn('diario')} onRemove={removeFile} />
         <h2 className="section-title">MOTORES</h2>
-        <div className="motor-grid">{motors.map(motor => <article className="motor-card" key={motor.id}><h3>{motor.name}</h3>{motor.id === 'clientes' ? <><div className="client-source-list">{clientSources.map(source => { const uploaded = clientSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong><small>{uploaded ? `Atualizado em ${new Date(rawFiles[uploaded.id]?.lastModified ?? Date.now()).toLocaleDateString('pt-BR')}` : 'Ainda não enviado'}</small></span><label className="source-upload">{uploaded ? 'Trocar arquivo' : 'Adicionar arquivo'}<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => clientSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={clientProcessing || !Object.keys(clientSlots).length} onClick={processClients}>{clientProcessing ? 'Conferindo arquivos' : 'Criar base de clientes'}</button>{clientIndicators ? <div className="indicators"><span>{clientIndicators.totalClients.toLocaleString('pt-BR')} clientes</span><span>{clientIndicators.complete.toLocaleString('pt-BR')} completos</span><button type="button" onClick={downloadClientBase}>Baixar base</button></div> : null}</> : <><button type="button" className="add-button" onClick={() => motorInputs.current[motor.id]?.click()}>Adicionar arquivos</button><input ref={element => { motorInputs.current[motor.id] = element }} aria-label={`Adicionar arquivos de ${motor.name}`} type="file" multiple onChange={event => fileChange(motor.id, event)} /><FileList files={filesIn(motor.id)} onRemove={removeFile} compact /></>}</article>)}</div>
+        <div className="motor-grid">{motors.map(motor => <article className="motor-card" key={motor.id}><h3>{motor.name}</h3>{motor.id === 'clientes' ? <><div className="client-source-list">{clientSources.map(source => { const uploaded = clientSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong><small>{uploaded ? `Atualizado em ${new Date(rawFiles[uploaded.id]?.lastModified ?? Date.now()).toLocaleDateString('pt-BR')}` : 'Ainda não enviado'}</small></span><label className="source-upload">{uploaded ? 'Trocar arquivo' : 'Adicionar arquivo'}<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => clientSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={clientProcessing || !Object.keys(clientSlots).length} onClick={processClients}>{clientProcessing ? 'Conferindo arquivos' : 'Criar base de clientes'}</button>{clientIndicators ? <div className="indicators"><span>{clientIndicators.totalClients.toLocaleString('pt-BR')} clientes</span><span>{clientIndicators.complete.toLocaleString('pt-BR')} completos</span><button type="button" onClick={downloadClientBase}>Baixar JSON</button><button type="button" onClick={downloadClientExcel}>Baixar Excel</button></div> : null}</> : <><button type="button" className="add-button" onClick={() => motorInputs.current[motor.id]?.click()}>Adicionar arquivos</button><input ref={element => { motorInputs.current[motor.id] = element }} aria-label={`Adicionar arquivos de ${motor.name}`} type="file" multiple onChange={event => fileChange(motor.id, event)} /><FileList files={filesIn(motor.id)} onRemove={removeFile} compact /></>}</article>)}</div>
       </section> : <section className="content">
         <div className="audit-heading"><h2>AUDITORIA</h2><button className="secondary-button" type="button" onClick={downloadAiJson}>Gerar resumo para IA</button></div>
         <div className="notice-list">{audit.map(item => <button className={`notice ${item.level}`} key={item.id} type="button" onClick={() => setActiveNotice(item)}><span>{item.title}</span><small>{item.instruction}</small></button>)}</div>
