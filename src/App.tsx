@@ -1,5 +1,5 @@
 import { ChangeEvent, DragEvent, useMemo, useRef, useState } from 'react'
-import * as XLSX from 'xlsx'
+import XLSX from 'xlsx-js-style'
 import { buildAiAuditJson, buildAudit } from './domain/audit'
 import type { AuditItem, SourceArea, UploadedFile } from './domain/types'
 import { processClientMotor, type CanonicalClient } from './domain/clientMotor'
@@ -61,16 +61,38 @@ export function App() {
   }
   function downloadClientBase() { const url = URL.createObjectURL(new Blob([JSON.stringify(clientBase, null, 2)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = 'base-canonica-clientes.json'; link.click(); URL.revokeObjectURL(url) }
   function downloadClientExcel() {
-    const rows = clientBase.map(client => ({
-      Documento: client.document, Código: client.winthorCode ?? '', Cliente: client.legalName ?? '', Fantasia: client.tradeName ?? '', Cidade: client.city ?? '',
-      'Código RCA': client.rcaCode ?? '', RCA: client.rcaName ?? '', Supervisor: client.supervisor ?? '', Atividade: client.commercialActivity ?? '',
-      Bairro: client.district ?? '', Endereço: client.address ?? '', Latitude: client.latitude ?? '', Longitude: client.longitude ?? '',
-      Frequência: client.visitFrequency ?? '', Visita: client.visitDay ?? '', 'Dias sem comprar': client.daysWithoutPurchase ?? '',
-      Premissa: client.premiseSemester ?? '', Ambiente: client.premiseEnvironment ?? '', Faixa: client.premiseRange ?? '', Estado: client.premiseState ?? '',
-      Cluster: client.premiseCluster ?? '', 'Média 12 meses': client.premiseAverage12Months ?? '', Perfil: client.premiseProfile ?? '', Rede: client.premiseNetwork ?? '', Fontes: client.sources.join(', '),
+    const groups = [
+      { title: 'DADOS 1203', color: 'DCEBFF', titleColor: '8FC2FF', columns: [['Documento', 'document'], ['Código', 'winthorCode'], ['Cliente', 'legalName'], ['Fantasia', 'tradeName'], ['Município', 'city'], ['Cód. RCA', 'rcaCode'], ['RCA', 'rcaName'], ['Supervisor', 'supervisor'], ['Venc. crédito', 'creditDueDate']] },
+      { title: 'DADOS PREMISSAS', color: 'FFE1E1', titleColor: 'FFACAC', columns: [['Documento', 'document'], ['Semestre', 'premiseSemester'], ['Ambiente', 'premiseEnvironment'], ['Código cliente', 'winthorCode'], ['Cliente', 'legalName'], ['Faixa', 'premiseRange'], ['Estado', 'premiseState'], ['Cidade', 'city'], ['Cluster', 'premiseCluster'], ['Média 12 meses', 'premiseAverage12Months'], ['Perfil', 'premiseProfile'], ['Rede', 'premiseNetwork']] },
+      { title: 'DADOS CARTEIRA', color: 'FFF3BF', titleColor: 'FFE17B', columns: [['Documento', 'document'], ['Código cliente', 'winthorCode'], ['Cliente', 'legalName'], ['Fantasia', 'tradeName'], ['Atividade', 'commercialActivity'], ['Cidade', 'city'], ['Bairro', 'district'], ['Endereço', 'address'], ['Latitude', 'latitude'], ['Longitude', 'longitude'], ['Frequência', 'visitFrequency'], ['Visita', 'visitDay'], ['Dias sem comprar', 'daysWithoutPurchase'], ['Representante', 'representative']] },
+    ] as const
+    const titleRow = groups.flatMap(group => [group.title, ...Array(group.columns.length - 1).fill('')])
+    const headerRow = groups.flatMap(group => group.columns.map(column => column[0]))
+    const rows = clientBase.map(client => groups.flatMap(group => {
+      const source = group.title === 'DADOS 1203' ? client.sourceData.internal : group.title === 'DADOS PREMISSAS' ? client.sourceData.premises : client.sourceData.portfolio
+      return group.columns.map(([, key]) => source?.[key] ?? '')
     }))
-    const sheet = XLSX.utils.json_to_sheet(rows)
-    sheet['!cols'] = [{ wch: 16 }, { wch: 13 }, { wch: 38 }, { wch: 28 }, { wch: 18 }, ...Array(19).fill({ wch: 18 })]
+    const sheet = XLSX.utils.aoa_to_sheet([titleRow, headerRow, ...rows])
+    const merges: { s: { r: number; c: number }; e: { r: number; c: number } }[] = []
+    let start = 0
+    groups.forEach(group => {
+      const end = start + group.columns.length - 1
+      merges.push({ s: { r: 0, c: start }, e: { r: 0, c: end } })
+      for (let col = start; col <= end; col++) {
+        const titleCell = XLSX.utils.encode_cell({ r: 0, c: col })
+        const headerCell = XLSX.utils.encode_cell({ r: 1, c: col })
+        if (sheet[titleCell]) sheet[titleCell].s = { fill: { fgColor: { rgb: group.titleColor }, patternType: 'solid' }, font: { bold: true, color: { rgb: '171717' } }, alignment: { horizontal: 'center' } }
+        if (sheet[headerCell]) sheet[headerCell].s = { fill: { fgColor: { rgb: group.color }, patternType: 'solid' }, font: { bold: true }, alignment: { wrapText: true } }
+        for (let row = 2; row < rows.length + 2; row++) {
+          const cell = XLSX.utils.encode_cell({ r: row, c: col })
+          if (!sheet[cell]) sheet[cell] = { t: 's', v: '' }
+          sheet[cell].s = { fill: { fgColor: { rgb: group.color }, patternType: 'solid' } }
+        }
+      }
+      start = end + 1
+    })
+    sheet['!merges'] = merges
+    sheet['!cols'] = headerRow.map((header: string) => ({ wch: Math.max(14, Math.min(36, header.length + 7)) }))
     const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, sheet, 'Clientes'); XLSX.writeFile(book, 'base-canonica-clientes.xlsx')
   }
   function downloadAiJson() {

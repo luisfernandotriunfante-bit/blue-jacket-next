@@ -29,6 +29,11 @@ export type CanonicalClient = {
   premiseProfile?: string
   premiseNetwork?: string
   sources: string[]
+  sourceData: {
+    internal?: Record<string, unknown>
+    premises?: Record<string, unknown>
+    portfolio?: Record<string, unknown>
+  }
 }
 
 export type ClientMotorResult = {
@@ -115,9 +120,14 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
   if (!internal.size && !portfolio.size && !premises.size) audit.push({ id: 'no-client-source', level: 'action', title: 'Nenhum arquivo de clientes foi reconhecido', instruction: 'Envie o cadastro interno, a carteira ou as premissas.', detail: 'O sistema não encontrou a estrutura esperada nos arquivos enviados. Nenhum dado foi usado.', area: 'clientes' })
   const allKeys = new Set([...internal.keys(), ...portfolio.keys(), ...premises.keys()])
   const canonicalBase = [...allKeys].map(document => {
-    const current: CanonicalClient = { document, sources: [] }
+    const current: CanonicalClient = { document, sources: [], sourceData: {} }
     const merge = (input?: Partial<CanonicalClient>, fallback = false) => { if (!input) return; for (const [key, value] of Object.entries(input)) { if (key === 'sources') continue; if (value !== undefined && (!fallback || (current as Record<string, unknown>)[key] === undefined)) (current as Record<string, unknown>)[key] = value }; for (const source of input.sources ?? []) if (!current.sources.includes(source)) current.sources.push(source) }
-    merge(internal.get(document)); merge(portfolio.get(document)); merge(premises.get(document)); return current
+    const internalData = internal.get(document); const portfolioData = portfolio.get(document); const premisesData = premises.get(document)
+    merge(internalData); merge(portfolioData); merge(premisesData)
+    if (internalData) current.sourceData.internal = internalData as Record<string, unknown>
+    if (portfolioData) current.sourceData.portfolio = portfolioData as Record<string, unknown>
+    if (premisesData) current.sourceData.premises = premisesData as Record<string, unknown>
+    return current
   }).sort((a, b) => a.document.localeCompare(b.document))
   const indicators = { totalClients: canonicalBase.length, internal: internal.size, portfolio: portfolio.size, premises: premises.size, complete: canonicalBase.filter(client => client.sources.length >= 3).length }
   audit.push({ id: 'client-base-ready', level: 'ok', title: 'Base de clientes criada', instruction: `${indicators.totalClients.toLocaleString('pt-BR')} clientes na base única.`, detail: 'A base reuniu todos os clientes encontrados, mesmo quando uma fonte não tinha todas as informações.', area: 'clientes' })
