@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx'
 import type { AuditItem } from './types'
+import { classifyProduct } from './productGrouping'
 
 export type CanonicalProduct = {
   id: string
@@ -55,6 +56,10 @@ export type CanonicalProduct = {
   supplierName?: string
   inTransitQuantity?: number
   inTransitValue?: number
+  groupCode?: string
+  groupName?: string
+  groupFamily?: string
+  groupStatus?: 'automatic' | 'review'
   status: 'active' | 'industry_only' | 'in_transit'
   sources: string[]
 }
@@ -107,11 +112,13 @@ export async function processProductMotor(files: File[]): Promise<ProductMotorRe
   // A Carteira é a única exceção: pode criar um produto novo, mas somente
   // quando ele realmente está em trânsito. A lista da indústria o enriquece.
   for (const [key, source] of transit) { const product = ensure(resolve(source, `TRANSITO:${key}`), source); merge(product, source); merge(product, industry.get(key)); if (product.status !== 'active') product.status = 'in_transit' }
-  const canonicalBase = [...products.values()].sort((a, b) => (a.description ?? '').localeCompare(b.description ?? ''))
+  const canonicalBase = [...products.values()].map(product => { const grouping = classifyProduct(product); return { ...product, groupCode: grouping.group?.code, groupName: grouping.group?.name, groupFamily: grouping.group?.family, groupStatus: grouping.status } }).sort((a, b) => (a.description ?? '').localeCompare(b.description ?? ''))
   let differences = 0; for (const [key, value] of check105) if (stock.has(key) && Math.abs((stock.get(key)?.totalStock ?? 0) - value) > .01) differences++
   if (differences) results.push(audit('prod-stock-diff', 'Há diferenças na conferência de estoque', 'Revise o estoque antes de usar os saldos.', `${differences.toLocaleString('pt-BR')} itens possuem saldo diferente entre os dois relatórios.`, 'attention'))
   if (!canonicalBase.length) results.push(audit('prod-none', 'Nenhum arquivo de produtos foi reconhecido', 'Envie os arquivos do Motor de Produtos.', 'Nenhum dado foi usado.', 'action'))
   const indicators = { total: canonicalBase.length, active: canonicalBase.filter(product => product.status === 'active').length, industryOnly: canonicalBase.filter(product => product.status === 'industry_only').length, inTransit: canonicalBase.filter(product => product.inTransitQuantity).length, stockAuditDifferences: differences }
+  const ungrouped = canonicalBase.filter(product => product.groupStatus === 'review').length
+  if (ungrouped) results.push(audit('prod-group-review', 'Alguns produtos precisam de agrupamento', `Revise ${ungrouped.toLocaleString('pt-BR')} produto(s).`, 'Os demais foram agrupados automaticamente conforme suas características.', 'attention'))
   results.push(audit('prod-base-ready', 'Base de produtos criada', `${indicators.total.toLocaleString('pt-BR')} produtos na base única.`, 'Itens em trânsito não foram incluídos no estoque disponível.'))
   return { canonicalBase, audit: results, indicators }
 }
