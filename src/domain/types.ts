@@ -6,6 +6,7 @@ export type UploadedFile = {
   size: number
   area: SourceArea
   receivedAt: string
+  lastModified?: number
 }
 
 export type AuditItem = {
