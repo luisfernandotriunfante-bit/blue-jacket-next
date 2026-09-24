@@ -1,0 +1,21 @@
+{
+  "name": "blue-jacket-next",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "tsc -b --pretty false"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^6.1.1",
+    "vite": "^8.3.0",
+    "typescript": "~6.0.2",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7"
+  },
+  "devDependencies": {}
+}
