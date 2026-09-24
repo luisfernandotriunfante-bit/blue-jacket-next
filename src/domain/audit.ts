@@ -19,7 +19,7 @@ export function buildAudit(files: UploadedFile[]): AuditItem[] {
 
 export function buildAiAuditJson(files: UploadedFile[], audit: AuditItem[]) {
   return {
-    type: 'blue_jacket_audit',
+    type: 'red_jacket_audit',
     generated_at: new Date().toISOString(),
     purpose: 'Resumo claro para uma IA ajudar a corrigir pendências do painel.',
     current_stage: 'Preparação dos motores',

@@ -1,6 +1,6 @@
-# Blue Jacket Next
+# Red Jacket
 
-Base limpa do painel Blue Jacket.
+Base limpa do painel Red Jacket.
 
 ## Primeiro ciclo
 

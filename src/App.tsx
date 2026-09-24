@@ -32,12 +32,12 @@ export function App() {
   function downloadAiJson() {
     const body = JSON.stringify(buildAiAuditJson(files, audit), null, 2)
     const url = URL.createObjectURL(new Blob([body], { type: 'application/json' }))
-    const link = document.createElement('a'); link.href = url; link.download = 'auditoria-blue-jacket.json'; link.click(); URL.revokeObjectURL(url)
+    const link = document.createElement('a'); link.href = url; link.download = 'auditoria-red-jacket.json'; link.click(); URL.revokeObjectURL(url)
   }
   const filesIn = (area: SourceArea) => files.filter(file => file.area === area)
 
   return <div className={`app theme-${theme}`}>
-    <aside className="sidebar"><div className="brand">BLUE JACKET</div><button className="nav-item active" type="button">Administração</button><div className="sidebar-bottom"><button className="theme-toggle" type="button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? 'Tema claro' : 'Tema escuro'}</button></div></aside>
+    <aside className="sidebar"><div className="brand">RED JACKET</div><button className="nav-item active" type="button">Administração</button><div className="sidebar-bottom"><button className="theme-toggle" type="button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? 'Tema claro' : 'Tema escuro'}</button></div></aside>
     <main className="main">
       <header className="topbar"><h1>ADMINISTRAÇÃO</h1><nav className="tabs" aria-label="Administração"><button className={tab === 'uploads' ? 'selected' : ''} onClick={() => setTab('uploads')} type="button">Uploads</button><button className={tab === 'auditoria' ? 'selected' : ''} onClick={() => setTab('auditoria')} type="button">Auditoria</button></nav></header>
       {tab === 'uploads' ? <section className="content">
