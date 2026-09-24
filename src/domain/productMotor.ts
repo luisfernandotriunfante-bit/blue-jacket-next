@@ -106,7 +106,14 @@ export async function processProductMotor(files: File[]): Promise<ProductMotorRe
   // A lista da indústria apenas complementa um produto já reconhecido no
   // cadastro interno. Ela não cria catálogo paralelo por conta própria.
   for (const [, source] of industry) { const productId = byManufacturer.get(source.manufacturerCode ?? '') ?? byEan.get(source.ean ?? ''); if (!productId) continue; const product = ensure(productId); merge(product, source) }
-  for (const [key, source] of stock) { const product = ensure(`WINTHOR:${key}`, source); merge(product, source); product.status = 'active'; if (source.manufacturerCode) byManufacturer.set(source.manufacturerCode, product.id) }
+  // Saldos do 1118 são a fonte autoritativa de estoque, inclusive quando o
+  // cadastro 286 traz zero ou um saldo anterior para o mesmo produto.
+  for (const [key, source] of stock) {
+    const product = ensure(`WINTHOR:${key}`, source); merge(product, source)
+    product.availableStock = source.availableStock; product.totalStock = source.totalStock; product.reservedStock = source.reservedStock
+    product.blockedStock = source.blockedStock; product.damagedStock = source.damagedStock; product.industryQuantity = source.industryQuantity; product.stockLot = source.stockLot
+    product.status = 'active'; if (source.manufacturerCode) byManufacturer.set(source.manufacturerCode, product.id)
+  }
   // Preço de venda não cadastra item: só atualiza produto que já existe.
   for (const [key, source] of prices) { const product = products.get(`WINTHOR:${key}`); if (product) merge(product, source) }
   // A Carteira é a única exceção: pode criar um produto novo, mas somente
