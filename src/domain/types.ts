@@ -14,5 +14,6 @@ export type AuditItem = {
   title: string
   instruction: string
   detail: string
+  aiDetail?: string
   area: SourceArea
 }

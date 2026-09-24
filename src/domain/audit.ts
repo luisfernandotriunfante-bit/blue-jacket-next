@@ -29,7 +29,7 @@ export function buildAiAuditJson(files: UploadedFile[], audit: AuditItem[]) {
       user_message: item.title,
       what_the_user_needs_to_do: item.instruction,
       plain_language_context: item.detail,
-      technical_instruction_for_ai: 'Não inventar dados. Solicitar o arquivo ou a regra manual correspondente e registrar a decisão na auditoria.',
+      technical_context_for_ai: item.aiDetail ?? 'Não inventar dados. Solicitar o arquivo ou a regra manual correspondente e registrar a decisão na auditoria.',
     })),
     rule: 'A base canônica interna será JSON. Planilhas Excel serão geradas para conferência e entrega humana.',
   }
