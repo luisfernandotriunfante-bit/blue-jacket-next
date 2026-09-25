@@ -10,6 +10,7 @@ import { processReceiptMotor, type CanonicalReceipt, type ReceiptIndicators } fr
 import { classifyProduct } from './domain/productGrouping'
 import { loadPersisted, savePersisted } from './domain/persistence'
 import { detectFile } from './domain/fileDetector'
+import { StockTab } from './StockTab'
 
 const motors: Array<{ id: Exclude<SourceArea, 'diario'>; name: string }> = [
   { id: 'produtos', name: 'Produtos' },
@@ -46,6 +47,7 @@ const dedupeList = (files: UploadedFile[] | undefined) => (files ?? []).filter((
 
 export function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
+  const [section, setSection] = useState<'administracao' | 'estoque'>('administracao')
   const [tab, setTab] = useState<'uploads' | 'auditoria'>('uploads')
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [rawFiles, setRawFiles] = useState<Record<string, File>>({})
@@ -290,8 +292,12 @@ export function App() {
   const filesIn = (area: SourceArea) => files.filter(file => file.area === area)
 
   return <div className={`app theme-${theme}`}>
-    <aside className="sidebar"><div className="brand">RED JACKET</div><button className="nav-item active" type="button">Administração</button><div className="sidebar-bottom"><button className="theme-toggle" type="button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? 'Tema claro' : 'Tema escuro'}</button></div></aside>
+    <aside className="sidebar"><div className="brand">RED JACKET</div><button className={`nav-item${section === 'administracao' ? ' active' : ''}`} type="button" onClick={() => setSection('administracao')}>Administração</button><button className={`nav-item${section === 'estoque' ? ' active' : ''}`} type="button" onClick={() => setSection('estoque')}>Estoque</button><div className="sidebar-bottom"><button className="theme-toggle" type="button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? 'Tema claro' : 'Tema escuro'}</button></div></aside>
     <main className="main">
+      {section === 'estoque' ? <>
+        <header className="topbar"><h1>ESTOQUE</h1></header>
+        <StockTab productBase={productBase} clientBase={clientBase} receiptBase={receiptBase} />
+      </> : <>
       <header className="topbar"><h1>ADMINISTRAÇÃO</h1><nav className="tabs" aria-label="Administração"><button className={tab === 'uploads' ? 'selected' : ''} onClick={() => setTab('uploads')} type="button">Uploads</button><button className={tab === 'auditoria' ? 'selected' : ''} onClick={() => setTab('auditoria')} type="button">Auditoria</button></nav></header>
       {tab === 'uploads' ? <section className="content">
         <h2>ARQUIVOS DIÁRIOS</h2>
@@ -305,6 +311,7 @@ export function App() {
         <div className="audit-heading"><h2>AUDITORIA</h2><button className="secondary-button" type="button" onClick={downloadAiJson}>Gerar resumo para IA</button></div>
         <div className="notice-list">{audit.map(item => <button className={`notice ${item.level}`} key={item.id} type="button" onClick={() => setActiveNotice(item)}><span>{item.title}</span><small>{item.instruction}</small></button>)}</div>
       </section>}
+      </>}
     </main>
     {activeNotice ? <div className="modal-backdrop" onMouseDown={() => setActiveNotice(null)}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="notice-title" onMouseDown={event => event.stopPropagation()}><button className="close" aria-label="Fechar" type="button" onClick={() => setActiveNotice(null)}>×</button><h2 id="notice-title">{activeNotice.title}</h2><p>{activeNotice.detail}</p><strong>{activeNotice.instruction}</strong></section></div> : null}
   </div>
