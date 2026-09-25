@@ -267,7 +267,7 @@ export function App() {
   }
   function downloadHistoryBase() { const url = URL.createObjectURL(new Blob([JSON.stringify(historyBase, null, 2)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = 'base-canonica-historico.json'; link.click(); URL.revokeObjectURL(url) }
   function downloadHistoryExcel() {
-    const rows = historyBase.map(record => ({ Competência: record.competence, 'Fechamento disponível': record.closingDate, Sistema: 'Legado', Cliente: record.customerCode, Produto: record.productCode, Vendedor: record.sellerCode ?? '', Quantidade: record.quantity, Valor: record.salesValue, Desconto: record.discount, 'Valor líquido': record.netValue, 'Linhas de venda': record.salesLines }))
+    const rows = historyBase.map(record => ({ Data: record.date, Competência: record.competence, Nota: record.invoiceNumber ?? '', Sistema: 'Legado', Cliente: record.customerCode, Produto: record.productCode, Vendedor: record.sellerCode ?? '', Quantidade: record.quantity, Valor: record.salesValue, Desconto: record.discount, 'Valor líquido': record.netValue }))
     const sheet = XLSX.utils.json_to_sheet(rows); sheet['!cols'] = Object.keys(rows[0] ?? {}).map(header => ({ wch: Math.max(14, header.length + 4) }))
     const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, sheet, 'Histórico'); XLSX.writeFile(book, 'base-canonica-historico.xlsx')
   }
