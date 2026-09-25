@@ -7,6 +7,7 @@ export type CanonicalHistory = {
   sourceSystem: 'legado'
   customerCode: string
   productCode: string
+  sellerCode?: string
   quantity: number
   salesValue: number
   discount: number
@@ -67,11 +68,11 @@ export async function processHistoryMotor(files: File[]): Promise<HistoryMotorRe
       const signature = line.trim()
       if (seen.has(signature)) { duplicates++; continue }
       seen.add(signature)
-      const [, dateText, invoice, series, productCode, quantityText, valueText, discountText, , , , customerCode] = match
+      const [, dateText, invoice, series, productCode, quantityText, valueText, discountText, , sellerCode, , customerCode] = match
       const date = toDate(dateText)
       const competence = competenceOf(date)
       const closingDate = dateIso(date)
-      const key = `${competence}|${customerCode}|${productCode}`
+      const key = `${competence}|${customerCode}|${productCode}|${sellerCode ?? ''}`
       const quantity = number(quantityText)
       const salesValue = number(valueText)
       const discount = number(discountText)
@@ -83,7 +84,7 @@ export async function processHistoryMotor(files: File[]): Promise<HistoryMotorRe
         existing.netValue += salesValue - discount
         existing.salesLines++
       } else {
-        base.set(key, { id: `LEGADO:${key}`, competence, closingDate, sourceSystem: 'legado', customerCode, productCode, quantity, salesValue, discount, netValue: salesValue - discount, salesLines: 1, sources: ['Vendas detalhadas do legado'] })
+        base.set(key, { id: `LEGADO:${key}`, competence, closingDate, sourceSystem: 'legado', customerCode, productCode, sellerCode: sellerCode || undefined, quantity, salesValue, discount, netValue: salesValue - discount, salesLines: 1, sources: ['Vendas detalhadas do legado'] })
       }
       const oldClosing = closing.get(competence)
       if (!oldClosing || closingDate > oldClosing) closing.set(competence, closingDate)

@@ -18,6 +18,7 @@ export type CanonicalMovement = {
   value?: number
   orderStatus?: string
   saleType?: string
+  sellerCode?: string
   seller?: string
   supplierCode?: string
   supplierName?: string
@@ -54,7 +55,8 @@ export async function processMovementMotor(files: File[]): Promise<MovementMotor
         const saleType = text(row[index('TIPO VENDA')])?.toUpperCase(); const orderStatus = text(row[index('STATUS PEDIDO')])?.toUpperCase()
         const movementType: MovementType = saleType === 'DEVOLUCAO' ? 'devolucao' : saleType === 'BONIFICACAO' ? 'bonificacao' : orderStatus === 'A FATURAR' ? 'a_faturar' : 'venda_faturada'
         const orderId = code(row[index('NUMERO PED. WINTHOR')]); const key = `${customerCode}|${productCode}`; saleKeys.add(key)
-        movements.push({ id: `ATUAL:VENDA:${movementDate}:${orderId ?? ''}:${customerCode}:${productCode}:${movements.length}`, movementDate, movementType, orderId, invoiceNumber: code(row[index('NUMERO NOTA FISCAL')]), customerCode, customerDocument: code(row[index('CNPJ/CPF CLIENTE')]), customerName: text(row[index('NOME CLIENTE')]), productCode, manufacturerCode: code(row[index('CODIGO FABRICANTE')]), description: text(row[index('DESCRICAO PRODUTO')]), quantity: number(row[index('UNIDADES VENDIDAS')]), value: number(row[index('VALOR NOTA R$')]), orderStatus, saleType, seller: text(row[index('VENDEDOR')]), sources: ['Vendas atuais'] }); salesFound++
+        const sellerCode = code(row[index('COD. VENDEDOR')]) ?? code(row[index('CODVENDEDOR')]) ?? code(row[index('CODIGO VENDEDOR')])
+        movements.push({ id: `ATUAL:VENDA:${movementDate}:${orderId ?? ''}:${customerCode}:${productCode}:${movements.length}`, movementDate, movementType, orderId, invoiceNumber: code(row[index('NUMERO NOTA FISCAL')]), customerCode, customerDocument: code(row[index('CNPJ/CPF CLIENTE')]), customerName: text(row[index('NOME CLIENTE')]), productCode, manufacturerCode: code(row[index('CODIGO FABRICANTE')]), description: text(row[index('DESCRICAO PRODUTO')]), quantity: number(row[index('UNIDADES VENDIDAS')]), value: number(row[index('VALOR NOTA R$')]), orderStatus, saleType, sellerCode, seller: text(row[index('VENDEDOR')]), sources: ['Vendas atuais'] }); salesFound++
       }
       continue
     }
