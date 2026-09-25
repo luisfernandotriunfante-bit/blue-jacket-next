@@ -26,7 +26,7 @@ export type HistoryIndicators = {
 
 export type HistoryMotorResult = { canonicalBase: CanonicalHistory[]; audit: AuditItem[]; indicators: HistoryIndicators }
 
-const saleLine = /^\s*(\d{2}\/\d{2}\/\d{4})\s+(\d+)\s+(\S+)\s+(\d+)\s+([\d.,-]+)\s+([\d.,-]+)\s+([\d.,-]+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)/
+const saleLine = /^\s*(\d{2}\/\d{2}\/\d{4})\s+(\d+)\s+(\S+)\s+(\d+)\s+([\d.,-]+)\s+([\d.,-]+)\s+([\d.,-]+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)/
 const number = (value: string) => {
   const raw = value.trim()
   const normal = raw.includes(',') && raw.includes('.') ? raw.replace(/\./g, '').replace(',', '.') : raw.replace(',', '.')
@@ -68,7 +68,7 @@ export async function processHistoryMotor(files: File[]): Promise<HistoryMotorRe
       const signature = line.trim()
       if (seen.has(signature)) { duplicates++; continue }
       seen.add(signature)
-      const [, dateText, invoice, series, productCode, quantityText, valueText, discountText, , sellerCode, , customerCode] = match
+      const [, dateText, invoice, series, productCode, quantityText, valueText, discountText, , sellerCode, , , customerCode] = match
       const date = toDate(dateText)
       const competence = competenceOf(date)
       const closingDate = dateIso(date)
