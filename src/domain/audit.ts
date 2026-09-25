@@ -5,11 +5,12 @@ const areaLabel: Record<SourceArea, string> = {
   produtos: 'Produtos',
   clientes: 'Clientes',
   movimentacoes: 'Movimentações',
+  recebimentos: 'Chegada de notas',
   historico: 'Histórico',
 }
 
 export function buildAudit(files: UploadedFile[]): AuditItem[] {
-  const areas: SourceArea[] = ['diario', 'produtos', 'clientes', 'movimentacoes', 'historico']
+  const areas: SourceArea[] = ['diario', 'produtos', 'clientes', 'movimentacoes', 'recebimentos', 'historico']
   return areas.map(area => {
     const count = files.filter(file => file.area === area).length
     if (count > 0) return { id: area, level: 'ok', title: `${areaLabel[area]} recebido${count > 1 ? 's' : ''}`, instruction: 'Pronto para conferir.', detail: `${count} arquivo${count > 1 ? 's foram enviados' : ' foi enviado'} para esta etapa. Quando o motor for criado, ele conferirá essas informações antes de usar a base.`, area }

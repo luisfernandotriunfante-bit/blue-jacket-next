@@ -1,4 +1,4 @@
-export type SourceArea = 'diario' | 'produtos' | 'clientes' | 'movimentacoes' | 'historico'
+export type SourceArea = 'diario' | 'produtos' | 'clientes' | 'movimentacoes' | 'recebimentos' | 'historico'
 
 export type UploadedFile = {
   id: string
