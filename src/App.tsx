@@ -293,6 +293,20 @@ export function App() {
 
   return <div className={`app theme-${theme}`}>
     <aside className="sidebar"><div className="brand">RED JACKET</div><button className={`nav-item${section === 'administracao' ? ' active' : ''}`} type="button" onClick={() => setSection('administracao')}>Administração</button><button className={`nav-item${section === 'estoque' ? ' active' : ''}`} type="button" onClick={() => setSection('estoque')}>Estoque</button><div className="sidebar-bottom"><button className="theme-toggle" type="button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? 'Tema claro' : 'Tema escuro'}</button></div></aside>
+    <nav className="bottom-nav" aria-label="Navegação principal">
+      <button className={`bn-item${section === 'administracao' ? ' active' : ''}`} type="button" onClick={() => setSection('administracao')}>
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" /></svg>
+        <span>Admin</span>
+      </button>
+      <button className={`bn-item${section === 'estoque' ? ' active' : ''}`} type="button" onClick={() => setSection('estoque')}>
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z" /><path fillRule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
+        <span>Estoque</span>
+      </button>
+      <button className="bn-item bn-theme" type="button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" /></svg>
+        <span>{theme === 'dark' ? 'Claro' : 'Escuro'}</span>
+      </button>
+    </nav>
     <main className="main">
       {section === 'estoque' ? <>
         <header className="topbar"><h1>ESTOQUE</h1></header>
