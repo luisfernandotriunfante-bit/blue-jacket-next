@@ -63,6 +63,8 @@ export type CanonicalProduct = {
   sortimentStatus?: string
   lifestageStatus?: string
   sortimentChannels?: Record<string, number>
+  margin?: number
+  stockCoverage?: number
   status: 'active' | 'industry_only' | 'in_transit'
   sources: string[]
 }
@@ -134,7 +136,16 @@ export async function processProductMotor(files: File[]): Promise<ProductMotorRe
   for (const [key, source] of sortiment) { const productId = byManufacturer.get(key); if (!productId) continue; const product = ensure(productId); merge(product, source) }
   // Canais de sortimento (quais formatos de loja podem comprar cada produto).
   for (const [key, channels] of sortimentChannels) { const productId = byManufacturer.get(key); if (!productId) continue; const product = products.get(productId); if (product && !product.sortimentChannels) product.sortimentChannels = channels }
-  const canonicalBase = [...products.values()].map(product => { const grouping = classifyProduct(product); return { ...product, groupCode: grouping.group?.code, groupName: grouping.group?.name, groupFamily: grouping.group?.family, groupStatus: grouping.status } }).sort((a, b) => (a.description ?? '').localeCompare(b.description ?? ''))
+  const canonicalBase = [...products.values()].map(product => {
+    const grouping = classifyProduct(product)
+    const margin = product.sellerPrice !== undefined && product.financialCost !== undefined && product.sellerPrice > 0
+      ? Math.round((product.sellerPrice - product.financialCost) / product.sellerPrice * 10000) / 100
+      : undefined
+    const stockCoverage = product.availableStock !== undefined && product.dailyTurnover !== undefined && product.dailyTurnover > 0
+      ? Math.round(product.availableStock / product.dailyTurnover)
+      : undefined
+    return { ...product, groupCode: grouping.group?.code, groupName: grouping.group?.name, groupFamily: grouping.group?.family, groupStatus: grouping.status, margin, stockCoverage }
+  }).sort((a, b) => (a.description ?? '').localeCompare(b.description ?? ''))
   let differences = 0; for (const [key, value] of check105) if (stock.has(key) && Math.abs((stock.get(key)?.totalStock ?? 0) - value) > .01) differences++
   if (differences) results.push(audit('prod-stock-diff', 'Há diferenças na conferência de estoque', 'Revise o estoque antes de usar os saldos.', `${differences.toLocaleString('pt-BR')} itens possuem saldo diferente entre os dois relatórios.`, 'attention'))
   if (!canonicalBase.length) results.push(audit('prod-none', 'Nenhum arquivo de produtos foi reconhecido', 'Envie os arquivos do Motor de Produtos.', 'Nenhum dado foi usado.', 'action'))
