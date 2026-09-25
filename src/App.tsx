@@ -9,6 +9,7 @@ import { processMovementMotor, type CanonicalMovement, type MovementIndicators }
 import { processReceiptMotor, type CanonicalReceipt, type ReceiptIndicators } from './domain/receiptMotor'
 import { classifyProduct } from './domain/productGrouping'
 import { loadPersisted, savePersisted } from './domain/persistence'
+import { detectFile } from './domain/fileDetector'
 
 const motors: Array<{ id: Exclude<SourceArea, 'diario'>; name: string }> = [
   { id: 'produtos', name: 'Produtos' },
@@ -98,6 +99,56 @@ export function App() {
   useEffect(()=>{let active=true;void loadPersisted<SavedReceiptMotor>('recebimentos').then(saved=>{if(!active||!saved)return;setReceiptBase(saved.base);setReceiptAudit(saved.audit);setReceiptIndicators(saved.indicators);setReceiptSlots(saved.slots)}).finally(()=>{if(active)setReceiptStateLoaded(true)});return()=>{active=false}},[])
   useEffect(()=>{if(receiptStateLoaded)void savePersisted<SavedReceiptMotor>('recebimentos',{base:receiptBase,audit:receiptAudit,indicators:receiptIndicators,slots:receiptSlots})},[receiptStateLoaded,receiptBase,receiptAudit,receiptIndicators,receiptSlots])
 
+  async function distributeFiles(incoming: File[]) {
+    const detections = await Promise.all(incoming.map(file => detectFile(file).then(detection => ({ file, detection }))))
+    const newUploaded: UploadedFile[] = []
+    const newRaw: Record<string, File> = {}
+    const toProducts: Partial<Record<(typeof productSources)[number]['id'], UploadedFile>> = {}
+    const toClients: Partial<Record<(typeof clientSources)[number]['id'], UploadedFile>> = {}
+    const toHistory: Partial<Record<(typeof historySources)[number]['id'], UploadedFile[]>> = {}
+    const toMovements: Partial<Record<(typeof movementSources)[number]['id'], UploadedFile[]>> = {}
+    const toReceipts: Partial<Record<(typeof receiptSources)[number]['id'], UploadedFile[]>> = {}
+    const idsToRemove: string[] = []
+    for (const { file, detection } of detections) {
+      const id = `${file.name}-${file.size}-${crypto.randomUUID()}`
+      const now = new Date().toLocaleString('pt-BR')
+      if (!detection) {
+        newUploaded.push({ id, name: file.name, size: file.size, area: 'diario', receivedAt: now, lastModified: file.lastModified })
+        newRaw[id] = file; continue
+      }
+      const { motor, slot } = detection
+      if (motor === 'produtos') {
+        const slotId = slot as (typeof productSources)[number]['id']
+        const existing = productSlots[slotId]; if (existing) idsToRemove.push(existing.id)
+        const uploaded: UploadedFile = { id, name: file.name, size: file.size, area: 'produtos', receivedAt: now, lastModified: file.lastModified }
+        toProducts[slotId] = uploaded; newUploaded.push(uploaded); newRaw[id] = file
+      } else if (motor === 'clientes') {
+        const slotId = slot as (typeof clientSources)[number]['id']
+        const existing = clientSlots[slotId]; if (existing) idsToRemove.push(existing.id)
+        const uploaded: UploadedFile = { id, name: file.name, size: file.size, area: 'clientes', receivedAt: now, lastModified: file.lastModified }
+        toClients[slotId] = uploaded; newUploaded.push(uploaded); newRaw[id] = file
+      } else if (motor === 'historico') {
+        const slotId = slot as (typeof historySources)[number]['id']
+        const uploaded: UploadedFile = { id, name: file.name, size: file.size, area: 'historico', receivedAt: now, lastModified: file.lastModified }
+        if (!toHistory[slotId]) toHistory[slotId] = []; toHistory[slotId]!.push(uploaded); newUploaded.push(uploaded); newRaw[id] = file
+      } else if (motor === 'movimentacoes') {
+        const slotId = slot as (typeof movementSources)[number]['id']
+        const uploaded: UploadedFile = { id, name: file.name, size: file.size, area: 'movimentacoes', receivedAt: now, lastModified: file.lastModified }
+        if (!toMovements[slotId]) toMovements[slotId] = []; toMovements[slotId]!.push(uploaded); newUploaded.push(uploaded); newRaw[id] = file
+      } else if (motor === 'recebimentos') {
+        const slotId = slot as (typeof receiptSources)[number]['id']
+        const uploaded: UploadedFile = { id, name: file.name, size: file.size, area: 'recebimentos', receivedAt: now, lastModified: file.lastModified }
+        if (!toReceipts[slotId]) toReceipts[slotId] = []; toReceipts[slotId]!.push(uploaded); newUploaded.push(uploaded); newRaw[id] = file
+      }
+    }
+    setFiles(current => [...current.filter(f => !idsToRemove.includes(f.id)), ...newUploaded])
+    setRawFiles(current => { const next = { ...current }; for (const id of idsToRemove) delete next[id]; return { ...next, ...newRaw } })
+    if (Object.keys(toProducts).length) setProductSlots(current => ({ ...current, ...toProducts }))
+    if (Object.keys(toClients).length) setClientSlots(current => ({ ...current, ...toClients }))
+    if (Object.keys(toHistory).length) setHistorySlots(current => { const next = { ...current }; for (const [k, v] of Object.entries(toHistory) as [typeof historySources[number]['id'], UploadedFile[]][]) next[k] = [...(current[k] ?? []), ...v]; return next })
+    if (Object.keys(toMovements).length) setMovementSlots(current => { const next = { ...current }; for (const [k, v] of Object.entries(toMovements) as [typeof movementSources[number]['id'], UploadedFile[]][]) next[k] = [...(current[k] ?? []), ...v]; return next })
+    if (Object.keys(toReceipts).length) setReceiptSlots(current => { const next = { ...current }; for (const [k, v] of Object.entries(toReceipts) as [typeof receiptSources[number]['id'], UploadedFile[]][]) next[k] = [...(current[k] ?? []), ...v]; return next })
+  }
   function addFiles(area: SourceArea, incoming: FileList | File[]) {
     const next = Array.from(incoming).map(file => ({ id: `${file.name}-${file.size}-${crypto.randomUUID()}`, name: file.name, size: file.size, area, receivedAt: new Date().toLocaleString('pt-BR'), lastModified: file.lastModified }))
     setFiles(current => [...current, ...next])
@@ -220,7 +271,7 @@ export function App() {
       <header className="topbar"><h1>ADMINISTRAÇÃO</h1><nav className="tabs" aria-label="Administração"><button className={tab === 'uploads' ? 'selected' : ''} onClick={() => setTab('uploads')} type="button">Uploads</button><button className={tab === 'auditoria' ? 'selected' : ''} onClick={() => setTab('auditoria')} type="button">Auditoria</button></nav></header>
       {tab === 'uploads' ? <section className="content">
         <h2>ARQUIVOS DIÁRIOS</h2>
-        <div className="quick-upload" role="button" tabIndex={0} onClick={() => dailyInput.current?.click()} onDragOver={event => event.preventDefault()} onDrop={event => drop('diario', event)}><strong>Solte todos os arquivos aqui</strong><span>ou escolha os arquivos</span><input ref={dailyInput} aria-label="Adicionar arquivos diários" type="file" multiple onChange={event => fileChange('diario', event)} /></div>
+        <div className="quick-upload" role="button" tabIndex={0} onClick={() => dailyInput.current?.click()} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); void distributeFiles(Array.from(event.dataTransfer.files)) }}><strong>Solte todos os arquivos aqui</strong><span>ou escolha os arquivos</span><input ref={dailyInput} aria-label="Adicionar arquivos diários" type="file" multiple onChange={event => { if (event.target.files) void distributeFiles(Array.from(event.target.files)); event.target.value = '' }} /></div>
         <FileList files={filesIn('diario')} onRemove={removeFile} />
         <h2 className="section-title">MOTORES</h2>
         <div className="motor-grid">{motors.map(motor => <article className="motor-card" key={motor.id}><h3>{motor.name}</h3>{motor.id === 'produtos' ? <><div className="client-source-list">{productSources.map(source => { const uploaded = productSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded ? <small style={{display:'flex',gap:'6px',alignItems:'center'}}>{uploaded.name} <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeProductSlotFile(source.id, uploaded.id)}>Remover</button></small> : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => productSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={productProcessing || !Object.values(productSlots).some(file => file && rawFiles[file.id])} onClick={processProducts}>{productProcessing ? 'Conferindo arquivos' : 'Criar base de produtos'}</button>{productIndicators ? <div className="indicators"><span>{productIndicators.total.toLocaleString('pt-BR')} produtos</span><span>{productIndicators.inTransit.toLocaleString('pt-BR')} em trânsito</span><button type="button" onClick={downloadProductBase}>Baixar JSON</button><button type="button" onClick={downloadProductExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'clientes' ? <><div className="client-source-list">{clientSources.map(source => { const uploaded = clientSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded ? <small style={{display:'flex',gap:'6px',alignItems:'center'}}>{uploaded.name} <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeClientSlotFile(source.id, uploaded.id)}>Remover</button></small> : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => clientSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={clientProcessing || !Object.values(clientSlots).some(file => file && rawFiles[file.id])} onClick={processClients}>{clientProcessing ? 'Conferindo arquivos' : 'Criar base de clientes'}</button>{clientIndicators ? <div className="indicators"><span>{clientIndicators.totalClients.toLocaleString('pt-BR')} clientes</span><span>{clientIndicators.complete.toLocaleString('pt-BR')} completos</span><button type="button" onClick={downloadClientBase}>Baixar JSON</button><button type="button" onClick={downloadClientExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'historico' ? <><div className="client-source-list">{historySources.map(source => { const uploaded = historySlots[source.id] ?? []; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file => <small key={file.id} style={{display:'flex',gap:'6px',alignItems:'center'}}>{file.name} <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeHistoryFile(file.id)}>Remover</button></small>) : <small>{source.id === 'summary' ? 'Opcional' : 'Ainda não enviado'}</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".txt" multiple onChange={event => historySourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={historyProcessing || !Object.values(historySlots).flat().some(file => rawFiles[file.id])} onClick={processHistory}>{historyProcessing ? 'Conferindo arquivos' : 'Criar base histórica'}</button>{historyIndicators ? <div className="indicators"><span>{historyIndicators.competencies.toLocaleString('pt-BR')} competências</span><span>{historyIndicators.salesLines.toLocaleString('pt-BR')} vendas</span><button type="button" onClick={downloadHistoryBase}>Baixar JSON</button><button type="button" onClick={downloadHistoryExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'movimentacoes' ? <><div className="client-source-list">{movementSources.map(source => { const uploaded = movementSlots[source.id] ?? []; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file => <small key={file.id} style={{display:'flex',gap:'6px',alignItems:'center'}}>{file.name} <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeMovementFile(file.id)}>Remover</button></small>) : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" multiple onChange={event => movementSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={movementProcessing || !Object.values(movementSlots).flat().some(file => rawFiles[file.id])} onClick={processMovements}>{movementProcessing ? 'Conferindo arquivos' : 'Criar base de movimentações'}</button>{movementIndicators ? <div className="indicators"><span>{movementIndicators.sales.toLocaleString('pt-BR')} vendas faturadas</span><span>{movementIndicators.pendingRetyping.toLocaleString('pt-BR')} para redigitar</span><button type="button" onClick={downloadMovementBase}>Baixar JSON</button><button type="button" onClick={downloadMovementExcel}>Baixar Excel</button></div> : null}</> : <><button type="button" className="add-button" onClick={() => motorInputs.current[motor.id]?.click()}>Adicionar arquivos</button><input ref={element => { motorInputs.current[motor.id] = element }} aria-label={`Adicionar arquivos de ${motor.name}`} type="file" multiple onChange={event => fileChange(motor.id, event)} /><FileList files={filesIn(motor.id)} onRemove={removeFile} compact /></>}</article>)}</div>
