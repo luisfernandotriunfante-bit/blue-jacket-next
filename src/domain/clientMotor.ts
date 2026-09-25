@@ -11,6 +11,9 @@ export type CanonicalClient = {
   rcaName?: string
   supervisor?: string
   creditDueDate?: string
+  branch?: string
+  billingType?: string
+  fiscalBlock?: string
   commercialActivity?: string
   district?: string
   address?: string
@@ -82,7 +85,7 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
         for (const row of rows.slice(internalHeader + 1)) {
           const key = documentKey(at(row, 5)); if (!hasDocument(key)) continue
           if (internal.has(key)) continue
-          internal.set(key, { document: key, winthorCode: text(at(row, 0)), legalName: text(at(row, 1)), tradeName: text(at(row, 2)), city: text(at(row, 6)), rcaCode: text(at(row, 10)), rcaName: text(at(row, 11)), supervisor: text(at(row, 13)), creditDueDate: text(at(row, 17)), sources: ['Cadastro interno'] }); accepted++
+          internal.set(key, { document: key, winthorCode: text(at(row, 0)), legalName: text(at(row, 1)), tradeName: text(at(row, 2)), city: text(at(row, 6)), rcaCode: text(at(row, 10)), rcaName: text(at(row, 11)), supervisor: text(at(row, 13)), branch: text(at(row, 8)), billingType: text(at(row, 9)), fiscalBlock: text(at(row, 14)), creditDueDate: text(at(row, 17)), sources: ['Cadastro interno'] }); accepted++
         }
         audit.push({ id: 'internal-ok', level: 'ok', title: 'Cadastro interno reconhecido', instruction: `${accepted.toLocaleString('pt-BR')} clientes prontos para juntar.`, detail: 'Os dados de identificação e referência comercial foram lidos.', area: 'clientes' }); continue
       }

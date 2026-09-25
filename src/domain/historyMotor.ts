@@ -7,6 +7,7 @@ export type CanonicalHistory = {
   sourceSystem: 'legado'
   customerCode: string
   productCode: string
+  winthorCode?: string
   sellerCode?: string
   invoiceNumber?: string
   quantity: number
@@ -80,6 +81,9 @@ export async function processHistoryMotor(files: File[]): Promise<HistoryMotorRe
       const salesValue = number(valueText)
       const discount = number(discountText)
       const invoice = invoiceRaw.replace(/^0+(?=\d)/, '') || invoiceRaw
+      const winthorCode = productCode.startsWith('111') && productCode.length === 8
+        ? productCode.slice(3).replace(/^0+(?=\d)/, '') || productCode.slice(3)
+        : undefined
       competenceSet.add(competence)
       if (!firstDate || dateStr < firstDate) firstDate = dateStr
       if (!lastDate || dateStr > lastDate) lastDate = dateStr
@@ -90,6 +94,7 @@ export async function processHistoryMotor(files: File[]): Promise<HistoryMotorRe
         sourceSystem: 'legado',
         customerCode,
         productCode,
+        winthorCode,
         sellerCode: sellerCode || undefined,
         invoiceNumber: invoice,
         quantity,
