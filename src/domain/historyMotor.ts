@@ -1,4 +1,5 @@
 import type { AuditItem } from './types'
+import type { CanonicalProduct } from './productMotor'
 
 export type CanonicalHistory = {
   id: string
@@ -45,7 +46,20 @@ const competenceOf = (date: Date) => `${date.getFullYear()}-${String(date.getMon
 const dateIso = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 const audit = (id: string, title: string, instruction: string, detail: string, level: AuditItem['level'] = 'ok'): AuditItem => ({ id, title, instruction, detail, level, area: 'historico' })
 
-export async function processHistoryMotor(files: File[]): Promise<HistoryMotorResult> {
+async function parseLegacyCatalog(file: File): Promise<Map<string, string>> {
+  const content = (await file.text()).replace(/\u0000/g, '')
+  const map = new Map<string, string>()
+  for (const line of content.split(/\r?\n/)) {
+    const codeMatch = line.match(/^(\d{8})\s/)
+    if (!codeMatch) continue
+    const eanMatch = line.match(/\b(\d{13})\b/)
+    if (!eanMatch) continue
+    map.set(codeMatch[1], eanMatch[1])
+  }
+  return map
+}
+
+export async function processHistoryMotor(files: File[], options?: { catalogFile?: File; productBase?: CanonicalProduct[] }): Promise<HistoryMotorResult> {
   const audits: AuditItem[] = []
   const base: CanonicalHistory[] = []
   const seen = new Set<string>()
@@ -55,6 +69,16 @@ export async function processHistoryMotor(files: File[]): Promise<HistoryMotorRe
   let duplicates = 0
   let firstDate: string | undefined
   let lastDate: string | undefined
+  let catalogHits = 0
+  let prefixHits = 0
+
+  const legacyToEan = options?.catalogFile ? await parseLegacyCatalog(options.catalogFile) : new Map<string, string>()
+  const eanToWinthor = new Map<string, string>()
+  if (options?.productBase) {
+    for (const product of options.productBase) {
+      if (product.ean && product.internalCode) eanToWinthor.set(product.ean, product.internalCode)
+    }
+  }
 
   for (const file of files) {
     const content = (await file.text()).replace(/\u0000/g, '')
@@ -81,9 +105,20 @@ export async function processHistoryMotor(files: File[]): Promise<HistoryMotorRe
       const salesValue = number(valueText)
       const discount = number(discountText)
       const invoice = invoiceRaw.replace(/^0+(?=\d)/, '') || invoiceRaw
-      const winthorCode = productCode.startsWith('111') && productCode.length === 8
-        ? productCode.slice(3).replace(/^0+(?=\d)/, '') || productCode.slice(3)
-        : undefined
+
+      let winthorCode: string | undefined
+      if (legacyToEan.size > 0) {
+        const ean = legacyToEan.get(productCode)
+        if (ean) {
+          const fromCatalog = eanToWinthor.get(ean)
+          if (fromCatalog) { winthorCode = fromCatalog; catalogHits++ }
+        }
+      }
+      if (!winthorCode && productCode.startsWith('111') && productCode.length === 8) {
+        winthorCode = productCode.slice(3).replace(/^0+(?=\d)/, '') || productCode.slice(3)
+        prefixHits++
+      }
+
       competenceSet.add(competence)
       if (!firstDate || dateStr < firstDate) firstDate = dateStr
       if (!lastDate || dateStr > lastDate) lastDate = dateStr
@@ -111,6 +146,18 @@ export async function processHistoryMotor(files: File[]): Promise<HistoryMotorRe
   if (detailedFiles) audits.push(audit('history-sales-ready', 'Vendas históricas organizadas', `${competencies.length} competência(s) — ${canonicalBase.length.toLocaleString('pt-BR')} linhas individuais.`, `Cada linha de venda foi mantida com data exata, CNPJ do cliente e código do vendedor.`))
   if (summaries) audits.push(audit('history-summary-ready', 'Consolidado por cliente reconhecido', 'Use este relatório como conferência das vendas.', 'O consolidado não possui a data de cada venda e não entra na base de linhas.'))
   if (duplicates) audits.push(audit('history-duplicates', 'Linhas repetidas foram ignoradas', 'Confira os arquivos se a repetição não era esperada.', `${duplicates.toLocaleString('pt-BR')} linha(s) idêntica(s) não foram duplicadas.`, 'attention'))
+  if (legacyToEan.size > 0) {
+    const unmatched = canonicalBase.length - catalogHits - prefixHits
+    audits.push(audit(
+      'history-catalog-match',
+      'De-para Milênio aplicado',
+      `${legacyToEan.size.toLocaleString('pt-BR')} itens no catálogo. ${catalogHits.toLocaleString('pt-BR')} via EAN, ${prefixHits.toLocaleString('pt-BR')} via prefixo 111.`,
+      unmatched > 0
+        ? `${unmatched.toLocaleString('pt-BR')} linha(s) sem código Winthor correspondente.`
+        : 'Todas as linhas de venda foram associadas a um código Winthor.',
+      unmatched > 0 ? 'attention' : 'ok'
+    ))
+  }
   audits.push(audit('history-stock-missing', 'Faltam as fotografias mensais de estoque', 'Adicione os relatórios de posição de estoque de cada fechamento quando estiverem disponíveis.', 'Os arquivos recebidos têm vendas, mas não possuem saldos de estoque por mês.', 'attention'))
   if (!canonicalBase.length) audits.push(audit('history-none', 'Nenhuma venda histórica foi encontrada', 'Envie os relatórios detalhados de vendas do legado.', 'Nenhuma linha de venda foi usada para criar a base.', 'action'))
   return { canonicalBase, audit: audits, indicators: { records: canonicalBase.length, competencies: competencies.length, salesLines: canonicalBase.length, firstDate, lastDate } }
