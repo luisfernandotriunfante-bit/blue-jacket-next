@@ -42,6 +42,7 @@ type SavedMovementMotor = { base: CanonicalMovement[]; audit: AuditItem[]; indic
 type SavedReceiptMotor = { base: CanonicalReceipt[]; audit: AuditItem[]; indicators: ReceiptIndicators | null; slots: Partial<Record<(typeof receiptSources)[number]['id'], UploadedFile[]>> }
 
 function fileSize(size: number) { return size < 1_000_000 ? `${Math.max(1, Math.round(size / 1024))} KB` : `${(size / 1_000_000).toFixed(1)} MB` }
+const dedupeList = (files: UploadedFile[] | undefined) => (files ?? []).filter((f, i, arr) => arr.findIndex(e => e.name === f.name && e.size === f.size) === i)
 
 export function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
@@ -93,14 +94,14 @@ export function App() {
   }, [clientStateLoaded, clientBase, clientAudit, clientIndicators, clientSlots])
   useEffect(() => { let active = true; void loadPersisted<SavedProductMotor>('produtos').then(saved => { if (!active || !saved) return; const base = saved.base.map(product => { const grouping = classifyProduct(product); return { ...product, groupCode: grouping.group?.code, groupName: grouping.group?.name, groupFamily: grouping.group?.family, groupStatus: grouping.status } }); setProductBase(base); setProductAudit(saved.audit); setProductIndicators(saved.indicators); setProductSlots(saved.slots) }).finally(() => { if (active) setProductStateLoaded(true) }); return () => { active = false } }, [])
   useEffect(() => { if (productStateLoaded) void savePersisted<SavedProductMotor>('produtos', { base: productBase, audit: productAudit, indicators: productIndicators, slots: productSlots }) }, [productStateLoaded, productBase, productAudit, productIndicators, productSlots])
-  useEffect(() => { let active = true; void loadPersisted<SavedHistoryMotor>('historico').then(saved => { if (!active || !saved) return; setHistoryBase(saved.base); setHistoryAudit(saved.audit); setHistoryIndicators(saved.indicators); setHistorySlots(saved.slots) }).finally(() => { if (active) setHistoryStateLoaded(true) }); return () => { active = false } }, [])
+  useEffect(() => { let active = true; void loadPersisted<SavedHistoryMotor>('historico').then(saved => { if (!active || !saved) return; setHistoryBase(saved.base); setHistoryAudit(saved.audit); setHistoryIndicators(saved.indicators); setHistorySlots(Object.fromEntries(Object.entries(saved.slots).map(([k, v]) => [k, dedupeList(v as UploadedFile[])])) as typeof saved.slots) }).finally(() => { if (active) setHistoryStateLoaded(true) }); return () => { active = false } }, [])
   useEffect(() => { if (historyStateLoaded) void savePersisted<SavedHistoryMotor>('historico', { base: historyBase, audit: historyAudit, indicators: historyIndicators, slots: historySlots }) }, [historyStateLoaded, historyBase, historyAudit, historyIndicators, historySlots])
-  useEffect(() => { let active = true; void loadPersisted<SavedMovementMotor>('movimentacoes').then(saved => { if (!active || !saved) return; setMovementBase(saved.base); setMovementAudit(saved.audit); setMovementIndicators(saved.indicators); setMovementSlots(saved.slots) }).finally(() => { if (active) setMovementStateLoaded(true) }); return () => { active = false } }, [])
+  useEffect(() => { let active = true; void loadPersisted<SavedMovementMotor>('movimentacoes').then(saved => { if (!active || !saved) return; setMovementBase(saved.base); setMovementAudit(saved.audit); setMovementIndicators(saved.indicators); setMovementSlots(Object.fromEntries(Object.entries(saved.slots).map(([k, v]) => [k, dedupeList(v as UploadedFile[])])) as typeof saved.slots) }).finally(() => { if (active) setMovementStateLoaded(true) }); return () => { active = false } }, [])
   useEffect(() => { if (movementStateLoaded) void savePersisted<SavedMovementMotor>('movimentacoes', { base: movementBase, audit: movementAudit, indicators: movementIndicators, slots: movementSlots }) }, [movementStateLoaded, movementBase, movementAudit, movementIndicators, movementSlots])
-  useEffect(()=>{let active=true;void loadPersisted<SavedReceiptMotor>('recebimentos').then(saved=>{if(!active||!saved)return;setReceiptBase(saved.base);setReceiptAudit(saved.audit);setReceiptIndicators(saved.indicators);setReceiptSlots(saved.slots)}).finally(()=>{if(active)setReceiptStateLoaded(true)});return()=>{active=false}},[])
+  useEffect(()=>{let active=true;void loadPersisted<SavedReceiptMotor>('recebimentos').then(saved=>{if(!active||!saved)return;setReceiptBase(saved.base);setReceiptAudit(saved.audit);setReceiptIndicators(saved.indicators);setReceiptSlots(Object.fromEntries(Object.entries(saved.slots).map(([k,v])=>[k,dedupeList(v as UploadedFile[])])) as typeof saved.slots)}).finally(()=>{if(active)setReceiptStateLoaded(true)});return()=>{active=false}},[])
   useEffect(()=>{if(receiptStateLoaded)void savePersisted<SavedReceiptMotor>('recebimentos',{base:receiptBase,audit:receiptAudit,indicators:receiptIndicators,slots:receiptSlots})},[receiptStateLoaded,receiptBase,receiptAudit,receiptIndicators,receiptSlots])
 
-  const isDupeInSlot = (list: UploadedFile[] | undefined, file: File) => (list ?? []).some(e => e.name === file.name && e.size === file.size)
+  const findInSlot = (list: UploadedFile[] | undefined, file: File) => (list ?? []).find(e => e.name === file.name && e.size === file.size)
   async function distributeFiles(incoming: File[]) {
     const detections = await Promise.all(incoming.map(file => detectFile(file).then(detection => ({ file, detection }))))
     const newUploaded: UploadedFile[] = []
@@ -131,23 +132,26 @@ export function App() {
         toClients[slotId] = uploaded; newUploaded.push(uploaded); newRaw[id] = file
       } else if (motor === 'historico') {
         const slotId = slot as (typeof historySources)[number]['id']
-        if (isDupeInSlot(historySlots[slotId], file) || isDupeInSlot(toHistory[slotId], file)) continue
+        const dupe = findInSlot(historySlots[slotId], file) ?? findInSlot(toHistory[slotId], file)
+        if (dupe) { newRaw[dupe.id] = file; continue } // re-envio: restaura rawFile sem duplicar metadado
         const uploaded: UploadedFile = { id, name: file.name, size: file.size, area: 'historico', receivedAt: now, lastModified: file.lastModified }
         if (!toHistory[slotId]) toHistory[slotId] = []; toHistory[slotId]!.push(uploaded); newUploaded.push(uploaded); newRaw[id] = file
       } else if (motor === 'movimentacoes') {
         const slotId = slot as (typeof movementSources)[number]['id']
-        if (isDupeInSlot(movementSlots[slotId], file) || isDupeInSlot(toMovements[slotId], file)) continue
+        const dupe = findInSlot(movementSlots[slotId], file) ?? findInSlot(toMovements[slotId], file)
+        if (dupe) { newRaw[dupe.id] = file; continue }
         const uploaded: UploadedFile = { id, name: file.name, size: file.size, area: 'movimentacoes', receivedAt: now, lastModified: file.lastModified }
         if (!toMovements[slotId]) toMovements[slotId] = []; toMovements[slotId]!.push(uploaded); newUploaded.push(uploaded); newRaw[id] = file
       } else if (motor === 'recebimentos') {
         const slotId = slot as (typeof receiptSources)[number]['id']
-        if (isDupeInSlot(receiptSlots[slotId], file) || isDupeInSlot(toReceipts[slotId], file)) continue
+        const dupe = findInSlot(receiptSlots[slotId], file) ?? findInSlot(toReceipts[slotId], file)
+        if (dupe) { newRaw[dupe.id] = file; continue }
         const uploaded: UploadedFile = { id, name: file.name, size: file.size, area: 'recebimentos', receivedAt: now, lastModified: file.lastModified }
         if (!toReceipts[slotId]) toReceipts[slotId] = []; toReceipts[slotId]!.push(uploaded); newUploaded.push(uploaded); newRaw[id] = file
       }
     }
-    if (!newUploaded.length && !idsToRemove.length) return
-    setFiles(current => [...current.filter(f => !idsToRemove.includes(f.id)), ...newUploaded])
+    if (!newUploaded.length && !idsToRemove.length && !Object.keys(newRaw).length) return
+    if (newUploaded.length || idsToRemove.length) setFiles(current => [...current.filter(f => !idsToRemove.includes(f.id)), ...newUploaded])
     setRawFiles(current => { const next = { ...current }; for (const id of idsToRemove) delete next[id]; return { ...next, ...newRaw } })
     if (Object.keys(toProducts).length) setProductSlots(current => ({ ...current, ...toProducts }))
     if (Object.keys(toClients).length) setClientSlots(current => ({ ...current, ...toClients }))
