@@ -24,7 +24,7 @@ const clientSources = [
   { id: 'premises', label: 'Premissas' },
 ] as const
 const productSources = [
-  { id: 'internal', label: 'Cadastro interno' }, { id: 'industry', label: 'Lista da indústria' }, { id: 'stock', label: 'Estoque atual' }, { id: 'price', label: 'Preço de venda' },
+  { id: 'internal', label: 'Cadastro interno' }, { id: 'industry', label: 'Lista da indústria' }, { id: 'stock', label: 'Estoque atual' }, { id: 'price', label: 'Preço de venda' }, { id: 'sortiment', label: 'Sortimento' },
 ] as const
 const historySources = [
   { id: 'sales', label: 'Vendas detalhadas do legado' }, { id: 'summary', label: 'Consolidado por cliente' },
@@ -195,13 +195,13 @@ export function App() {
   }
   function downloadHistoryBase() { const url = URL.createObjectURL(new Blob([JSON.stringify(historyBase, null, 2)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = 'base-canonica-historico.json'; link.click(); URL.revokeObjectURL(url) }
   function downloadHistoryExcel() {
-    const rows = historyBase.map(record => ({ Competência: record.competence, 'Fechamento disponível': record.closingDate, Sistema: 'Legado', Cliente: record.customerCode, Produto: record.productCode, Quantidade: record.quantity, Valor: record.salesValue, Desconto: record.discount, 'Valor líquido': record.netValue, 'Linhas de venda': record.salesLines }))
+    const rows = historyBase.map(record => ({ Competência: record.competence, 'Fechamento disponível': record.closingDate, Sistema: 'Legado', Cliente: record.customerCode, Produto: record.productCode, Vendedor: record.sellerCode ?? '', Quantidade: record.quantity, Valor: record.salesValue, Desconto: record.discount, 'Valor líquido': record.netValue, 'Linhas de venda': record.salesLines }))
     const sheet = XLSX.utils.json_to_sheet(rows); sheet['!cols'] = Object.keys(rows[0] ?? {}).map(header => ({ wch: Math.max(14, header.length + 4) }))
     const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, sheet, 'Histórico'); XLSX.writeFile(book, 'base-canonica-historico.xlsx')
   }
   function downloadMovementBase() { const url = URL.createObjectURL(new Blob([JSON.stringify(movementBase, null, 2)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = 'base-canonica-movimentacoes.json'; link.click(); URL.revokeObjectURL(url) }
   function downloadMovementExcel() {
-    const rows = movementBase.map(record => ({ Data: record.movementDate ?? '', Movimento: record.movementType, Pedido: record.orderId ?? '', Nota: record.invoiceNumber ?? '', Cliente: record.customerCode ?? '', CNPJ: record.customerDocument ?? '', 'Nome cliente': record.customerName ?? '', Produto: record.productCode ?? '', 'Código fabricante': record.manufacturerCode ?? '', Descrição: record.description ?? '', Quantidade: record.quantity ?? '', Valor: record.value ?? '', 'Status pedido': record.orderStatus ?? '', 'Tipo venda': record.saleType ?? '', Vendedor: record.seller ?? '', Fornecedor: record.supplierName ?? '', 'Preço unitário': record.unitPrice ?? '', 'Custo financeiro atual': record.currentFinancialCost ?? '', 'Precisa redigitar': record.needsRetyping === undefined ? '' : record.needsRetyping ? 'Sim' : 'Não' }))
+    const rows = movementBase.map(record => ({ Data: record.movementDate ?? '', Movimento: record.movementType, Pedido: record.orderId ?? '', Nota: record.invoiceNumber ?? '', Cliente: record.customerCode ?? '', CNPJ: record.customerDocument ?? '', 'Nome cliente': record.customerName ?? '', Produto: record.productCode ?? '', 'Código fabricante': record.manufacturerCode ?? '', Descrição: record.description ?? '', Quantidade: record.quantity ?? '', Valor: record.value ?? '', 'Status pedido': record.orderStatus ?? '', 'Tipo venda': record.saleType ?? '', 'Código vendedor': record.sellerCode ?? '', Vendedor: record.seller ?? '', Fornecedor: record.supplierName ?? '', 'Preço unitário': record.unitPrice ?? '', 'Custo financeiro atual': record.currentFinancialCost ?? '', 'Precisa redigitar': record.needsRetyping === undefined ? '' : record.needsRetyping ? 'Sim' : 'Não' }))
     const sheet = XLSX.utils.json_to_sheet(rows); sheet['!cols'] = Object.keys(rows[0] ?? {}).map(header => ({ wch: Math.max(14, header.length + 4) }))
     const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, sheet, 'Movimentações'); XLSX.writeFile(book, 'base-canonica-movimentacoes.xlsx')
   }
