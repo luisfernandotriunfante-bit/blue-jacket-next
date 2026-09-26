@@ -223,10 +223,12 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
         .map(r => normNf(r.invoice!))
         .filter(Boolean)
     )
-    // Abate só as NFs da carteira que já deram entrada no Milênio
-    const receivedCarteiraValue = receiptBase
+    // Abate só as NFs da carteira que já deram entrada no Milênio (um valor por NF — o value do atual é repetido por item)
+    const receivedNFValues = new Map<string, number>()
+    receiptBase
       .filter(r => r.status === 'recebida' && r.invoice && carteiraInvoices.has(normNf(r.invoice)))
-      .reduce((s, r) => s + (r.value ?? 0), 0)
+      .forEach(r => { const nf = normNf(r.invoice!); if (!receivedNFValues.has(nf)) receivedNFValues.set(nf, r.value ?? 0) })
+    const receivedCarteiraValue = Array.from(receivedNFValues.values()).reduce((s, v) => s + v, 0)
     const resolvedCarteira = Math.max(0, grossCarteira - receivedCarteiraValue)
     const resolvedEmTransito = (productIndicators?.inTransit != null && productIndicators.inTransit > 0)
       ? productIndicators.inTransit
