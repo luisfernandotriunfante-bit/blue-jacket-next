@@ -146,16 +146,16 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 .stock-treemap-empty { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; color: var(--muted); font-size: 13px; margin-bottom: 24px; }
 /* Treemap: 5 colunas lado a lado, igual ao sistema antigo */
 .stock-line-list { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: start; gap: .8rem; }
-.stock-line-card { display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; overflow: hidden; border: 1px solid rgba(255,255,255,.16); border-radius: 16px; background: #111821; box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 8px 20px rgba(0,0,0,.13); }
+.stock-line-card { display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 16px; background: #111821; box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 8px 20px rgba(0,0,0,.13); }
 .stock-line-head { display: grid; grid-template-columns: minmax(0,1fr) auto; grid-template-areas: 'line value' 'detail detail'; align-items: baseline; gap: .22rem .75rem; padding: .8rem .9rem .7rem; background: rgba(255,255,255,.04); border-bottom: 1px solid rgba(255,255,255,.08); }
-.stock-line-card[data-hue='0'] .stock-line-head { border-left: 3px solid rgba(241,68,93,.7); }
-.stock-line-card[data-hue='1'] .stock-line-head { border-left: 3px solid rgba(39,137,238,.7); }
-.stock-line-card[data-hue='2'] .stock-line-head { border-left: 3px solid rgba(23,173,113,.7); }
-.stock-line-card[data-hue='3'] .stock-line-head { border-left: 3px solid rgba(158,91,238,.7); }
-.stock-line-card[data-hue='4'] .stock-line-head { border-left: 3px solid rgba(226,159,38,.7); }
+.stock-line-card[data-hue='0'] .stock-line-head { border-left: 3px solid var(--red); }
+.stock-line-card[data-hue='1'] .stock-line-head { border-left: 3px solid #2789ee; }
+.stock-line-card[data-hue='2'] .stock-line-head { border-left: 3px solid var(--green); }
+.stock-line-card[data-hue='3'] .stock-line-head { border-left: 3px solid #9e5bee; }
+.stock-line-card[data-hue='4'] .stock-line-head { border-left: 3px solid var(--amber); }
 .stock-line-head strong { grid-area: line; font-size: .88rem; line-height: 1.1; color: #fff; font-family: 'Space Grotesk', sans-serif; font-weight: 700; }
 .stock-line-head > span { grid-area: value; color: #fff; font-size: .92rem; font-weight: 800; text-align: right; font-family: 'Space Grotesk', sans-serif; }
-.stock-line-head small { grid-area: detail; color: rgba(255,255,255,.5); font-size: .64rem; line-height: 1.25; }
+.stock-line-head small { grid-area: detail; color: var(--muted); font-size: .64rem; line-height: 1.25; }
 .stock-line-body { min-width: 0; padding: .55rem; }
 .stock-subbrand-treemap { position: relative; height: 18rem; overflow: hidden; border-radius: 10px; background: rgba(255,255,255,.04); }
 .stock-tile { position: absolute; overflow: hidden; padding: .45rem; border: 1px solid rgba(8,12,19,.85); display: grid; align-content: center; gap: .16rem; min-width: 0; color: #fff; box-shadow: inset 0 1px rgba(255,255,255,.1); box-sizing: border-box; transition: filter .14s ease; }
@@ -197,8 +197,8 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 .stock-layout.has-detail { grid-template-columns: minmax(0, 1fr) 360px; align-items: start; }
 
 /* List */
-.stock-list { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
-.stock-head { display: grid; gap: 0; padding: 9px 14px; background: var(--surface-raised); border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.stock-list { border: 1px solid var(--border); border-radius: 10px; overflow-x: hidden; overflow-y: auto; max-height: clamp(340px, 56vh, 700px); position: relative; }
+.stock-head { display: grid; gap: 0; padding: 9px 14px; background: var(--surface-raised); border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; position: sticky; top: 0; z-index: 2; }
 .stock-list--estoque .stock-head { grid-template-columns: minmax(0,1fr) 90px 110px 110px; }
 .stock-list--produtos .stock-head { grid-template-columns: minmax(0,1fr) 80px 80px 60px; }
 .sc-desc { } .sc-num { text-align: right; } .sc-tags { }
@@ -268,7 +268,7 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 
 /* ── Notas tab ──────────────────────────────────────────── */
 .notas-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
-.notas-section { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; margin-bottom: 20px; display: flex; flex-direction: column; max-height: 420px; }
+.notas-section { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; margin-bottom: 20px; display: flex; flex-direction: column; max-height: clamp(280px, 42vh, 520px); }
 .notas-section-head { display: flex; align-items: center; gap: 12px; padding: 13px 18px 12px; border-bottom: 1px solid var(--border); flex-wrap: wrap; flex-shrink: 0; }
 .notas-section-body { overflow-y: auto; flex: 1; }
 .notas-section-title { font-size: 10px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .09em; flex: 1; min-width: 120px; }
@@ -282,7 +282,7 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 .notas-inv-toggle.open { transform: rotate(90deg); }
 .notas-inv-num { font-size: 13px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; min-width: 110px; }
 .notas-inv-supplier { flex: 1; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.notas-inv-qty { font-size: 12px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; text-align: right; min-width: 64px; color: var(--muted); }
+.notas-inv-qty { font-size: 12px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; text-align: right; min-width: 64px; color: var(--text); }
 .notas-inv-val { font-size: 12px; font-weight: 800; font-family: 'Space Grotesk', sans-serif; color: var(--green); text-align: right; min-width: 88px; }
 .notas-inv-items { background: var(--surface-raised); border-bottom: 1px solid var(--border); overflow-x: auto; }
 .notas-items-table { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -294,7 +294,7 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 .notas-cart-row:last-child { border-bottom: 0; }
 .notas-cart-num { font-size: 13px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; min-width: 130px; }
 .notas-cart-supplier { flex: 1; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 100px; }
-.notas-cart-qty { font-size: 12px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; text-align: right; min-width: 70px; color: var(--muted); }
+.notas-cart-qty { font-size: 12px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; text-align: right; min-width: 70px; color: var(--text); }
 .notas-cart-val { font-size: 12px; font-weight: 800; font-family: 'Space Grotesk', sans-serif; color: var(--amber); text-align: right; min-width: 88px; }
 .notas-cart-date { border: 1px solid var(--border); background: var(--surface-raised); color: var(--text); border-radius: 7px; padding: 5px 9px; font-size: 12px; font-family: inherit; cursor: pointer; }
 .notas-cart-date:focus { outline: none; border-color: var(--red); }
