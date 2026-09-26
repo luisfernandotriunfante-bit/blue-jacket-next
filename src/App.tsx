@@ -26,7 +26,7 @@ const clientSources = [
   { id: 'premises', label: 'Premissas de clientes' },
 ] as const
 const productSources = [
-  { id: 'internal', label: 'Cadastro de produtos (286)' }, { id: 'industry', label: 'Lista SAP da indústria' }, { id: 'stock', label: 'Estoque atual (1118)' }, { id: 'price', label: 'Preço de venda (8011)' }, { id: 'pricesheet', label: 'Planilha de preços (PREÇO UND / com ST)' }, { id: 'subbrands', label: 'Sub-marcas (8013)' }, { id: 'sortiment', label: 'Sortimento SAP' },
+  { id: 'internal', label: 'Cadastro de produtos (286)' }, { id: 'industry', label: 'Lista SAP da indústria' }, { id: 'stock', label: 'Estoque atual (1118)' }, { id: 'price', label: 'Preço de venda (8011)' }, { id: 'subbrands', label: 'Sub-marcas (8013)' }, { id: 'sortiment', label: 'Sortimento SAP' },
 ] as const
 const historySources = [
   { id: 'sales', label: 'Vendas detalhadas do legado (.txt)' }, { id: 'catalog', label: 'Catálogo Milênio — de-para (12.322)' },
