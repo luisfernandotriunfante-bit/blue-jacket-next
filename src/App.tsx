@@ -329,9 +329,9 @@ export function App() {
         <StockTab productBase={productBase} receiptBase={receiptBase} />
       </> : <>
       <header className="topbar stock-topbar" aria-label="Administração">
-        <button type="button" className={`stock-nav-btn${tab === 'uploads' ? ' on' : ''}`} onClick={() => setTab('uploads')}>Uploads</button>
-        <button type="button" className={`stock-nav-btn${tab === 'auditoria' ? ' on' : ''}`} onClick={() => setTab('auditoria')}>Auditoria</button>
-        <button type="button" className={`stock-nav-btn${tab === 'config' ? ' on' : ''}`} onClick={() => setTab('config')}>Configurações</button>
+        <button type="button" className={`stock-nav-btn${tab === 'uploads' ? ' on' : ''}`} onClick={() => { setTab('uploads'); setActiveNotice(null) }}>Uploads</button>
+        <button type="button" className={`stock-nav-btn${tab === 'auditoria' ? ' on' : ''}`} onClick={() => { setTab('auditoria'); setActiveNotice(null) }}>Auditoria</button>
+        <button type="button" className={`stock-nav-btn${tab === 'config' ? ' on' : ''}`} onClick={() => { setTab('config'); setActiveNotice(null) }}>Configurações</button>
       </header>
       {tab === 'uploads' ? <section className="content">
         <h2>ARQUIVOS DIÁRIOS</h2>
