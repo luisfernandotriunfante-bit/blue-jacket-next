@@ -326,7 +326,7 @@ export function App() {
     </nav>
     <main className="main">
       {section === 'estoque' ? <>
-        <StockTab productBase={productBase} receiptBase={receiptBase} />
+        <StockTab productBase={productBase} receiptBase={receiptBase} productIndicators={productIndicators} />
       </> : <>
       <header className="topbar stock-topbar" aria-label="Administração">
         <button type="button" className={`stock-nav-btn${tab === 'uploads' ? ' on' : ''}`} onClick={() => { setTab('uploads'); setActiveNotice(null) }}>Uploads</button>

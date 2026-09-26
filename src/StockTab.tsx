@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import type { CanonicalProduct } from './domain/productMotor'
+import type { CanonicalProduct, ProductIndicators } from './domain/productMotor'
 import type { CanonicalReceipt } from './domain/receiptMotor'
 
 type ProductTag = { launch?: boolean; pex?: boolean }
@@ -108,9 +108,10 @@ function loadTags(): Tags {
   catch { return {} }
 }
 
-export function StockTab({ productBase, receiptBase }: {
+export function StockTab({ productBase, receiptBase, productIndicators }: {
   productBase: CanonicalProduct[]
   receiptBase: CanonicalReceipt[]
+  productIndicators: ProductIndicators | null
 }) {
   const [subTab, setSubTab] = useState<'estoque' | 'produtos' | 'lancamentos' | 'notas'>('estoque')
   const [search, setSearch] = useState('')
@@ -182,8 +183,7 @@ export function StockTab({ productBase, receiptBase }: {
       transitByMfr.set(r.productCode, { qty: cur.qty + (r.quantity ?? 0), value: cur.value + (r.value ?? 0) })
     }
 
-    let comEstoque = 0, semEstoque = 0, emTransito = 0, comPreco = 0
-    let custoCusto = 0, custoVenda = 0, carteiraCusto = 0
+    let comEstoque = 0, semEstoque = 0, emTransito = 0, comPreco = 0, carteiraCusto = 0
     for (const p of productBase) {
       const avail = p.availableStock ?? 0
       if (avail > 0) {
@@ -198,18 +198,22 @@ export function StockTab({ productBase, receiptBase }: {
         ? (p.inTransitValue ?? 0)
         : (p.manufacturerCode ? transitByMfr.get(p.manufacturerCode)?.value ?? 0 : 0)
       if (tQty > 0) emTransito++
-      const cost = p.realCost ?? p.financialCost
-      if (cost !== undefined && avail > 0) custoCusto += avail * cost
-      if (p.sellerPrice !== undefined && avail > 0) custoVenda += avail * p.sellerPrice
       carteiraCusto += tVal
     }
+    // Custo e valor à venda vêm do motor; fallback para dados pré-migração sem esses campos
+    const custoCusto = (productIndicators?.stockAtCost != null)
+      ? productIndicators.stockAtCost
+      : productBase.reduce((s, p) => { const a = p.availableStock ?? 0; return a > 0 && p.financialCost != null ? s + a * p.financialCost : s }, 0)
+    const custoVenda = (productIndicators?.stockAtSalePrice != null)
+      ? productIndicators.stockAtSalePrice
+      : productBase.reduce((s, p) => { const a = p.availableStock ?? 0; return a > 0 && p.sellerPrice != null ? s + a * p.sellerPrice : s }, 0)
     const projetadoCusto = custoCusto + carteiraCusto
     const projetadoVenda = markup > 0 ? projetadoCusto * (1 + markup / 100) : null
     const pricedCoverage = comEstoque > 0 ? comPreco / comEstoque : null
     const marginRatio = custoVenda > 0 ? custoCusto / custoVenda : null
     const transitRatio = projetadoCusto > 0 ? carteiraCusto / projetadoCusto : null
     return { comEstoque, semEstoque, emTransito, comPreco, total: productBase.length, custoCusto, custoVenda, carteiraCusto, projetadoCusto, projetadoVenda, pricedCoverage, marginRatio, transitRatio }
-  }, [productBase, receiptBase, markup])
+  }, [productBase, receiptBase, markup, productIndicators])
 
   const coverageStats = useMemo(() => {
     const now = Date.now()
@@ -233,13 +237,14 @@ export function StockTab({ productBase, receiptBase }: {
     for (const p of productBase) {
       const avail = p.availableStock ?? 0
       if (avail <= 0) { critico++; continue }
-      // Fonte 1: dailyTurnover do Winthor (campo nativo, mais preciso)
-      // Fonte 2: taxa de reposição derivada dos recebimentos com productCode
-      const rate = (p.dailyTurnover && p.dailyTurnover > 0)
-        ? p.dailyTurnover
-        : (p.internalCode ? receiptRate.get(p.internalCode) : undefined)
-      if (!rate) { semHistorico++; continue }
-      const dias = avail / rate
+      // Usa stockCoverage pré-computado pelo motor; fallback: taxa derivada dos recebimentos
+      const dias = p.stockCoverage !== undefined
+        ? p.stockCoverage
+        : (() => {
+            const rate = p.internalCode ? receiptRate.get(p.internalCode) : undefined
+            return rate ? avail / rate : undefined
+          })()
+      if (dias === undefined) { semHistorico++; continue }
       if (dias < low) critico++
       else if (dias <= high) adequado++
       else excesso++

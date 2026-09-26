@@ -69,7 +69,19 @@ export type CanonicalProduct = {
   status: 'active' | 'industry_only' | 'in_transit'
   sources: string[]
 }
-export type ProductIndicators = { total: number; active: number; industryOnly: number; inTransit: number; stockAuditDifferences: number }
+export type ProductIndicators = {
+  total: number
+  active: number
+  industryOnly: number
+  inTransit: number
+  stockAuditDifferences: number
+  /** Σ(disponível × custo financeiro) — valor do estoque a custo */
+  stockAtCost: number
+  /** Σ(disponível × preço de venda com ST) — valor do estoque a preço de venda */
+  stockAtSalePrice: number
+  /** Σ(inTransitValue) — valor total da carteira em trânsito */
+  inTransitTotalValue: number
+}
 export type ProductMotorResult = { canonicalBase: CanonicalProduct[]; audit: AuditItem[]; indicators: ProductIndicators }
 type Row = unknown[]
 type Sheet = { rows: Row[] }
@@ -160,7 +172,23 @@ export async function processProductMotor(files: File[]): Promise<ProductMotorRe
   let differences = 0; for (const [key, value] of check105) if (stock.has(key) && Math.abs((stock.get(key)?.totalStock ?? 0) - value) > .01) differences++
   if (differences) results.push(audit('prod-stock-diff', 'Há diferenças na conferência de estoque', 'Revise o estoque antes de usar os saldos.', `${differences.toLocaleString('pt-BR')} itens possuem saldo diferente entre os dois relatórios.`, 'attention'))
   if (!canonicalBase.length) results.push(audit('prod-none', 'Nenhum arquivo de produtos foi reconhecido', 'Envie os arquivos do Motor de Produtos.', 'Nenhum dado foi usado.', 'action'))
-  const indicators = { total: canonicalBase.length, active: canonicalBase.filter(product => product.status === 'active').length, industryOnly: canonicalBase.filter(product => product.status === 'industry_only').length, inTransit: canonicalBase.filter(product => product.inTransitQuantity).length, stockAuditDifferences: differences }
+  let stockAtCost = 0, stockAtSalePrice = 0, inTransitTotalValue = 0
+  for (const p of canonicalBase) {
+    const avail = p.availableStock ?? 0
+    if (avail > 0 && p.financialCost !== undefined) stockAtCost += avail * p.financialCost
+    if (avail > 0 && p.sellerPrice !== undefined) stockAtSalePrice += avail * p.sellerPrice
+    if (p.inTransitValue !== undefined) inTransitTotalValue += p.inTransitValue
+  }
+  const indicators: ProductIndicators = {
+    total: canonicalBase.length,
+    active: canonicalBase.filter(product => product.status === 'active').length,
+    industryOnly: canonicalBase.filter(product => product.status === 'industry_only').length,
+    inTransit: canonicalBase.filter(product => product.inTransitQuantity).length,
+    stockAuditDifferences: differences,
+    stockAtCost: Math.round(stockAtCost * 100) / 100,
+    stockAtSalePrice: Math.round(stockAtSalePrice * 100) / 100,
+    inTransitTotalValue: Math.round(inTransitTotalValue * 100) / 100,
+  }
   const ungrouped = canonicalBase.filter(product => product.groupStatus === 'review').length
   if (ungrouped) results.push(audit('prod-group-review', 'Alguns produtos precisam de agrupamento', `Revise ${ungrouped.toLocaleString('pt-BR')} produto(s).`, 'Os demais foram agrupados automaticamente conforme suas características.', 'attention'))
   results.push(audit('prod-base-ready', 'Base de produtos criada', `${indicators.total.toLocaleString('pt-BR')} produtos na base única.`, 'Itens em trânsito não foram incluídos no estoque disponível.'))
