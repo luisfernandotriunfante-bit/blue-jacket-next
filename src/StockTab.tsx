@@ -124,6 +124,10 @@ export function StockTab({ productBase, receiptBase }: {
     try { return Number(localStorage.getItem('rj-markup-pct') ?? '0') || 0 }
     catch { return 0 }
   })
+  const [covDays, setCovDays] = useState<[number, number]>(() => {
+    try { return JSON.parse(localStorage.getItem('rj-cov-days') ?? 'null') ?? [30, 90] }
+    catch { return [30, 90] }
+  })
   const searchRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -162,6 +166,39 @@ export function StockTab({ productBase, receiptBase }: {
     const transitRatio = projetadoCusto > 0 ? carteiraCusto / projetadoCusto : null
     return { comEstoque, semEstoque, emTransito, comPreco, total: productBase.length, custoCusto, custoVenda, carteiraCusto, projetadoCusto, projetadoVenda, pricedCoverage, marginRatio, transitRatio }
   }, [productBase, markup])
+
+  const coverageStats = useMemo(() => {
+    const now = Date.now()
+    // taxa de reposição por código de produto (proxy de consumo diário)
+    const acc = new Map<string, { qty: number; firstMs: number }>()
+    for (const r of receiptBase) {
+      if (r.status !== 'recebida' || !r.productCode || !r.quantity || !r.entryDate) continue
+      const ms = new Date(r.entryDate).getTime()
+      if (!Number.isFinite(ms)) continue
+      const cur = acc.get(r.productCode)
+      if (!cur) acc.set(r.productCode, { qty: r.quantity, firstMs: ms })
+      else { cur.qty += r.quantity; if (ms < cur.firstMs) cur.firstMs = ms }
+    }
+    const dailyRate = new Map<string, number>()
+    for (const [code, s] of acc) {
+      const span = Math.max(1, (now - s.firstMs) / 86_400_000)
+      dailyRate.set(code, s.qty / span)
+    }
+    let critico = 0, adequado = 0, excesso = 0, semHistorico = 0
+    const [low, high] = covDays
+    for (const p of productBase) {
+      const avail = p.availableStock ?? 0
+      if (avail <= 0) { critico++; continue }
+      const rate = p.manufacturerCode ? dailyRate.get(p.manufacturerCode) : undefined
+      if (!rate) { semHistorico++; continue }
+      const dias = avail / rate
+      if (dias < low) critico++
+      else if (dias <= high) adequado++
+      else excesso++
+    }
+    const total = critico + adequado + excesso + semHistorico
+    return { critico, adequado, excesso, semHistorico, total, hasHistory: dailyRate.size > 0 }
+  }, [productBase, receiptBase, covDays])
 
   const treemapData = useMemo(() => {
     const lineMap = new Map<CommercialLine, Map<string, { value: number; items: number }>>()
@@ -329,46 +366,57 @@ export function StockTab({ productBase, receiptBase }: {
                   ...(kpis.emTransito > 0 ? [{ value: kpis.emTransito, color: 'var(--amber)', label: 'Em trânsito' }] : []),
                 ]}
                 total={kpis.total}
+                centerLabel="SKUs"
               />
-              <div className="stock-sku-stats">
-                {/* Cobertura de preço — complementa o donut, mostra saúde comercial */}
-                {(() => {
-                  const semPreco = kpis.comEstoque - kpis.comPreco
-                  const pct = kpis.comEstoque > 0 ? (semPreco / kpis.comEstoque) * 100 : 0
-                  return semPreco > 0 ? (
-                    <div className="sku-stat sku-stat-red">
-                      <span className="sku-stat-val">{semPreco.toLocaleString('pt-BR')}</span>
-                      <span className="sku-stat-label">sem preço de venda</span>
-                      <div className="sku-stat-bar"><div className="sku-stat-fill" style={{ width: `${pct}%` }} /></div>
-                      <span className="sku-stat-pct">{pct.toFixed(0)}% dos SKUs com saldo não têm preço cadastrado</span>
-                    </div>
-                  ) : kpis.comEstoque > 0 ? (
-                    <div className="sku-stat sku-stat-green">
-                      <span className="sku-stat-val">100%</span>
-                      <span className="sku-stat-label">cobertura de preço</span>
-                      <div className="sku-stat-bar"><div className="sku-stat-fill" style={{ width: '100%' }} /></div>
-                      <span className="sku-stat-pct">todos os {kpis.comEstoque.toLocaleString('pt-BR')} SKUs com saldo têm preço cadastrado</span>
-                    </div>
-                  ) : null
-                })()}
-                {/* Ruptura — SKUs sem nenhum saldo */}
-                {kpis.total > 0 && (
-                  <div className="sku-stat sku-stat-red">
-                    <span className="sku-stat-val">{kpis.semEstoque.toLocaleString('pt-BR')}</span>
-                    <span className="sku-stat-label">ruptura</span>
-                    <div className="sku-stat-bar"><div className="sku-stat-fill" style={{ width: `${(kpis.semEstoque / kpis.total) * 100}%` }} /></div>
-                    <span className="sku-stat-pct">{((kpis.semEstoque / kpis.total) * 100).toFixed(0)}% do portfólio sem nenhum saldo físico</span>
+              <div className="cov-divider" />
+              <div className="cov-donut-wrap">
+                <StockDonut
+                  segments={coverageStats.hasHistory ? [
+                    { value: coverageStats.critico, color: 'var(--red)', label: `Crítico  <${covDays[0]}d` },
+                    { value: coverageStats.adequado, color: 'var(--green)', label: `Adequado  ${covDays[0]}–${covDays[1]}d` },
+                    { value: coverageStats.excesso, color: 'var(--amber)', label: `Excesso  >${covDays[1]}d` },
+                    ...(coverageStats.semHistorico > 0 ? [{ value: coverageStats.semHistorico, color: 'var(--border)', label: 'Sem histórico' }] : []),
+                  ] : [
+                    { value: 1, color: 'var(--border)', label: 'Sem histórico de entradas' },
+                  ]}
+                  total={coverageStats.total || 1}
+                  centerLabel="Cobertura"
+                />
+                <div className="cov-thresholds">
+                  <span className="cov-thresh-label">Crítico abaixo de</span>
+                  <div className="cov-thresh-row">
+                    <input
+                      type="number" min={1} max={365}
+                      className="cov-thresh-input"
+                      value={covDays[0]}
+                      onChange={e => {
+                        const v = Math.max(1, Math.min(365, Number(e.target.value) || 1))
+                        const next: [number, number] = [v, Math.max(v + 1, covDays[1])]
+                        setCovDays(next)
+                        try { localStorage.setItem('rj-cov-days', JSON.stringify(next)) } catch { /* */ }
+                      }}
+                    />
+                    <span className="cov-thresh-unit">dias</span>
                   </div>
-                )}
-                {/* Carteira — quantidade E valor em trânsito */}
-                {kpis.emTransito > 0 && (
-                  <div className="sku-stat sku-stat-amber">
-                    <span className="sku-stat-val">{kpis.emTransito.toLocaleString('pt-BR')}</span>
-                    <span className="sku-stat-label">a receber</span>
-                    <div className="sku-stat-bar"><div className="sku-stat-fill" style={{ width: `${kpis.total > 0 ? (kpis.emTransito / kpis.total) * 100 : 0}%` }} /></div>
-                    <span className="sku-stat-pct">{kpiCurrency(kpis.carteiraCusto)} em Carteira confirmada</span>
+                  <span className="cov-thresh-label">Excesso acima de</span>
+                  <div className="cov-thresh-row">
+                    <input
+                      type="number" min={1} max={730}
+                      className="cov-thresh-input"
+                      value={covDays[1]}
+                      onChange={e => {
+                        const v = Math.max(covDays[0] + 1, Math.min(730, Number(e.target.value) || 1))
+                        const next: [number, number] = [covDays[0], v]
+                        setCovDays(next)
+                        try { localStorage.setItem('rj-cov-days', JSON.stringify(next)) } catch { /* */ }
+                      }}
+                    />
+                    <span className="cov-thresh-unit">dias</span>
                   </div>
-                )}
+                  {!coverageStats.hasHistory && (
+                    <span className="cov-no-history">Carregue notas de entrada para calcular cobertura</span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -796,9 +844,10 @@ function KpiCard({ label, value, accent, sub, percent, pctLabel }: {
   )
 }
 
-function StockDonut({ segments, total }: {
+function StockDonut({ segments, total, centerLabel }: {
   segments: Array<{ value: number; color: string; label: string }>
   total: number
+  centerLabel?: string
 }) {
   const r = 48, cx = 60, cy = 60
   const circ = 2 * Math.PI * r
@@ -828,7 +877,7 @@ function StockDonut({ segments, total }: {
         </svg>
         <div className="donut-center">
           <span className="donut-center-val">{total.toLocaleString('pt-BR')}</span>
-          <span className="donut-center-label">SKUs</span>
+          <span className="donut-center-label">{centerLabel ?? 'SKUs'}</span>
         </div>
       </div>
       <div className="donut-legend">

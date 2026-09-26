@@ -121,6 +121,15 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 
 /* SKU overview row */
 .stock-sku-overview { display: flex; align-items: flex-start; gap: 24px; margin-bottom: 28px; padding: 20px 20px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; flex-wrap: wrap; }
+.cov-divider { width: 1px; background: var(--border); align-self: stretch; flex-shrink: 0; }
+.cov-donut-wrap { display: flex; gap: 20px; align-items: center; flex: 1; min-width: 280px; }
+.cov-thresholds { display: flex; flex-direction: column; gap: 6px; min-width: 140px; }
+.cov-thresh-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.cov-thresh-row { display: flex; align-items: center; gap: 6px; }
+.cov-thresh-input { width: 52px; padding: 4px 8px; background: var(--surface-raised); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font: inherit; font-size: 13px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; text-align: right; }
+.cov-thresh-input:focus { outline: none; border-color: var(--red); }
+.cov-thresh-unit { font-size: 11px; color: var(--muted); font-weight: 600; }
+.cov-no-history { font-size: 10px; color: var(--muted); line-height: 1.4; margin-top: 4px; }
 .stock-sku-stats { display: flex; flex-direction: column; gap: 14px; flex: 1; min-width: 220px; }
 .sku-stat { display: grid; grid-template-columns: 3.6rem 1fr; grid-template-rows: auto 4px auto; column-gap: 10px; align-items: center; }
 .sku-stat-val { font-size: 20px; font-weight: 800; line-height: 1; font-family: 'Space Grotesk', sans-serif; grid-row: 1; }
@@ -144,11 +153,12 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 /* Treemap: 5 colunas lado a lado, igual ao sistema antigo */
 .stock-line-list { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: start; gap: .8rem; }
 .stock-line-card { display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; overflow: hidden; border: 1px solid rgba(255,255,255,.16); border-radius: 16px; background: #111821; box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 8px 20px rgba(0,0,0,.13); }
-.stock-line-head { display: grid; grid-template-columns: minmax(0,1fr) auto; grid-template-areas: 'line value' 'detail detail'; align-items: baseline; gap: .22rem .75rem; padding: .8rem .9rem .7rem; background: linear-gradient(125deg, rgba(241,68,93,.24), rgba(13,19,29,.98) 74%); }
-.stock-line-card[data-hue='1'] .stock-line-head { background: linear-gradient(145deg, rgba(39,137,238,.25), rgba(13,19,29,.98) 72%); }
-.stock-line-card[data-hue='2'] .stock-line-head { background: linear-gradient(145deg, rgba(23,173,113,.25), rgba(13,19,29,.98) 72%); }
-.stock-line-card[data-hue='3'] .stock-line-head { background: linear-gradient(145deg, rgba(158,91,238,.25), rgba(13,19,29,.98) 72%); }
-.stock-line-card[data-hue='4'] .stock-line-head { background: linear-gradient(145deg, rgba(226,159,38,.26), rgba(13,19,29,.98) 72%); }
+.stock-line-head { display: grid; grid-template-columns: minmax(0,1fr) auto; grid-template-areas: 'line value' 'detail detail'; align-items: baseline; gap: .22rem .75rem; padding: .8rem .9rem .7rem; background: rgba(255,255,255,.04); border-bottom: 1px solid rgba(255,255,255,.08); }
+.stock-line-card[data-hue='0'] .stock-line-head { border-left: 3px solid rgba(241,68,93,.7); }
+.stock-line-card[data-hue='1'] .stock-line-head { border-left: 3px solid rgba(39,137,238,.7); }
+.stock-line-card[data-hue='2'] .stock-line-head { border-left: 3px solid rgba(23,173,113,.7); }
+.stock-line-card[data-hue='3'] .stock-line-head { border-left: 3px solid rgba(158,91,238,.7); }
+.stock-line-card[data-hue='4'] .stock-line-head { border-left: 3px solid rgba(226,159,38,.7); }
 .stock-line-head strong { grid-area: line; font-size: .88rem; line-height: 1.1; color: #fff; font-family: 'Space Grotesk', sans-serif; font-weight: 700; }
 .stock-line-head > span { grid-area: value; color: #fff; font-size: .92rem; font-weight: 800; text-align: right; font-family: 'Space Grotesk', sans-serif; }
 .stock-line-head small { grid-area: detail; color: rgba(255,255,255,.5); font-size: .64rem; line-height: 1.25; }
