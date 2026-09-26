@@ -48,6 +48,7 @@ export function StockTab({ productBase, receiptBase }: {
   const [filterMarcacao, setFilterMarcacao] = useState<'all' | 'mandatory' | 'important'>('all')
   const [selected, setSelected] = useState<CanonicalProduct | null>(null)
   const [tags, setTags] = useState<Tags>(loadTags)
+  const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -68,17 +69,25 @@ export function StockTab({ productBase, receiptBase }: {
     return { comEstoque, semEstoque, emTransito, valorEstoque, valorTransito, total: productBase.length }
   }, [productBase])
 
-  const arrivalGroups = useMemo(() => {
+  const arrivalInvoices = useMemo(() => {
     const transit = receiptBase
       .filter(r => r.status === 'em_transito')
       .sort((a, b) => (a.entryDate ?? '').localeCompare(b.entryDate ?? ''))
     const groups = new Map<string, CanonicalReceipt[]>()
     for (const r of transit) {
-      const key = r.entryDate ?? ''
+      const key = r.invoice ?? `_${r.entryDate ?? ''}_${r.productCode ?? ''}`
       if (!groups.has(key)) groups.set(key, [])
       groups.get(key)!.push(r)
     }
-    return Array.from(groups.entries())
+    return Array.from(groups.entries()).map(([invoice, items]) => ({
+      invoice,
+      displayInvoice: items[0]?.invoice ?? 'Sem nota',
+      items,
+      date: items[0]?.entryDate,
+      supplier: items[0]?.supplierName,
+      totalQty: items.reduce((s, r) => s + (r.quantity ?? 0), 0),
+      totalValue: items.reduce((s, r) => s + (r.value ?? 0), 0),
+    }))
   }, [receiptBase])
 
   const availableChannels = useMemo(() => {
@@ -157,47 +166,105 @@ export function StockTab({ productBase, receiptBase }: {
           <>
             <div className="stock-kpis">
               <KpiCard label="Total de SKUs" value={kpis.total.toLocaleString('pt-BR')} />
-              <KpiCard label="Com estoque" value={kpis.comEstoque.toLocaleString('pt-BR')} accent="green" />
-              <KpiCard label="Sem estoque" value={kpis.semEstoque.toLocaleString('pt-BR')} accent="red" />
+              <KpiCard
+                label="Com estoque"
+                value={kpis.comEstoque.toLocaleString('pt-BR')}
+                accent="green"
+                percent={kpis.total > 0 ? (kpis.comEstoque / kpis.total) * 100 : 0}
+                pctLabel={kpis.total > 0 ? `${((kpis.comEstoque / kpis.total) * 100).toFixed(0)}% dos SKUs` : ''}
+              />
+              <KpiCard
+                label="Sem estoque"
+                value={kpis.semEstoque.toLocaleString('pt-BR')}
+                accent="red"
+                percent={kpis.total > 0 ? (kpis.semEstoque / kpis.total) * 100 : 0}
+                pctLabel={kpis.total > 0 ? `${((kpis.semEstoque / kpis.total) * 100).toFixed(0)}% dos SKUs` : ''}
+              />
               {kpis.emTransito > 0 && (
-                <KpiCard label="Em trânsito" value={kpis.emTransito.toLocaleString('pt-BR')} accent="amber" />
-              )}
-              {kpis.valorEstoque > 0 && (
-                <KpiCard label="Valor em estoque" value={kpiCurrency(kpis.valorEstoque)} sub="com ST" />
-              )}
-              {kpis.valorTransito > 0 && (
-                <KpiCard label="Valor a chegar" value={kpiCurrency(kpis.valorTransito)} accent="amber" />
+                <KpiCard
+                  label="Em trânsito"
+                  value={kpis.emTransito.toLocaleString('pt-BR')}
+                  accent="amber"
+                  percent={kpis.total > 0 ? (kpis.emTransito / kpis.total) * 100 : 0}
+                  pctLabel={kpis.total > 0 ? `${((kpis.emTransito / kpis.total) * 100).toFixed(0)}% dos SKUs` : ''}
+                />
               )}
             </div>
 
+            <div className="stock-charts">
+              <div className="stock-donut-wrap">
+                <StockDonut
+                  segments={[
+                    { value: kpis.comEstoque, color: 'var(--green)', label: 'Com estoque' },
+                    { value: kpis.semEstoque, color: 'var(--red)', label: 'Sem estoque' },
+                    ...(kpis.emTransito > 0 ? [{ value: kpis.emTransito, color: 'var(--amber)', label: 'Em trânsito' }] : []),
+                  ]}
+                  total={kpis.total}
+                />
+              </div>
+              <div className="stock-charts-right">
+                {kpis.valorEstoque > 0 && (
+                  <KpiCard label="Valor em estoque" value={kpiCurrency(kpis.valorEstoque)} sub="preço com ST × disponível" big />
+                )}
+                {kpis.valorTransito > 0 && (
+                  <KpiCard label="Valor a chegar" value={kpiCurrency(kpis.valorTransito)} accent="amber" sub="custo da carteira" big />
+                )}
+              </div>
+            </div>
+
             <div className="stock-arrivals">
-              <div className="arrivals-head">Entradas previstas</div>
-              {arrivalGroups.length === 0 ? (
+              <div className="arrivals-head">
+                Carteira em trânsito
+                {arrivalInvoices.length > 0 && (
+                  <span className="arrivals-count">{arrivalInvoices.length} nota{arrivalInvoices.length !== 1 ? 's' : ''}</span>
+                )}
+              </div>
+              {arrivalInvoices.length === 0 ? (
                 <p className="empty" style={{ padding: '24px 16px' }}>
                   Sem entradas previstas. Importe a carteira em Administração.
                 </p>
-              ) : arrivalGroups.map(([date, items]) => (
-                <div key={date || 'nodate'} className="arrival-group">
-                  <div className="arrival-date">{fmtDate(date || undefined)}</div>
-                  {items.map((r, i) => {
-                    const prod = productBase.find(p => p.internalCode === r.productCode)
-                    const desc = r.description ?? prod?.description ?? r.productCode ?? '—'
-                    return (
-                      <div key={i} className="arrival-row">
-                        <span className="arr-desc">
-                          <span>{desc}</span>
-                          {r.productCode && <code className="arr-code">{r.productCode}</code>}
-                        </span>
-                        <span className="arr-qty">
-                          <strong>{(r.quantity ?? 0).toLocaleString('pt-BR')}</strong>
-                          <small>UN</small>
-                        </span>
-                        <span className="arr-val">
-                          {r.value ? `R$ ${brl(r.value)}` : '—'}
-                        </span>
-                      </div>
-                    )
-                  })}
+              ) : arrivalInvoices.map(inv => (
+                <div key={inv.invoice} className="arrival-invoice">
+                  <button
+                    type="button"
+                    className={`arrival-inv-btn${expandedInvoice === inv.invoice ? ' open' : ''}`}
+                    onClick={() => setExpandedInvoice(ex => ex === inv.invoice ? null : inv.invoice)}
+                  >
+                    <span className="arr-inv-note">
+                      <span className="arr-inv-code">{inv.displayInvoice}</span>
+                      <span className="arr-inv-items-count">{inv.items.length} ite{inv.items.length !== 1 ? 'ns' : 'm'}</span>
+                    </span>
+                    <span className="arr-inv-date">{fmtDate(inv.date)}</span>
+                    <span className="arr-inv-supplier">{inv.supplier ?? '—'}</span>
+                    <span className="arr-inv-totals">
+                      <strong>{inv.totalQty.toLocaleString('pt-BR')} UN</strong>
+                      {inv.totalValue > 0 && <small>R$ {brl(inv.totalValue)}</small>}
+                    </span>
+                    <span className="arr-inv-chevron" aria-hidden="true">▾</span>
+                  </button>
+                  {expandedInvoice === inv.invoice && (
+                    <div className="arrival-inv-items">
+                      {inv.items.map((r, i) => {
+                        const prod = productBase.find(p => p.internalCode === r.productCode)
+                        const desc = r.description ?? prod?.description ?? r.productCode ?? '—'
+                        return (
+                          <div key={i} className="arrival-row">
+                            <span className="arr-desc">
+                              <span>{desc}</span>
+                              {r.productCode && <code className="arr-code">{r.productCode}</code>}
+                            </span>
+                            <span className="arr-qty">
+                              <strong>{(r.quantity ?? 0).toLocaleString('pt-BR')}</strong>
+                              <small>UN</small>
+                            </span>
+                            <span className="arr-val">
+                              {r.value ? `R$ ${brl(r.value)}` : '—'}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -470,12 +537,69 @@ export function StockTab({ productBase, receiptBase }: {
   )
 }
 
-function KpiCard({ label, value, accent, sub }: { label: string; value: string; accent?: 'green' | 'red' | 'amber'; sub?: string }) {
+function KpiCard({ label, value, accent, sub, percent, pctLabel, big }: {
+  label: string; value: string; accent?: 'green' | 'red' | 'amber'; sub?: string;
+  percent?: number; pctLabel?: string; big?: boolean
+}) {
   return (
-    <div className={`kpi-card${accent ? ` kpi-${accent}` : ''}`}>
+    <div className={`kpi-card${accent ? ` kpi-${accent}` : ''}${big ? ' kpi-big' : ''}`}>
       <div className="kpi-val">{value}</div>
       <div className="kpi-label">{label}</div>
+      {pctLabel && <div className="kpi-pct">{pctLabel}</div>}
       {sub && <div className="kpi-sub">{sub}</div>}
+      {percent !== undefined && (
+        <div className="kpi-bar">
+          <div className="kpi-bar-fill" style={{ width: `${Math.min(100, percent)}%` }} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function StockDonut({ segments, total }: {
+  segments: Array<{ value: number; color: string; label: string }>
+  total: number
+}) {
+  const r = 48, cx = 60, cy = 60
+  const circ = 2 * Math.PI * r
+  const gap = 3
+  let offset = 0
+  const arcs = segments.map(seg => {
+    const dash = Math.max(0, (seg.value / total) * circ - gap)
+    const arc = { ...seg, dash, offset }
+    offset += (seg.value / total) * circ
+    return arc
+  })
+  return (
+    <div className="stock-donut-wrap">
+      <div className="donut-svg-wrap">
+        <svg viewBox="0 0 120 120">
+          <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--border)" strokeWidth="12" />
+          <g transform={`rotate(-90 ${cx} ${cy})`}>
+            {arcs.map((arc, i) => arc.dash > 0 && (
+              <circle key={i} cx={cx} cy={cy} r={r}
+                fill="none" stroke={arc.color} strokeWidth="12"
+                strokeDasharray={`${arc.dash} ${circ}`}
+                strokeDashoffset={-arc.offset}
+                strokeLinecap="round"
+              />
+            ))}
+          </g>
+        </svg>
+        <div className="donut-center">
+          <span className="donut-center-val">{total.toLocaleString('pt-BR')}</span>
+          <span className="donut-center-label">SKUs</span>
+        </div>
+      </div>
+      <div className="donut-legend">
+        {segments.map(s => (
+          <div key={s.label} className="donut-leg-item">
+            <span className="donut-leg-dot" style={{ background: s.color }} />
+            <span className="donut-leg-label">{s.label}</span>
+            <span className="donut-leg-val" style={{ color: s.color }}>{s.value.toLocaleString('pt-BR')}</span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
