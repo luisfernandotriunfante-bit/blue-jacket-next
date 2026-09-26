@@ -131,7 +131,8 @@ export function StockTab({ productBase, receiptBase }: {
     for (const p of productBase) {
       const line = resolveCommercialLine(p)
       if (!line) continue
-      const sub = p.subBrand ?? '(sem sub-brand)'
+      // Prefere subBrand do 8013; se não existir, usa groupName (produto agrupado automaticamente)
+      const sub = p.subBrand ?? p.groupName ?? '(sem sub-brand)'
       const avail = p.availableStock ?? 0
       const val = avail > 0 && p.sellerPrice !== undefined ? avail * p.sellerPrice : 0
       if (!lineMap.has(line)) lineMap.set(line, new Map())
@@ -148,7 +149,7 @@ export function StockTab({ productBase, receiptBase }: {
           .filter(t => t.value > 0)
           .sort((a, b) => b.value - a.value)
         const totalValue = tiles.reduce((s, t) => s + t.value, 0)
-        return { line, totalValue, subbrands: sm.size, tiles }
+        return { line, totalValue, subbrands: tiles.length, tiles }
       })
       .filter((g): g is NonNullable<typeof g> => g !== null && g.totalValue > 0)
   }, [productBase])
