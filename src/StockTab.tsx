@@ -112,7 +112,7 @@ export function StockTab({ productBase, receiptBase }: {
   productBase: CanonicalProduct[]
   receiptBase: CanonicalReceipt[]
 }) {
-  const [subTab, setSubTab] = useState<'estoque' | 'produtos' | 'lancamentos'>('estoque')
+  const [subTab, setSubTab] = useState<'estoque' | 'produtos' | 'lancamentos' | 'notas'>('estoque')
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<StockFilter>('all')
   const [filterChannel, setFilterChannel] = useState('')
@@ -122,6 +122,14 @@ export function StockTab({ productBase, receiptBase }: {
   const [lncSearch, setLncSearch] = useState('')
   const [lncFilter, setLncFilter] = useState<'all' | 'launch' | 'pex'>('all')
   const [lncStatus, setLncStatus] = useState<StockFilter>('all')
+  const [notaPrev, setNotaPrev] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem('rj-nota-prev') ?? '{}') } catch { return {} }
+  })
+  const [notasSeen, setNotasSeen] = useState<number>(() => {
+    try { return Number(localStorage.getItem('rj-notas-seen') ?? '0') } catch { return 0 }
+  })
+  const [notasSearch, setNotasSearch] = useState('')
+  const [expandedNotas, setExpandedNotas] = useState<Set<string>>(new Set())
   const [markup, setMarkup] = useState<number>(() => {
     try { return Number(localStorage.getItem('rj-markup-pct') ?? '0') || 0 }
     catch { return 0 }
@@ -154,6 +162,16 @@ export function StockTab({ productBase, receiptBase }: {
     try { localStorage.setItem('rj-product-tags', JSON.stringify(tags)) }
     catch { /* quota exceeded */ }
   }, [tags])
+
+  useEffect(() => {
+    try { localStorage.setItem('rj-nota-prev', JSON.stringify(notaPrev)) }
+    catch { /* quota exceeded */ }
+  }, [notaPrev])
+
+  useEffect(() => {
+    try { localStorage.setItem('rj-notas-seen', String(notasSeen)) }
+    catch { /* */ }
+  }, [notasSeen])
 
   const kpis = useMemo(() => {
     // Agrega carteira dos receipts em_transito (productCode = código fabricante / material)
@@ -272,11 +290,12 @@ export function StockTab({ productBase, receiptBase }: {
       displayInvoice: items[0]?.invoice ?? 'Sem nota',
       items,
       date: items[0]?.entryDate,
+      previewDate: notaPrev[invoice] ?? items[0]?.entryDate,
       supplier: items[0]?.supplierName,
       totalQty: items.reduce((s, r) => s + (r.quantity ?? 0), 0),
       totalValue: items.reduce((s, r) => s + (r.value ?? 0), 0),
     }))
-  }, [receiptBase])
+  }, [receiptBase, notaPrev])
 
   const arrivalBuckets = useMemo(() => {
     const today = new Date(); today.setHours(0, 0, 0, 0)
@@ -289,8 +308,8 @@ export function StockTab({ productBase, receiptBase }: {
       { key: 'semdata', label: 'Sem previsão', count: 0, value: 0 },
     ]
     for (const inv of arrivalInvoices) {
-      if (!inv.date) { buckets[4].count++; buckets[4].value += inv.totalValue; continue }
-      const diff = Math.round((new Date(inv.date).setHours(0,0,0,0) - todayMs) / 86_400_000)
+      if (!inv.previewDate) { buckets[4].count++; buckets[4].value += inv.totalValue; continue }
+      const diff = Math.round((new Date(inv.previewDate).setHours(0,0,0,0) - todayMs) / 86_400_000)
       if (diff < 0) { buckets[0].count++; buckets[0].value += inv.totalValue }
       else if (diff <= 7) { buckets[1].count++; buckets[1].value += inv.totalValue }
       else if (diff <= 15) { buckets[2].count++; buckets[2].value += inv.totalValue }
@@ -376,6 +395,51 @@ export function StockTab({ productBase, receiptBase }: {
     return { launch, pex, total: launch + pex }
   }, [productBase, tags])
 
+  const receivedInvoices = useMemo(() => {
+    const groups = new Map<string, CanonicalReceipt[]>()
+    for (const r of receiptBase) {
+      if (r.status !== 'recebida') continue
+      const key = r.invoice ?? `_${r.entryDate ?? ''}_${r.productCode ?? ''}`
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key)!.push(r)
+    }
+    return Array.from(groups.entries())
+      .map(([invoice, items]) => ({
+        invoice,
+        displayInvoice: items[0]?.invoice ?? 'Sem nota',
+        items,
+        date: items[0]?.entryDate,
+        supplier: items[0]?.supplierName,
+        totalQty: items.reduce((s, r) => s + (r.quantity ?? 0), 0),
+        totalValue: items.reduce((s, r) => s + (r.value ?? 0), 0),
+      }))
+      .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
+  }, [receiptBase])
+
+  const notasBadge = useMemo(() => {
+    if (notasSeen === 0) return receivedInvoices.length > 0 ? receivedInvoices.length : 0
+    const seenDate = new Date(notasSeen).toISOString().slice(0, 10)
+    return receivedInvoices.filter(inv => (inv.date ?? '') > seenDate).length
+  }, [receivedInvoices, notasSeen])
+
+  const filteredReceived = useMemo(() => {
+    const q = notasSearch.trim().toLowerCase()
+    if (!q) return receivedInvoices
+    return receivedInvoices.filter(inv =>
+      (inv.displayInvoice ?? '').toLowerCase().includes(q) ||
+      (inv.supplier ?? '').toLowerCase().includes(q) ||
+      inv.items.some(r => (r.description ?? '').toLowerCase().includes(q) || (r.productCode ?? '').includes(q))
+    )
+  }, [receivedInvoices, notasSearch])
+
+  const notasKpis = useMemo(() => {
+    const cartQty = arrivalInvoices.reduce((s, i) => s + i.totalQty, 0)
+    const cartVal = arrivalInvoices.reduce((s, i) => s + i.totalValue, 0)
+    const recVal = receivedInvoices.reduce((s, i) => s + i.totalValue, 0)
+    const lastDate = receivedInvoices[0]?.date
+    return { cartNfs: arrivalInvoices.length, cartQty, cartVal, recNfs: receivedInvoices.length, recVal, lastDate }
+  }, [arrivalInvoices, receivedInvoices])
+
   const lastReceipt = useMemo(() => {
     if (!selected) return null
     return receiptBase
@@ -388,6 +452,35 @@ export function StockTab({ productBase, receiptBase }: {
       const prev = cur[id] ?? {}
       return { ...cur, [id]: { ...prev, [key]: !prev[key] } }
     })
+  }
+
+  function toggleExpanded(key: string) {
+    setExpandedNotas(cur => {
+      const next = new Set(cur)
+      if (next.has(key)) next.delete(key); else next.add(key)
+      return next
+    })
+  }
+
+  function exportReceivedCsv() {
+    const rows: string[] = ['Data,NF,Fornecedor,Código,Descrição,Qtd,Preço Unit.,Valor']
+    for (const inv of filteredReceived) {
+      for (const r of inv.items) {
+        const esc = (s: string | undefined) => `"${(s ?? '').replace(/"/g, '""')}"`
+        rows.push([inv.date ?? '', esc(inv.displayInvoice), esc(inv.supplier), r.productCode ?? '', esc(r.description), r.quantity ?? 0, r.unitPrice?.toFixed(2) ?? '', r.value?.toFixed(2) ?? ''].join(','))
+      }
+    }
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = 'entradas.csv'; a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function visitNotas() {
+    setSubTab('notas')
+    setNotasSeen(Date.now())
+    try { localStorage.setItem('rj-notas-seen', String(Date.now())) } catch { /* */ }
   }
 
   const channelLevel = (v: number) => v === 1 ? 'Mandatório' : v === 2 ? 'Importante' : 'Fora'
@@ -413,6 +506,14 @@ export function StockTab({ productBase, receiptBase }: {
         >
           Lançamentos
           {lncCounts.total > 0 && <span className="nav-badge">{lncCounts.total}</span>}
+        </button>
+        <button
+          type="button"
+          className={`stock-nav-btn${subTab === 'notas' ? ' on' : ''}`}
+          onClick={visitNotas}
+        >
+          Notas
+          {notasBadge > 0 && <span className="nav-badge">{notasBadge}</span>}
         </button>
       </header>
 
@@ -789,7 +890,7 @@ export function StockTab({ productBase, receiptBase }: {
               )}
             </div>
           </>
-        ) : (
+        ) : subTab === 'lancamentos' ? (
           <>
             <div className="stock-toolbar">
               <div className="pf-bar">
@@ -1051,6 +1152,144 @@ export function StockTab({ productBase, receiptBase }: {
                 )}
               </div>
             )}
+          </>
+        ) : (
+          <>
+            <div className="notas-kpis">
+              <KpiCard
+                label="Carteira"
+                value={notasKpis.cartNfs > 0 ? `${notasKpis.cartNfs} NF${notasKpis.cartNfs !== 1 ? 's' : ''}` : '—'}
+                accent="amber"
+                pctLabel={notasKpis.cartVal > 0 ? `R$ ${brl(notasKpis.cartVal)}` : 'Sem carteira em aberto'}
+                percent={notasKpis.cartNfs + notasKpis.recNfs > 0 ? (notasKpis.cartNfs / (notasKpis.cartNfs + notasKpis.recNfs)) * 100 : 0}
+              />
+              <KpiCard
+                label="SKUs em carteira"
+                value={notasKpis.cartQty > 0 ? notasKpis.cartQty.toLocaleString('pt-BR') : '—'}
+                accent={notasKpis.cartQty > 0 ? 'amber' : undefined}
+                pctLabel="unidades a chegar"
+              />
+              <KpiCard
+                label="Notas recebidas"
+                value={notasKpis.recNfs > 0 ? `${notasKpis.recNfs} NF${notasKpis.recNfs !== 1 ? 's' : ''}` : '—'}
+                accent={notasKpis.recNfs > 0 ? 'green' : undefined}
+                pctLabel={notasKpis.recVal > 0 ? `R$ ${brl(notasKpis.recVal)}` : 'Nenhuma nota recebida'}
+                percent={notasKpis.cartNfs + notasKpis.recNfs > 0 ? (notasKpis.recNfs / (notasKpis.cartNfs + notasKpis.recNfs)) * 100 : 0}
+              />
+              <KpiCard
+                label="Última entrada"
+                value={notasKpis.lastDate ? fmtDate(notasKpis.lastDate) : '—'}
+                pctLabel={notasKpis.lastDate ? 'data da nota mais recente' : 'nenhuma nota recebida'}
+              />
+            </div>
+
+            <div className="notas-section">
+              <div className="notas-section-head">
+                <span className="notas-section-title">Notas Recebidas</span>
+                <input
+                  className="pf-input"
+                  style={{ maxWidth: 240, height: 32, fontSize: 12, padding: '0 10px' }}
+                  placeholder="Buscar NF, fornecedor ou produto…"
+                  value={notasSearch}
+                  onChange={e => setNotasSearch(e.target.value)}
+                />
+                {filteredReceived.length > 0 && (
+                  <button type="button" className="secondary-button" style={{ margin: 0, padding: '5px 12px', fontSize: 12 }} onClick={exportReceivedCsv}>
+                    ↓ CSV
+                  </button>
+                )}
+              </div>
+              {filteredReceived.length === 0 && (
+                <p className="empty compact" style={{ padding: '28px 18px' }}>
+                  {receivedInvoices.length === 0 ? 'Nenhuma nota recebida importada ainda.' : 'Nenhuma nota encontrada para a busca.'}
+                </p>
+              )}
+              {(() => {
+                const days = new Map<string, typeof filteredReceived>()
+                for (const inv of filteredReceived) {
+                  const d = inv.date ?? '(sem data)'
+                  if (!days.has(d)) days.set(d, [])
+                  days.get(d)!.push(inv)
+                }
+                return Array.from(days.entries()).map(([day, invs]) => (
+                  <div key={day} className="notas-day-group">
+                    <div className="notas-day-head">{day !== '(sem data)' ? fmtDate(day) : 'Sem data'}</div>
+                    {invs.map(inv => (
+                      <div key={inv.invoice}>
+                        <div
+                          className="notas-inv-row"
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => toggleExpanded(inv.invoice)}
+                          onKeyDown={e => e.key === 'Enter' && toggleExpanded(inv.invoice)}
+                        >
+                          <span className={`notas-inv-toggle${expandedNotas.has(inv.invoice) ? ' open' : ''}`}>▶</span>
+                          <span className="notas-inv-num">NF {inv.displayInvoice}</span>
+                          <span className="notas-inv-supplier">{inv.supplier ?? '—'}</span>
+                          <span className="notas-inv-qty">{inv.totalQty.toLocaleString('pt-BR')} UN</span>
+                          <span className="notas-inv-val">R$ {brl(inv.totalValue)}</span>
+                        </div>
+                        {expandedNotas.has(inv.invoice) && (
+                          <div className="notas-inv-items">
+                            <table className="notas-items-table">
+                              <thead>
+                                <tr>
+                                  <th>Código</th>
+                                  <th>Descrição</th>
+                                  <th className="n-right">Qtd</th>
+                                  <th className="n-right">Preço unit.</th>
+                                  <th className="n-right">Valor</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {inv.items.map((r, i) => (
+                                  <tr key={i}>
+                                    <td><code style={{ fontSize: 11 }}>{r.productCode ?? '—'}</code></td>
+                                    <td>{r.description ?? '—'}</td>
+                                    <td className="n-right">{(r.quantity ?? 0).toLocaleString('pt-BR')}</td>
+                                    <td className="n-right">{r.unitPrice !== undefined ? `R$ ${brl(r.unitPrice)}` : '—'}</td>
+                                    <td className="n-right">{r.value !== undefined ? `R$ ${brl(r.value)}` : '—'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ))
+              })()}
+            </div>
+
+            <div className="notas-section">
+              <div className="notas-section-head">
+                <span className="notas-section-title">Carteira — em trânsito</span>
+                <span className="arrivals-panel-total">
+                  {arrivalInvoices.length > 0
+                    ? `${arrivalInvoices.length} NF${arrivalInvoices.length !== 1 ? 's' : ''} · R$ ${brl(notasKpis.cartVal)}`
+                    : 'Vazia'}
+                </span>
+              </div>
+              {arrivalInvoices.length === 0 && (
+                <p className="empty compact" style={{ padding: '28px 18px' }}>Carteira vazia. Importe um arquivo de carteira no motor de notas.</p>
+              )}
+              {arrivalInvoices.map(inv => (
+                <div key={inv.invoice} className="notas-cart-row">
+                  <span className="notas-cart-num">NF {inv.displayInvoice}</span>
+                  <span className="notas-cart-supplier">{inv.supplier ?? '—'}</span>
+                  <span className="notas-cart-qty">{inv.totalQty.toLocaleString('pt-BR')} UN</span>
+                  <span className="notas-cart-val">R$ {brl(inv.totalValue)}</span>
+                  <input
+                    type="date"
+                    className="notas-cart-date"
+                    value={notaPrev[inv.invoice] ?? ''}
+                    onChange={e => setNotaPrev(prev => ({ ...prev, [inv.invoice]: e.target.value }))}
+                    title="Previsão de chegada"
+                  />
+                </div>
+              ))}
+            </div>
           </>
         )}
       </section>

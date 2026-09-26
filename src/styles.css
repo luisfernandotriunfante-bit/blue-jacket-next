@@ -265,3 +265,36 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 .c-muted { color: var(--muted) !important; }
 
 @media (max-width: 900px) { .stock-layout.has-detail { grid-template-columns: 1fr; } .stock-detail { position: static; max-height: none; } }
+
+/* ── Notas tab ──────────────────────────────────────────── */
+.notas-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.notas-section { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; margin-bottom: 20px; }
+.notas-section-head { display: flex; align-items: center; gap: 12px; padding: 13px 18px 12px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.notas-section-title { font-size: 10px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .09em; flex: 1; min-width: 120px; }
+.notas-day-group { border-bottom: 1px solid var(--border); }
+.notas-day-group:last-child { border-bottom: 0; }
+.notas-day-head { padding: 7px 18px 6px; background: var(--surface-raised); font-size: 11px; font-weight: 800; color: var(--muted); letter-spacing: .07em; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+.notas-inv-row { display: flex; align-items: center; gap: 12px; padding: 11px 18px; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; }
+.notas-inv-row:hover { background: var(--surface-raised); }
+.notas-inv-row:last-of-type { border-bottom: 0; }
+.notas-inv-toggle { width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 8px; flex-shrink: 0; transition: transform .18s; }
+.notas-inv-toggle.open { transform: rotate(90deg); }
+.notas-inv-num { font-size: 13px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; min-width: 110px; }
+.notas-inv-supplier { flex: 1; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notas-inv-qty { font-size: 12px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; text-align: right; min-width: 64px; color: var(--muted); }
+.notas-inv-val { font-size: 12px; font-weight: 800; font-family: 'Space Grotesk', sans-serif; color: var(--green); text-align: right; min-width: 88px; }
+.notas-inv-items { background: var(--surface-raised); border-bottom: 1px solid var(--border); overflow-x: auto; }
+.notas-items-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.notas-items-table th { padding: 8px 18px; text-align: left; font-size: 10px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.notas-items-table td { padding: 9px 18px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
+.notas-items-table tr:last-child td { border-bottom: 0; }
+.notas-items-table .n-right { text-align: right; font-family: 'Space Grotesk', sans-serif; font-weight: 700; }
+.notas-cart-row { display: flex; align-items: center; gap: 12px; padding: 11px 18px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.notas-cart-row:last-child { border-bottom: 0; }
+.notas-cart-num { font-size: 13px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; min-width: 130px; }
+.notas-cart-supplier { flex: 1; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 100px; }
+.notas-cart-qty { font-size: 12px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; text-align: right; min-width: 70px; color: var(--muted); }
+.notas-cart-val { font-size: 12px; font-weight: 800; font-family: 'Space Grotesk', sans-serif; color: var(--amber); text-align: right; min-width: 88px; }
+.notas-cart-date { border: 1px solid var(--border); background: var(--surface-raised); color: var(--text); border-radius: 7px; padding: 5px 9px; font-size: 12px; font-family: inherit; cursor: pointer; }
+.notas-cart-date:focus { outline: none; border-color: var(--red); }
+.notas-cart-date::-webkit-calendar-picker-indicator { filter: invert(0.7); }
