@@ -327,7 +327,7 @@ export function App() {
     <main className="main">
       {section === 'estoque' ? <>
         <header className="topbar"><h1>ESTOQUE</h1></header>
-        <StockTab productBase={productBase} clientBase={clientBase} receiptBase={receiptBase} />
+        <StockTab productBase={productBase} receiptBase={receiptBase} />
       </> : <>
       <header className="topbar"><h1>ADMINISTRAÇÃO</h1><nav className="tabs" aria-label="Administração"><button className={tab === 'uploads' ? 'selected' : ''} onClick={() => setTab('uploads')} type="button">Uploads</button><button className={tab === 'auditoria' ? 'selected' : ''} onClick={() => setTab('auditoria')} type="button">Auditoria</button></nav></header>
       {tab === 'uploads' ? <section className="content">

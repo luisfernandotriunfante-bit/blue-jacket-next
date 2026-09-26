@@ -1,13 +1,11 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import type { CanonicalProduct } from './domain/productMotor'
-import type { CanonicalClient } from './domain/clientMotor'
 import type { CanonicalReceipt } from './domain/receiptMotor'
 
 type ProductTag = { launch?: boolean; pex?: boolean }
 type Tags = Record<string, ProductTag>
 
 const norm = (v: unknown) => String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
-const docKey = (v: string) => v.replace(/\D/g, '')
 const brl = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 function loadTags(): Tags {
@@ -15,18 +13,16 @@ function loadTags(): Tags {
   catch { return {} }
 }
 
-export function StockTab({ productBase, clientBase, receiptBase }: {
+export function StockTab({ productBase, receiptBase }: {
   productBase: CanonicalProduct[]
-  clientBase: CanonicalClient[]
   receiptBase: CanonicalReceipt[]
 }) {
+  const [subTab, setSubTab] = useState<'estoque' | 'produtos'>('estoque')
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'in_transit'>('all')
-  const [filterSortiment, setFilterSortiment] = useState<'all' | 'mandatory' | 'important' | 'in_sortiment' | 'none'>('all')
-  const [filterTag, setFilterTag] = useState<'all' | 'launch' | 'pex'>('all')
+  const [filterChannel, setFilterChannel] = useState('')
+  const [filterMarcacao, setFilterMarcacao] = useState<'all' | 'mandatory' | 'important'>('all')
   const [filterInStock, setFilterInStock] = useState(false)
-  const [clientInput, setClientInput] = useState('')
-  const [activeClient, setActiveClient] = useState('')
   const [selected, setSelected] = useState<CanonicalProduct | null>(null)
   const [tags, setTags] = useState<Tags>(loadTags)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -36,11 +32,13 @@ export function StockTab({ productBase, clientBase, receiptBase }: {
     catch { /* quota exceeded */ }
   }, [tags])
 
-  const resolvedClient = useMemo(() => {
-    if (!activeClient) return null
-    const key = docKey(activeClient)
-    return clientBase.find(c => c.document === key) ?? null
-  }, [activeClient, clientBase])
+  const availableChannels = useMemo(() => {
+    const seen = new Set<string>()
+    for (const p of productBase)
+      if (p.sortimentChannels)
+        for (const ch of Object.keys(p.sortimentChannels)) seen.add(ch)
+    return Array.from(seen).sort()
+  }, [productBase])
 
   const filtered = useMemo(() => {
     const q = search.trim()
@@ -52,7 +50,6 @@ export function StockTab({ productBase, clientBase, receiptBase }: {
           if (q.length === 13) { if ((p.ean ?? '') !== q) return false }
           else if (q.length >= 7) { if (!(p.ean ?? '').endsWith(q)) return false }
           else {
-            // ≤6 dígitos: código interno (prefixo) OU sufixo de EAN
             const byCode = (p.internalCode ?? '').startsWith(q)
             const byEan = q.length >= 4 && (p.ean ?? '').endsWith(q)
             if (!byCode && !byEan) return false
@@ -61,28 +58,17 @@ export function StockTab({ productBase, clientBase, receiptBase }: {
           if (!norm(p.manufacturerCode).startsWith(norm(q))) return false
         } else {
           const words = q.split(/\s+/).filter(Boolean).map(norm)
-          const desc = norm(p.description)
-          if (!words.every(w => desc.includes(w))) return false
+          if (!words.every(w => norm(p.description).includes(w))) return false
         }
       }
       if (filterStatus !== 'all' && p.status !== filterStatus) return false
       if (filterInStock && (p.availableStock ?? 0) <= 0) return false
-      const tag = tags[p.id]
-      if (filterTag === 'launch' && !tag?.launch) return false
-      if (filterTag === 'pex' && !tag?.pex) return false
-      if (filterSortiment !== 'all') {
-        const ch = p.sortimentChannels
-        if (filterSortiment === 'none' && ch && Object.keys(ch).length > 0) return false
-        if (filterSortiment === 'in_sortiment' && (!ch || Object.keys(ch).length === 0)) return false
-        if (filterSortiment === 'mandatory' && (!ch || !Object.values(ch).some(v => v === 1))) return false
-        if (filterSortiment === 'important' && (!ch || !Object.values(ch).some(v => v === 2))) return false
-      }
-      if (activeClient && resolvedClient?.channelType) {
-        if ((p.sortimentChannels?.[resolvedClient.channelType] ?? 0) <= 0) return false
-      }
+      if (filterChannel && (p.sortimentChannels?.[filterChannel] ?? 0) <= 0) return false
+      if (filterMarcacao === 'mandatory' && !Object.values(p.sortimentChannels ?? {}).some(v => v === 1)) return false
+      if (filterMarcacao === 'important' && !Object.values(p.sortimentChannels ?? {}).some(v => v === 2)) return false
       return true
     })
-  }, [productBase, search, filterStatus, filterInStock, filterTag, filterSortiment, activeClient, resolvedClient, tags])
+  }, [productBase, search, filterStatus, filterInStock, filterChannel, filterMarcacao])
 
   const lastReceipt = useMemo(() => {
     if (!selected) return null
@@ -98,18 +84,21 @@ export function StockTab({ productBase, clientBase, receiptBase }: {
     })
   }
 
-  function applyClient() { setActiveClient(clientInput) }
-
   const channelLevel = (v: number) => v === 1 ? 'Mandatório' : v === 2 ? 'Importante' : 'Fora'
   const channelClass = (v: number) => v === 1 ? 'ch-mandatory' : v === 2 ? 'ch-important' : 'ch-none'
 
   return (
     <section className="content">
+      <div className="subtab-bar">
+        <button type="button" className={`subtab${subTab === 'estoque' ? ' on' : ''}`} onClick={() => setSubTab('estoque')}>Estoque</button>
+        <button type="button" className={`subtab${subTab === 'produtos' ? ' on' : ''}`} onClick={() => setSubTab('produtos')}>Produtos</button>
+      </div>
+
       <div className="stock-toolbar">
         <input
           ref={searchRef}
           className="stock-search"
-          placeholder="Descrição · código interno (ex: 915) · 4+ dígitos finais do EAN · cód. fab. (ex: FBR120)…"
+          placeholder="Descrição · código interno · 4+ dígitos finais do EAN · cód. fab. (ex: FBR120)…"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
@@ -120,45 +109,22 @@ export function StockTab({ productBase, clientBase, receiptBase }: {
               {s === 'all' ? 'Todos' : s === 'active' ? 'Ativo' : 'Em trânsito'}
             </button>
           ))}
-          <span className="filter-label" style={{ marginLeft: 10 }}>Sortimento</span>
-          {(['all', 'mandatory', 'important', 'in_sortiment', 'none'] as const).map(s => (
-            <button key={s} type="button" className={`chip${filterSortiment === s ? ' on' : ''}`} onClick={() => setFilterSortiment(s)}>
-              {s === 'all' ? 'Todos' : s === 'mandatory' ? 'Mandatório' : s === 'important' ? 'Importante' : s === 'in_sortiment' ? 'No sortimento' : 'Sem sortimento'}
-            </button>
-          ))}
+          {availableChannels.length > 0 && <>
+            <span className="filter-label" style={{ marginLeft: 10 }}>Sortimento</span>
+            <button type="button" className={`chip${filterChannel === '' ? ' on' : ''}`} onClick={() => setFilterChannel('')}>Todos</button>
+            {availableChannels.map(ch => (
+              <button key={ch} type="button" className={`chip${filterChannel === ch ? ' on' : ''}`} onClick={() => setFilterChannel(ch)}>{ch}</button>
+            ))}
+          </>}
           <span className="filter-label" style={{ marginLeft: 10 }}>Marcação</span>
-          {(['all', 'launch', 'pex'] as const).map(t => (
-            <button key={t} type="button" className={`chip${filterTag === t ? ' on' : ''}`} onClick={() => setFilterTag(t)}>
-              {t === 'all' ? 'Todos' : t === 'launch' ? 'Lançamento' : 'PEX'}
+          {(['all', 'mandatory', 'important'] as const).map(m => (
+            <button key={m} type="button" className={`chip${filterMarcacao === m ? ' on' : ''}`} onClick={() => setFilterMarcacao(m)}>
+              {m === 'all' ? 'Todos' : m === 'mandatory' ? 'Mandatório' : 'Importante'}
             </button>
           ))}
           <button type="button" className={`chip${filterInStock ? ' on' : ''}`} style={{ marginLeft: 10 }} onClick={() => setFilterInStock(v => !v)}>
             Com estoque
           </button>
-        </div>
-        <div className="stock-client-row">
-          <input
-            className="stock-cnpj"
-            placeholder="CNPJ do cliente para filtrar por sortimento…"
-            value={clientInput}
-            onChange={e => setClientInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && applyClient()}
-          />
-          <button type="button" className="process-button" style={{ margin: 0 }} onClick={applyClient}>
-            Filtrar
-          </button>
-          {activeClient && (
-            <button type="button" className="secondary-button" style={{ margin: 0 }} onClick={() => { setActiveClient(''); setClientInput('') }}>
-              Limpar
-            </button>
-          )}
-          {activeClient && (
-            <span className="client-pill">
-              {resolvedClient
-                ? <>{resolvedClient.tradeName ?? resolvedClient.legalName} <strong>· Canal: {resolvedClient.channelType ?? '—'}</strong></>
-                : 'Cliente não encontrado na base'}
-            </span>
-          )}
         </div>
       </div>
 
@@ -169,75 +135,128 @@ export function StockTab({ productBase, clientBase, receiptBase }: {
       </div>
 
       <div className={`stock-layout${selected ? ' has-detail' : ''}`}>
-        <div className="stock-list">
-          <div className="stock-head">
-            <span className="sc-desc">Produto</span>
-            <span className="sc-num">Disponível</span>
-            <span className="sc-num">Preço</span>
-            <span className="sc-num">Margem</span>
-            <span className="sc-num">Cobertura</span>
-            <span className="sc-tags"></span>
-          </div>
-          {filtered.length === 0 && (
-            <p className="empty" style={{ padding: '24px 16px' }}>Nenhum produto encontrado para os filtros selecionados.</p>
-          )}
-          {filtered.map(p => {
-            const tag = tags[p.id]
-            const isSel = selected?.id === p.id
-            const avail = p.availableStock ?? 0
-            return (
-              <div
-                key={p.id}
-                className={`stock-row${isSel ? ' sel' : ''}`}
-                role="button"
-                tabIndex={0}
-                onClick={() => setSelected(isSel ? null : p)}
-                onKeyDown={e => e.key === 'Enter' && setSelected(isSel ? null : p)}
-              >
-                <span className="sc-desc">
-                  <span className="p-name">{p.description ?? '—'}</span>
-                  <span className="p-meta">
-                    {p.internalCode && <code>{p.internalCode}</code>}
-                    {p.brand && <span>{p.brand}</span>}
-                    {p.groupName && <span className="p-group">{p.groupName}</span>}
-                    {tag?.launch && <span className="badge-launch">Lançamento</span>}
-                    {tag?.pex && <span className="badge-pex">PEX</span>}
+        <div className={`stock-list stock-list--${subTab}`}>
+          {subTab === 'estoque' ? <>
+            <div className="stock-head">
+              <span className="sc-desc">Produto</span>
+              <span className="sc-num">Disponível</span>
+              <span className="sc-num">Preço sem ST</span>
+              <span className="sc-num">Preço com ST</span>
+            </div>
+            {filtered.length === 0 && (
+              <p className="empty" style={{ padding: '24px 16px' }}>Nenhum produto encontrado.</p>
+            )}
+            {filtered.map(p => {
+              const isSel = selected?.id === p.id
+              const avail = p.availableStock ?? 0
+              const availCx = p.unitsPerBox ? Math.floor(avail / p.unitsPerBox) : undefined
+              const semStCx = (p.sellerPriceWithoutTax !== undefined && p.unitsPerBox) ? p.sellerPriceWithoutTax * p.unitsPerBox : undefined
+              const comStCx = (p.sellerPrice !== undefined && p.unitsPerBox) ? p.sellerPrice * p.unitsPerBox : undefined
+              return (
+                <div
+                  key={p.id}
+                  className={`stock-row${isSel ? ' sel' : ''}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelected(isSel ? null : p)}
+                  onKeyDown={e => e.key === 'Enter' && setSelected(isSel ? null : p)}
+                >
+                  <span className="sc-desc">
+                    <span className="p-name">{p.description ?? '—'}</span>
+                    <span className="p-meta">
+                      {p.internalCode && <code>{p.internalCode}</code>}
+                      {p.brand && <span>{p.brand}</span>}
+                      {p.groupName && <span className="p-group">{p.groupName}</span>}
+                    </span>
                   </span>
-                </span>
-                <span className="sc-num">
-                  <strong className={avail > 0 ? 'c-green' : 'c-muted'}>{avail.toLocaleString('pt-BR')}</strong>
-                  <small>{p.unit ?? ''}</small>
-                </span>
-                <span className="sc-num">
-                  <strong>{p.sellerPrice !== undefined ? `R$ ${brl(p.sellerPrice)}` : '—'}</strong>
-                </span>
-                <span className="sc-num">
-                  <strong className={p.margin !== undefined ? (p.margin >= 30 ? 'c-green' : p.margin >= 15 ? 'c-amber' : 'c-red') : ''}>
-                    {p.margin !== undefined ? `${p.margin.toFixed(1)}%` : '—'}
-                  </strong>
-                </span>
-                <span className="sc-num">
-                  <strong className={p.stockCoverage !== undefined ? (p.stockCoverage >= 30 ? 'c-green' : p.stockCoverage >= 7 ? 'c-amber' : 'c-red') : ''}>
-                    {p.stockCoverage !== undefined ? `${p.stockCoverage}d` : '—'}
-                  </strong>
-                </span>
-                <span className="sc-tags" onClick={e => e.stopPropagation()}>
-                  <button
-                    type="button"
-                    className={`tag-dot${tag?.launch ? ' tl' : ''}`}
-                    title={tag?.launch ? 'Remover marcação de Lançamento' : 'Marcar como Lançamento'}
-                    onClick={() => toggleTag(p.id, 'launch')}
-                  >L</button>
-                  <button
-                    type="button"
-                    className={`tag-dot${tag?.pex ? ' tp' : ''}`}
-                    title={tag?.pex ? 'Remover marcação de PEX' : 'Marcar como PEX'}
-                    onClick={() => toggleTag(p.id, 'pex')}
-                  >P</button>
-                </span>
-              </div>
-            )
-          })}
+                  <span className="sc-num">
+                    <span className="dual-val">
+                      <strong className={avail > 0 ? 'c-green' : 'c-muted'}>{avail.toLocaleString('pt-BR')}</strong>
+                      <small>UN</small>
+                    </span>
+                    {availCx !== undefined && (
+                      <span className="dual-val">
+                        <strong className={availCx > 0 ? 'c-green' : 'c-muted'}>{availCx.toLocaleString('pt-BR')}</strong>
+                        <small>CX</small>
+                      </span>
+                    )}
+                  </span>
+                  <span className="sc-num sc-hide-sm">
+                    <span className="dual-val">
+                      <strong>{p.sellerPriceWithoutTax !== undefined ? `R$ ${brl(p.sellerPriceWithoutTax)}` : '—'}</strong>
+                      <small>UN</small>
+                    </span>
+                    {semStCx !== undefined && (
+                      <span className="dual-val">
+                        <strong>{`R$ ${brl(semStCx)}`}</strong>
+                        <small>CX</small>
+                      </span>
+                    )}
+                  </span>
+                  <span className="sc-num">
+                    <span className="dual-val">
+                      <strong>{p.sellerPrice !== undefined ? `R$ ${brl(p.sellerPrice)}` : '—'}</strong>
+                      <small>UN</small>
+                    </span>
+                    {comStCx !== undefined && (
+                      <span className="dual-val">
+                        <strong>{`R$ ${brl(comStCx)}`}</strong>
+                        <small>CX</small>
+                      </span>
+                    )}
+                  </span>
+                </div>
+              )
+            })}
+          </> : <>
+            <div className="stock-head">
+              <span className="sc-desc">Produto</span>
+              <span className="sc-num">Margem</span>
+              <span className="sc-num">Cobertura</span>
+              <span className="sc-num sc-hide-sm">UN/CX</span>
+            </div>
+            {filtered.length === 0 && (
+              <p className="empty" style={{ padding: '24px 16px' }}>Nenhum produto encontrado.</p>
+            )}
+            {filtered.map(p => {
+              const isSel = selected?.id === p.id
+              return (
+                <div
+                  key={p.id}
+                  className={`stock-row${isSel ? ' sel' : ''}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelected(isSel ? null : p)}
+                  onKeyDown={e => e.key === 'Enter' && setSelected(isSel ? null : p)}
+                >
+                  <span className="sc-desc">
+                    <span className="p-name">{p.description ?? '—'}</span>
+                    <span className="p-meta">
+                      {p.internalCode && <code>{p.internalCode}</code>}
+                      {p.brand && <span>{p.brand}</span>}
+                      {p.subBrand && <span className="p-subbrand">{p.subBrand}</span>}
+                      {p.groupName && <span className="p-group">{p.groupName}</span>}
+                      {tags[p.id]?.launch && <span className="badge-launch">Lançamento</span>}
+                      {tags[p.id]?.pex && <span className="badge-pex">PEX</span>}
+                    </span>
+                  </span>
+                  <span className="sc-num">
+                    <strong className={p.margin !== undefined ? (p.margin >= 30 ? 'c-green' : p.margin >= 15 ? 'c-amber' : 'c-red') : ''}>
+                      {p.margin !== undefined ? `${p.margin.toFixed(1)}%` : '—'}
+                    </strong>
+                  </span>
+                  <span className="sc-num">
+                    <strong className={p.stockCoverage !== undefined ? (p.stockCoverage >= 30 ? 'c-green' : p.stockCoverage >= 7 ? 'c-amber' : 'c-red') : ''}>
+                      {p.stockCoverage !== undefined ? `${p.stockCoverage}d` : '—'}
+                    </strong>
+                  </span>
+                  <span className="sc-num sc-hide-sm">
+                    <strong>{p.unitsPerBox ?? '—'}</strong>
+                  </span>
+                </div>
+              )
+            })}
+          </>}
         </div>
 
         {selected && (
@@ -255,115 +274,151 @@ export function StockTab({ productBase, clientBase, receiptBase }: {
             </div>
 
             <div className="sd-tags">
-              <button
-                type="button"
-                className={`tag-pill${tags[selected.id]?.launch ? ' tl' : ''}`}
-                onClick={() => toggleTag(selected.id, 'launch')}
-              >{tags[selected.id]?.launch ? '★ Lançamento' : '☆ Lançamento'}</button>
-              <button
-                type="button"
-                className={`tag-pill${tags[selected.id]?.pex ? ' tp' : ''}`}
-                onClick={() => toggleTag(selected.id, 'pex')}
-              >{tags[selected.id]?.pex ? '★ PEX' : '☆ PEX'}</button>
+              <button type="button" className={`tag-pill${tags[selected.id]?.launch ? ' tl' : ''}`} onClick={() => toggleTag(selected.id, 'launch')}>
+                {tags[selected.id]?.launch ? '★ Lançamento' : '☆ Lançamento'}
+              </button>
+              <button type="button" className={`tag-pill${tags[selected.id]?.pex ? ' tp' : ''}`} onClick={() => toggleTag(selected.id, 'pex')}>
+                {tags[selected.id]?.pex ? '★ PEX' : '☆ PEX'}
+              </button>
             </div>
 
-            <div className="sd-section">
-              <div className="sd-section-title">Estoque</div>
-              <div className="sd-grid">
-                <DI label="Disponível" value={(selected.availableStock ?? 0).toLocaleString('pt-BR')} hi={(selected.availableStock ?? 0) > 0} />
-                <DI label="Total" value={(selected.totalStock ?? 0).toLocaleString('pt-BR')} />
-                <DI label="Reservado" value={(selected.reservedStock ?? 0).toLocaleString('pt-BR')} />
-                <DI label="Bloqueado" value={(selected.blockedStock ?? 0).toLocaleString('pt-BR')} />
-                <DI label="Avariado" value={(selected.damagedStock ?? 0).toLocaleString('pt-BR')} />
-                <DI label="Ind. em estoque" value={(selected.industryQuantity ?? 0).toLocaleString('pt-BR')} />
-              </div>
-            </div>
-
-            {(selected.inTransitQuantity ?? 0) > 0 && (
-              <div className="sd-section">
-                <div className="sd-section-title">Carteira (a chegar)</div>
-                <div className="sd-grid">
-                  <DI label="Quantidade" value={(selected.inTransitQuantity ?? 0).toLocaleString('pt-BR')} hi />
-                  <DI label="Valor" value={selected.inTransitValue !== undefined ? `R$ ${brl(selected.inTransitValue)}` : '—'} />
+            {subTab === 'estoque' ? <>
+              {(selected.inTransitQuantity ?? 0) > 0 && (
+                <div className="sd-section">
+                  <div className="sd-section-title">Carteira (a chegar)</div>
+                  <div className="sd-grid">
+                    <DI label="Quantidade" value={(selected.inTransitQuantity ?? 0).toLocaleString('pt-BR')} hi />
+                    <DI label="Valor" value={selected.inTransitValue !== undefined ? `R$ ${brl(selected.inTransitValue)}` : '—'} />
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {lastReceipt && (
-              <div className="sd-section">
-                <div className="sd-section-title">Última entrada</div>
-                <div className="sd-grid">
-                  <DI label="Data" value={lastReceipt.entryDate ?? '—'} />
-                  <DI label="Nota" value={lastReceipt.invoice ?? '—'} />
-                  <DI label="Quantidade" value={(lastReceipt.quantity ?? 0).toLocaleString('pt-BR')} />
-                  <DI label="Custo unit." value={lastReceipt.unitPrice !== undefined ? `R$ ${brl(lastReceipt.unitPrice)}` : '—'} />
-                  <DI label="Fornecedor" value={lastReceipt.supplierName ?? '—'} />
-                </div>
-              </div>
-            )}
-
-            <div className="sd-section">
-              <div className="sd-section-title">Preços e custos</div>
-              <div className="sd-grid">
-                <DI label="Preço com ST" value={selected.sellerPrice !== undefined ? `R$ ${brl(selected.sellerPrice)}` : '—'} hi={selected.sellerPrice !== undefined} />
-                <DI label="Preço sem ST" value={selected.sellerPriceWithoutTax !== undefined ? `R$ ${brl(selected.sellerPriceWithoutTax)}` : '—'} />
-                <DI label="Custo financeiro" value={selected.financialCost !== undefined ? `R$ ${brl(selected.financialCost)}` : '—'} />
-                <DI label="Custo real" value={selected.realCost !== undefined ? `R$ ${brl(selected.realCost)}` : '—'} />
-                <DI label="Margem bruta" value={selected.margin !== undefined ? `${selected.margin.toFixed(1)}%` : '—'} hi={selected.margin !== undefined && selected.margin >= 30} />
-                <DI label="Giro diário" value={selected.dailyTurnover !== undefined ? selected.dailyTurnover.toString() : '—'} />
-                <DI label="Cobertura de estoque" value={selected.stockCoverage !== undefined ? `${selected.stockCoverage} dias` : '—'} />
-                {selected.industryBasePrice !== undefined && <DI label="Ref. indústria" value={`R$ ${brl(selected.industryBasePrice)}`} />}
-              </div>
-            </div>
-
-            <div className="sd-section">
-              <div className="sd-section-title">Sortimento</div>
-              <DI label="Status" value={selected.sortimentStatus ?? '—'} />
-              <DI label="Ciclo de vida" value={selected.lifestageStatus ?? '—'} />
               {selected.sortimentChannels && Object.keys(selected.sortimentChannels).length > 0 && (
-                <div className="channel-grid">
-                  {Object.entries(selected.sortimentChannels)
-                    .sort((a, b) => b[1] - a[1])
-                    .map(([ch, lv]) => (
-                      <div key={ch} className={`channel-item ${channelClass(lv)}`}>
-                        <span className="ch-name">{ch}</span>
-                        <span className="ch-level">{channelLevel(lv)}</span>
-                      </div>
-                    ))}
+                <div className="sd-section">
+                  <div className="sd-section-title">Sortimento</div>
+                  <div className="channel-grid">
+                    {Object.entries(selected.sortimentChannels)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([ch, lv]) => (
+                        <div key={ch} className={`channel-item ${channelClass(lv)}`}>
+                          <span className="ch-name">{ch}</span>
+                          <span className="ch-level">{channelLevel(lv)}</span>
+                        </div>
+                      ))}
+                  </div>
                 </div>
               )}
-              {(!selected.sortimentChannels || Object.keys(selected.sortimentChannels).length === 0) && (
-                <p className="empty" style={{ marginTop: 8, fontSize: 12 }}>Sem dados de canal de sortimento.</p>
+
+              {selected.unitsPerBox && (
+                <div className="sd-section">
+                  <div className="sd-section-title">Embalagem</div>
+                  <div className="sd-grid">
+                    <DI label="Un. por caixa" value={selected.unitsPerBox.toString()} />
+                    {selected.boxesPerPallet !== undefined && <DI label="Cx. por palete" value={selected.boxesPerPallet.toString()} />}
+                    {selected.grossWeightUnit !== undefined && <DI label="Peso bruto unit." value={`${selected.grossWeightUnit} kg`} />}
+                    {selected.netWeightUnit !== undefined && <DI label="Peso líq. unit." value={`${selected.netWeightUnit} kg`} />}
+                  </div>
+                </div>
               )}
-            </div>
-
-            {(selected.category || selected.brand || selected.subBrand || selected.department) && (
+            </> : <>
               <div className="sd-section">
-                <div className="sd-section-title">Classificação</div>
+                <div className="sd-section-title">Estoque</div>
                 <div className="sd-grid">
-                  {selected.brand && <DI label="Marca" value={selected.brand} />}
-                  {selected.subBrand && <DI label="Sub-marca" value={selected.subBrand} />}
-                  {selected.category && <DI label="Categoria" value={selected.category} />}
-                  {selected.subcategory && <DI label="Subcategoria" value={selected.subcategory} />}
-                  {selected.department && <DI label="Departamento" value={selected.department} />}
-                  {selected.ncm && <DI label="NCM" value={selected.ncm} />}
-                  {selected.taxClassification && <DI label="Tributação" value={selected.taxClassification} />}
-                  {selected.buyer && <DI label="Comprador" value={selected.buyer} />}
+                  <DI label="Disponível" value={(selected.availableStock ?? 0).toLocaleString('pt-BR')} hi={(selected.availableStock ?? 0) > 0} />
+                  <DI label="Total" value={(selected.totalStock ?? 0).toLocaleString('pt-BR')} />
+                  <DI label="Reservado" value={(selected.reservedStock ?? 0).toLocaleString('pt-BR')} />
+                  <DI label="Bloqueado" value={(selected.blockedStock ?? 0).toLocaleString('pt-BR')} />
+                  <DI label="Avariado" value={(selected.damagedStock ?? 0).toLocaleString('pt-BR')} />
+                  <DI label="Ind. em estoque" value={(selected.industryQuantity ?? 0).toLocaleString('pt-BR')} />
                 </div>
               </div>
-            )}
 
-            {selected.unitsPerBox && (
+              {(selected.inTransitQuantity ?? 0) > 0 && (
+                <div className="sd-section">
+                  <div className="sd-section-title">Carteira (a chegar)</div>
+                  <div className="sd-grid">
+                    <DI label="Quantidade" value={(selected.inTransitQuantity ?? 0).toLocaleString('pt-BR')} hi />
+                    <DI label="Valor" value={selected.inTransitValue !== undefined ? `R$ ${brl(selected.inTransitValue)}` : '—'} />
+                  </div>
+                </div>
+              )}
+
+              {lastReceipt && (
+                <div className="sd-section">
+                  <div className="sd-section-title">Última entrada</div>
+                  <div className="sd-grid">
+                    <DI label="Data" value={lastReceipt.entryDate ?? '—'} />
+                    <DI label="Nota" value={lastReceipt.invoice ?? '—'} />
+                    <DI label="Quantidade" value={(lastReceipt.quantity ?? 0).toLocaleString('pt-BR')} />
+                    <DI label="Custo unit." value={lastReceipt.unitPrice !== undefined ? `R$ ${brl(lastReceipt.unitPrice)}` : '—'} />
+                    <DI label="Fornecedor" value={lastReceipt.supplierName ?? '—'} />
+                  </div>
+                </div>
+              )}
+
               <div className="sd-section">
-                <div className="sd-section-title">Embalagem</div>
+                <div className="sd-section-title">Preços e custos</div>
                 <div className="sd-grid">
-                  <DI label="Un. por caixa" value={selected.unitsPerBox.toString()} />
-                  {selected.boxesPerPallet !== undefined && <DI label="Cx. por palete" value={selected.boxesPerPallet.toString()} />}
-                  {selected.grossWeightUnit !== undefined && <DI label="Peso bruto unit." value={`${selected.grossWeightUnit} kg`} />}
-                  {selected.netWeightUnit !== undefined && <DI label="Peso líq. unit." value={`${selected.netWeightUnit} kg`} />}
+                  <DI label="Preço com ST" value={selected.sellerPrice !== undefined ? `R$ ${brl(selected.sellerPrice)}` : '—'} hi={selected.sellerPrice !== undefined} />
+                  <DI label="Preço sem ST" value={selected.sellerPriceWithoutTax !== undefined ? `R$ ${brl(selected.sellerPriceWithoutTax)}` : '—'} />
+                  <DI label="Custo financeiro" value={selected.financialCost !== undefined ? `R$ ${brl(selected.financialCost)}` : '—'} />
+                  <DI label="Custo real" value={selected.realCost !== undefined ? `R$ ${brl(selected.realCost)}` : '—'} />
+                  <DI label="Margem bruta" value={selected.margin !== undefined ? `${selected.margin.toFixed(1)}%` : '—'} hi={selected.margin !== undefined && selected.margin >= 30} />
+                  <DI label="Giro diário" value={selected.dailyTurnover !== undefined ? selected.dailyTurnover.toString() : '—'} />
+                  <DI label="Cobertura" value={selected.stockCoverage !== undefined ? `${selected.stockCoverage} dias` : '—'} />
+                  {selected.industryBasePrice !== undefined && <DI label="Ref. indústria" value={`R$ ${brl(selected.industryBasePrice)}`} />}
                 </div>
               </div>
-            )}
+
+              <div className="sd-section">
+                <div className="sd-section-title">Sortimento</div>
+                <DI label="Status" value={selected.sortimentStatus ?? '—'} />
+                <DI label="Ciclo de vida" value={selected.lifestageStatus ?? '—'} />
+                {selected.sortimentChannels && Object.keys(selected.sortimentChannels).length > 0 && (
+                  <div className="channel-grid" style={{ marginTop: 8 }}>
+                    {Object.entries(selected.sortimentChannels)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([ch, lv]) => (
+                        <div key={ch} className={`channel-item ${channelClass(lv)}`}>
+                          <span className="ch-name">{ch}</span>
+                          <span className="ch-level">{channelLevel(lv)}</span>
+                        </div>
+                      ))}
+                  </div>
+                )}
+                {(!selected.sortimentChannels || Object.keys(selected.sortimentChannels).length === 0) && (
+                  <p className="empty" style={{ marginTop: 8, fontSize: 12 }}>Sem dados de canal de sortimento.</p>
+                )}
+              </div>
+
+              {(selected.category || selected.brand || selected.subBrand || selected.department) && (
+                <div className="sd-section">
+                  <div className="sd-section-title">Classificação</div>
+                  <div className="sd-grid">
+                    {selected.brand && <DI label="Marca" value={selected.brand} />}
+                    {selected.subBrand && <DI label="Sub-marca" value={selected.subBrand} />}
+                    {selected.category && <DI label="Categoria" value={selected.category} />}
+                    {selected.subcategory && <DI label="Subcategoria" value={selected.subcategory} />}
+                    {selected.department && <DI label="Departamento" value={selected.department} />}
+                    {selected.ncm && <DI label="NCM" value={selected.ncm} />}
+                    {selected.taxClassification && <DI label="Tributação" value={selected.taxClassification} />}
+                    {selected.buyer && <DI label="Comprador" value={selected.buyer} />}
+                  </div>
+                </div>
+              )}
+
+              {selected.unitsPerBox && (
+                <div className="sd-section">
+                  <div className="sd-section-title">Embalagem</div>
+                  <div className="sd-grid">
+                    <DI label="Un. por caixa" value={selected.unitsPerBox.toString()} />
+                    {selected.boxesPerPallet !== undefined && <DI label="Cx. por palete" value={selected.boxesPerPallet.toString()} />}
+                    {selected.grossWeightUnit !== undefined && <DI label="Peso bruto unit." value={`${selected.grossWeightUnit} kg`} />}
+                    {selected.netWeightUnit !== undefined && <DI label="Peso líq. unit." value={`${selected.netWeightUnit} kg`} />}
+                  </div>
+                </div>
+              )}
+            </>}
           </aside>
         )}
       </div>
