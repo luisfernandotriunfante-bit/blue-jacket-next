@@ -87,8 +87,8 @@ type Row = unknown[]
 type Sheet = { rows: Row[] }
 const norm = (value: unknown) => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
 const text = (value: unknown) => { const result = String(value ?? '').trim(); return result || undefined }
-const code = (value: unknown) => { const result = String(value ?? '').replace(/\.0$/, '').replace(/\s/g, '').replace(/^0+(?=\d)/, ''); return result || undefined }
-const number = (value: unknown) => { const raw = String(value ?? '').trim(); const normalized = raw.includes(',') && raw.includes('.') ? (raw.lastIndexOf(',') < raw.lastIndexOf('.') ? raw.replace(/,/g, '') : raw.replace(/\./g, '').replace(',', '.')) : raw.replace(',', '.'); const result = Number(normalized); return Number.isFinite(result) ? result : undefined }
+const code = (value: unknown) => { const result = String(value ?? '').replace(/\*/g, '').replace(/\.0$/, '').replace(/\s/g, '').replace(/^0+(?=\d)/, ''); return result || undefined }
+const number = (value: unknown) => { const raw = String(value ?? '').replace(/\*/g, '').trim(); const normalized = raw.includes(',') && raw.includes('.') ? (raw.lastIndexOf(',') < raw.lastIndexOf('.') ? raw.replace(/,/g, '') : raw.replace(/\./g, '').replace(',', '.')) : raw.replace(',', '.'); const result = Number(normalized); return Number.isFinite(result) ? result : undefined }
 const rowsFrom = async (file: File): Promise<Sheet[]> => { const book = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: 'array' }); return book.SheetNames.map(name => ({ rows: XLSX.utils.sheet_to_json<Row>(book.Sheets[name], { header: 1, defval: '', raw: false }) })) }
 const headerAt = (rows: Row[], expected: Record<number, string>) => rows.findIndex(row => Object.entries(expected).every(([index, label]) => norm(row[Number(index)]) === label))
 const audit = (id: string, title: string, instruction: string, detail: string, level: AuditItem['level'] = 'ok'): AuditItem => ({ id, title, instruction, detail, level, area: 'produtos' })
