@@ -141,11 +141,14 @@ export function StockTab({ productBase, receiptBase }: {
   }, [tags])
 
   const kpis = useMemo(() => {
-    let comEstoque = 0, semEstoque = 0, emTransito = 0
+    let comEstoque = 0, semEstoque = 0, emTransito = 0, comPreco = 0
     let custoCusto = 0, custoVenda = 0, carteiraCusto = 0
     for (const p of productBase) {
       const avail = p.availableStock ?? 0
-      if (avail > 0) comEstoque++; else semEstoque++
+      if (avail > 0) {
+        comEstoque++
+        if (p.sellerPrice !== undefined) comPreco++
+      } else semEstoque++
       if ((p.inTransitQuantity ?? 0) > 0) emTransito++
       const cost = p.realCost ?? p.financialCost
       if (cost !== undefined && avail > 0) custoCusto += avail * cost
@@ -154,7 +157,10 @@ export function StockTab({ productBase, receiptBase }: {
     }
     const projetadoCusto = custoCusto + carteiraCusto
     const projetadoVenda = markup > 0 ? projetadoCusto * (1 + markup / 100) : null
-    return { comEstoque, semEstoque, emTransito, total: productBase.length, custoCusto, custoVenda, carteiraCusto, projetadoCusto, projetadoVenda }
+    const pricedCoverage = comEstoque > 0 ? comPreco / comEstoque : null
+    const marginRatio = custoVenda > 0 ? custoCusto / custoVenda : null
+    const transitRatio = projetadoCusto > 0 ? carteiraCusto / projetadoCusto : null
+    return { comEstoque, semEstoque, emTransito, comPreco, total: productBase.length, custoCusto, custoVenda, carteiraCusto, projetadoCusto, projetadoVenda, pricedCoverage, marginRatio, transitRatio }
   }, [productBase, markup])
 
   const treemapData = useMemo(() => {
@@ -280,45 +286,79 @@ export function StockTab({ productBase, receiptBase }: {
         {subTab === 'estoque' ? (
           <>
             <div className="stock-kpis">
-              <KpiCard label="Estoque a custo" value={kpis.custoCusto > 0 ? kpiCurrency(kpis.custoCusto) : '—'} />
-              <KpiCard label="Estoque à venda" value={kpis.custoVenda > 0 ? kpiCurrency(kpis.custoVenda) : '—'} accent="green" />
+              <KpiCard
+                label="Estoque a custo"
+                value={kpis.custoCusto > 0 ? kpiCurrency(kpis.custoCusto) : '—'}
+                percent={kpis.marginRatio !== null ? kpis.marginRatio * 100 : undefined}
+                pctLabel={kpis.marginRatio !== null ? `${(kpis.marginRatio * 100).toFixed(0)}% do valor a venda` : 'Sem preço de venda'}
+              />
+              <KpiCard
+                label="Estoque à venda"
+                value={kpis.custoVenda > 0 ? kpiCurrency(kpis.custoVenda) : '—'}
+                accent="green"
+                percent={kpis.pricedCoverage !== null ? kpis.pricedCoverage * 100 : undefined}
+                pctLabel={kpis.pricedCoverage !== null ? `${(kpis.pricedCoverage * 100).toFixed(0)}% dos SKUs com saldo têm preço` : 'Sem SKUs com saldo'}
+              />
               <KpiCard
                 label="Carteira em trânsito"
                 value={kpis.carteiraCusto > 0 ? kpiCurrency(kpis.carteiraCusto) : '—'}
                 accent="amber"
-                sub={kpis.emTransito > 0 ? `${kpis.emTransito.toLocaleString('pt-BR')} SKUs em trânsito` : undefined}
+                percent={kpis.emTransito > 0 && kpis.total > 0 ? (kpis.emTransito / kpis.total) * 100 : undefined}
+                pctLabel={kpis.emTransito > 0 ? `${kpis.emTransito.toLocaleString('pt-BR')} SKUs em trânsito` : 'Sem Carteira em aberto'}
               />
-              <KpiCard label="Projetado a custo" value={kpis.projetadoCusto > 0 ? kpiCurrency(kpis.projetadoCusto) : '—'} />
+              <KpiCard
+                label="Projetado a custo"
+                value={kpis.projetadoCusto > 0 ? kpiCurrency(kpis.projetadoCusto) : '—'}
+                percent={kpis.transitRatio !== null ? kpis.transitRatio * 100 : undefined}
+                pctLabel={kpis.carteiraCusto > 0 ? `${kpiCurrency(kpis.carteiraCusto)} vêm da Carteira` : 'Sem entradas projetadas'}
+              />
               <KpiCard
                 label="Projetado à venda"
                 value={kpis.projetadoVenda !== null ? kpiCurrency(kpis.projetadoVenda) : '—'}
                 accent={kpis.projetadoVenda !== null ? 'green' : undefined}
-                sub={markup === 0 ? 'Configure markup em Administração' : `markup ${markup.toLocaleString('pt-BR')}%`}
+                percent={markup > 0 ? Math.min(markup, 100) : undefined}
+                pctLabel={markup === 0 ? 'Configure markup em Administração' : `markup ${markup.toLocaleString('pt-BR')}%`}
               />
             </div>
 
-            <div className="stock-charts">
-              <div className="stock-donut-wrap">
-                <StockDonut
-                  segments={[
-                    { value: kpis.comEstoque, color: 'var(--green)', label: 'Com estoque' },
-                    { value: kpis.semEstoque, color: 'var(--red)', label: 'Sem estoque' },
-                    ...(kpis.emTransito > 0 ? [{ value: kpis.emTransito, color: 'var(--amber)', label: 'Em trânsito' }] : []),
-                  ]}
-                  total={kpis.total}
-                />
-              </div>
-              <div className="stock-charts-right">
-                <KpiCard label="Com estoque" value={kpis.comEstoque.toLocaleString('pt-BR')} accent="green"
-                  percent={kpis.total > 0 ? (kpis.comEstoque / kpis.total) * 100 : 0}
-                  pctLabel={kpis.total > 0 ? `${((kpis.comEstoque / kpis.total) * 100).toFixed(0)}% dos SKUs` : ''}
-                  big
-                />
-                <KpiCard label="Sem estoque" value={kpis.semEstoque.toLocaleString('pt-BR')} accent="red"
-                  percent={kpis.total > 0 ? (kpis.semEstoque / kpis.total) * 100 : 0}
-                  pctLabel={kpis.total > 0 ? `${((kpis.semEstoque / kpis.total) * 100).toFixed(0)}% dos SKUs` : ''}
-                  big
-                />
+            <div className="stock-sku-overview">
+              <StockDonut
+                segments={[
+                  { value: kpis.comEstoque, color: 'var(--green)', label: 'Com estoque' },
+                  { value: kpis.semEstoque, color: 'var(--red)', label: 'Sem estoque' },
+                  ...(kpis.emTransito > 0 ? [{ value: kpis.emTransito, color: 'var(--amber)', label: 'Em trânsito' }] : []),
+                ]}
+                total={kpis.total}
+              />
+              <div className="stock-sku-stats">
+                <div className="sku-stat sku-stat-green">
+                  <span className="sku-stat-val">{kpis.comEstoque.toLocaleString('pt-BR')}</span>
+                  <span className="sku-stat-label">com estoque</span>
+                  <div className="sku-stat-bar"><div className="sku-stat-fill" style={{ width: `${kpis.total > 0 ? (kpis.comEstoque / kpis.total) * 100 : 0}%` }} /></div>
+                  <span className="sku-stat-pct">{kpis.total > 0 ? `${((kpis.comEstoque / kpis.total) * 100).toFixed(0)}% dos SKUs` : ''}</span>
+                </div>
+                <div className="sku-stat sku-stat-red">
+                  <span className="sku-stat-val">{kpis.semEstoque.toLocaleString('pt-BR')}</span>
+                  <span className="sku-stat-label">sem estoque</span>
+                  <div className="sku-stat-bar"><div className="sku-stat-fill" style={{ width: `${kpis.total > 0 ? (kpis.semEstoque / kpis.total) * 100 : 0}%` }} /></div>
+                  <span className="sku-stat-pct">{kpis.total > 0 ? `${((kpis.semEstoque / kpis.total) * 100).toFixed(0)}% dos SKUs` : ''}</span>
+                </div>
+                {kpis.emTransito > 0 && (
+                  <div className="sku-stat sku-stat-amber">
+                    <span className="sku-stat-val">{kpis.emTransito.toLocaleString('pt-BR')}</span>
+                    <span className="sku-stat-label">em trânsito</span>
+                    <div className="sku-stat-bar"><div className="sku-stat-fill" style={{ width: `${kpis.total > 0 ? (kpis.emTransito / kpis.total) * 100 : 0}%` }} /></div>
+                    <span className="sku-stat-pct">{kpis.total > 0 ? `${((kpis.emTransito / kpis.total) * 100).toFixed(0)}% dos SKUs` : ''}</span>
+                  </div>
+                )}
+                {kpis.comPreco > 0 && (
+                  <div className="sku-stat">
+                    <span className="sku-stat-val">{kpis.comPreco.toLocaleString('pt-BR')}</span>
+                    <span className="sku-stat-label">com preço de venda</span>
+                    <div className="sku-stat-bar"><div className="sku-stat-fill sku-stat-fill-muted" style={{ width: `${kpis.total > 0 ? (kpis.comPreco / kpis.total) * 100 : 0}%` }} /></div>
+                    <span className="sku-stat-pct">{kpis.comEstoque > 0 ? `${((kpis.comPreco / kpis.comEstoque) * 100).toFixed(0)}% dos com saldo` : ''}</span>
+                  </div>
+                )}
               </div>
             </div>
 
