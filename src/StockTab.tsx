@@ -625,26 +625,28 @@ function StockTreemap({ data }: {
           const rects = squarifiedLayout(group.tiles.map(t => ({ id: t.key, value: t.value })), 0, 0, 100, 100)
           const rectMap = new Map(rects.map(r => [r.id, r]))
           return (
-            <section key={group.line} className="stock-line-card">
+            <section key={group.line} className="stock-line-card" data-hue={lineIdx % 5}>
               <header className="stock-line-head">
                 <strong>{group.line}</strong>
                 <span>{kpiCurrency(group.totalValue)}</span>
                 <small>{group.subbrands} sub-brand{group.subbrands !== 1 ? 's' : ''} · {pct(group.totalValue, totalAll)} do estoque</small>
               </header>
-              <div className="stock-subbrand-treemap">
-                {group.tiles.map((tile, tileIdx) => {
-                  const rect = rectMap.get(tile.key)
-                  if (!rect) return null
-                  const label = `${tile.label}: ${kpiCurrency(tile.value)} · ${pct(tile.value, group.totalValue)}`
-                  return (
-                    <div key={tile.key} className="stock-tile" title={label}
-                      style={{ left: `${rect.x}%`, top: `${rect.y}%`, width: `${rect.w}%`, height: `${rect.h}%`, background: tileBg(lineIdx, tileIdx) }}>
-                      <strong>{tile.label}</strong>
-                      <span>{kpiCurrency(tile.value)}</span>
-                      <small>{pct(tile.value, group.totalValue)}</small>
-                    </div>
-                  )
-                })}
+              <div className="stock-line-body">
+                <div className="stock-subbrand-treemap">
+                  {group.tiles.map((tile, tileIdx) => {
+                    const rect = rectMap.get(tile.key)
+                    if (!rect) return null
+                    const label = `${tile.label}: ${kpiCurrency(tile.value)} · ${pct(tile.value, group.totalValue)}`
+                    return (
+                      <div key={tile.key} className="stock-tile" title={label}
+                        style={{ left: `${rect.x}%`, top: `${rect.y}%`, width: `${rect.w}%`, height: `${rect.h}%`, background: tileBg(lineIdx, tileIdx) }}>
+                        <strong>{tile.label}</strong>
+                        <span>{kpiCurrency(tile.value)}</span>
+                        <small>{pct(tile.value, group.totalValue)}</small>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             </section>
           )
