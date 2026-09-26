@@ -35,6 +35,7 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 .stock-nav-btn { padding: 14px 32px; border: 0; background: transparent; color: var(--muted); font-size: 14px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; font-family: 'Space Grotesk', sans-serif; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; }
 .stock-nav-btn.on { color: var(--red); border-bottom-color: var(--red); }
 .stock-nav-btn:hover:not(.on) { color: var(--text); }
+.nav-badge { display: inline-flex; align-items: center; justify-content: center; margin-left: 7px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--red); color: #fff; font-size: 10px; font-weight: 800; line-height: 1; letter-spacing: 0; vertical-align: middle; }
 .quick-upload { margin-top: 18px; min-height: 180px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; border: 1px dashed var(--red); border-radius: 12px; background: var(--surface); color: var(--text); }
 .quick-upload strong { font-size: 18px; }.quick-upload span { color: var(--muted); }.quick-upload input, .motor-card input { display: none; }
 .section-title { margin-top: 50px; }.motor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }

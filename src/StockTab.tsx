@@ -112,13 +112,16 @@ export function StockTab({ productBase, receiptBase }: {
   productBase: CanonicalProduct[]
   receiptBase: CanonicalReceipt[]
 }) {
-  const [subTab, setSubTab] = useState<'estoque' | 'produtos'>('estoque')
+  const [subTab, setSubTab] = useState<'estoque' | 'produtos' | 'lancamentos'>('estoque')
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<StockFilter>('all')
   const [filterChannel, setFilterChannel] = useState('')
   const [filterMarcacao, setFilterMarcacao] = useState<'all' | 'mandatory' | 'important'>('all')
   const [selected, setSelected] = useState<CanonicalProduct | null>(null)
   const [tags, setTags] = useState<Tags>(loadTags)
+  const [lncSearch, setLncSearch] = useState('')
+  const [lncFilter, setLncFilter] = useState<'all' | 'launch' | 'pex'>('all')
+  const [lncStatus, setLncStatus] = useState<StockFilter>('all')
   const [markup, setMarkup] = useState<number>(() => {
     try { return Number(localStorage.getItem('rj-markup-pct') ?? '0') || 0 }
     catch { return 0 }
@@ -318,6 +321,44 @@ export function StockTab({ productBase, receiptBase }: {
     })
   }, [productBase, search, filterStatus, filterChannel, filterMarcacao])
 
+  const filteredLnc = useMemo(() => {
+    const q = lncSearch.trim()
+    return productBase.filter(p => {
+      const t = tags[p.id]
+      const isLaunch = !!t?.launch
+      const isPex = !!t?.pex
+      if (!isLaunch && !isPex) return false
+      if (lncFilter === 'launch' && !isLaunch) return false
+      if (lncFilter === 'pex' && !isPex) return false
+      if (lncStatus === 'com_estoque' && (p.availableStock ?? 0) <= 0) return false
+      if (lncStatus === 'sem_estoque' && (p.availableStock ?? 0) > 0) return false
+      if (lncStatus === 'em_transito' && (p.inTransitQuantity ?? 0) <= 0) return false
+      if (q) {
+        const allDigits = /^\d+$/.test(q)
+        const mixed = /[A-Za-z]/.test(q) && /\d/.test(q) && !q.includes(' ')
+        if (allDigits) {
+          if (q.length === 13) { if ((p.ean ?? '') !== q) return false }
+          else { if (!(p.internalCode ?? '').startsWith(q) && !(p.ean ?? '').endsWith(q)) return false }
+        } else if (mixed) {
+          if (!norm(p.manufacturerCode).startsWith(norm(q))) return false
+        } else {
+          const words = q.split(/\s+/).filter(Boolean).map(norm)
+          if (!words.every(w => norm(p.description).includes(w))) return false
+        }
+      }
+      return true
+    })
+  }, [productBase, tags, lncSearch, lncFilter, lncStatus])
+
+  const lncCounts = useMemo(() => {
+    let launch = 0, pex = 0
+    for (const p of productBase) {
+      if (tags[p.id]?.launch) launch++
+      if (tags[p.id]?.pex) pex++
+    }
+    return { launch, pex, total: launch + pex }
+  }, [productBase, tags])
+
   const lastReceipt = useMemo(() => {
     if (!selected) return null
     return receiptBase
@@ -348,6 +389,14 @@ export function StockTab({ productBase, receiptBase }: {
           className={`stock-nav-btn${subTab === 'produtos' ? ' on' : ''}`}
           onClick={() => setSubTab('produtos')}
         >Produtos</button>
+        <button
+          type="button"
+          className={`stock-nav-btn${subTab === 'lancamentos' ? ' on' : ''}`}
+          onClick={() => { setSubTab('lancamentos'); setSelected(null) }}
+        >
+          Lançamentos
+          {lncCounts.total > 0 && <span className="nav-badge">{lncCounts.total}</span>}
+        </button>
       </header>
 
       <section className="content">
@@ -461,7 +510,7 @@ export function StockTab({ productBase, receiptBase }: {
               </div>
             </div>
           </>
-        ) : (
+        ) : subTab === 'produtos' ? (
           <>
             <div className="stock-toolbar">
               <div className="pf-bar">
@@ -722,6 +771,269 @@ export function StockTab({ productBase, receiptBase }: {
                 </aside>
               )}
             </div>
+          </>
+        ) : (
+          <>
+            <div className="stock-toolbar">
+              <div className="pf-bar">
+                <input
+                  className="pf-input"
+                  placeholder="Buscar produto, EAN ou código interno…"
+                  value={lncSearch}
+                  onChange={e => setLncSearch(e.target.value)}
+                />
+                <select
+                  className="pf-select"
+                  value={lncStatus}
+                  onChange={e => setLncStatus(e.target.value as StockFilter)}
+                  aria-label="Filtrar situação"
+                >
+                  <option value="all">Todas as situações</option>
+                  <option value="com_estoque">Com estoque</option>
+                  <option value="sem_estoque">Sem estoque</option>
+                  <option value="em_transito">Em trânsito</option>
+                </select>
+              </div>
+              <fieldset className="pf-range">
+                <legend>Tipo</legend>
+                <div>
+                  <button type="button" className={lncFilter === 'all' ? 'is-active' : ''} onClick={() => setLncFilter('all')}>
+                    Todos {lncCounts.total > 0 && `(${lncCounts.total})`}
+                  </button>
+                  <button type="button" className={lncFilter === 'launch' ? 'is-active' : ''} onClick={() => setLncFilter('launch')}>
+                    Lançamentos {lncCounts.launch > 0 && `(${lncCounts.launch})`}
+                  </button>
+                  <button type="button" className={lncFilter === 'pex' ? 'is-active' : ''} onClick={() => setLncFilter('pex')}>
+                    PEX {lncCounts.pex > 0 && `(${lncCounts.pex})`}
+                  </button>
+                </div>
+              </fieldset>
+            </div>
+
+            <div className="stock-count">
+              <strong>{filteredLnc.length.toLocaleString('pt-BR')}</strong>{' '}
+              produto{filteredLnc.length !== 1 ? 's' : ''}
+              {lncCounts.total !== filteredLnc.length && ` de ${lncCounts.total.toLocaleString('pt-BR')}`}
+            </div>
+
+            {lncCounts.total === 0 && (
+              <p className="empty" style={{ padding: '40px 0', textAlign: 'center' }}>
+                Nenhum produto marcado como Lançamento ou PEX.<br />
+                <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>Acesse a aba Produtos, selecione um item e use as marcações no painel lateral.</span>
+              </p>
+            )}
+
+            {lncCounts.total > 0 && (
+              <div className={`stock-layout${selected ? ' has-detail' : ''}`}>
+                <div className="stock-list stock-list--estoque">
+                  <div className="stock-head">
+                    <span className="sc-desc">Produto</span>
+                    <span className="sc-num">Disponível</span>
+                    <span className="sc-num sc-hide-sm">Preço sem ST</span>
+                    <span className="sc-num">Preço com ST</span>
+                  </div>
+                  {filteredLnc.length === 0 && (
+                    <p className="empty" style={{ padding: '24px 16px' }}>Nenhum produto encontrado.</p>
+                  )}
+                  {filteredLnc.map(p => {
+                    const isSel = selected?.id === p.id
+                    const avail = p.availableStock ?? 0
+                    const availCx = p.unitsPerBox ? Math.floor(avail / p.unitsPerBox) : undefined
+                    const semStCx = (p.sellerPriceWithoutTax !== undefined && p.unitsPerBox) ? p.sellerPriceWithoutTax * p.unitsPerBox : undefined
+                    const comStCx = (p.sellerPrice !== undefined && p.unitsPerBox) ? p.sellerPrice * p.unitsPerBox : undefined
+                    return (
+                      <div
+                        key={p.id}
+                        className={`stock-row${isSel ? ' sel' : ''}`}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setSelected(isSel ? null : p)}
+                        onKeyDown={e => e.key === 'Enter' && setSelected(isSel ? null : p)}
+                      >
+                        <span className="sc-desc">
+                          <span className="p-name">{p.description ?? '—'}</span>
+                          {(p.package || p.netWeightUnit !== undefined) && (
+                            <span className="p-pkg-line">
+                              {p.package && <span className="p-pack">{p.package}</span>}
+                              {p.netWeightUnit !== undefined && fmtWeight(p.netWeightUnit) && (
+                                <span className="p-weight">{fmtWeight(p.netWeightUnit)}</span>
+                              )}
+                            </span>
+                          )}
+                          <span className="p-meta">
+                            {p.internalCode && <code>{p.internalCode}</code>}
+                            {p.brand && <span>{p.brand}</span>}
+                            {p.groupName && <span className="p-group">{p.groupName}</span>}
+                            {tags[p.id]?.launch && <span className="badge-launch">Lançamento</span>}
+                            {tags[p.id]?.pex && <span className="badge-pex">PEX</span>}
+                          </span>
+                        </span>
+                        <span className="sc-num">
+                          <span className="dual-val">
+                            <strong className={avail > 0 ? 'c-green' : 'c-muted'}>{avail.toLocaleString('pt-BR')}</strong>
+                            <small>UN</small>
+                          </span>
+                          {availCx !== undefined && (
+                            <span className="dual-val">
+                              <strong className={availCx > 0 ? 'c-green' : 'c-muted'}>{availCx.toLocaleString('pt-BR')}</strong>
+                              <small>CX</small>
+                            </span>
+                          )}
+                        </span>
+                        <span className="sc-num sc-hide-sm">
+                          {p.sellerPriceWithoutTax !== undefined ? <>
+                            <span className="dual-val">
+                              <strong>{`R$ ${brl(p.sellerPriceWithoutTax)}`}</strong>
+                              <small>UN</small>
+                            </span>
+                            {semStCx !== undefined && (
+                              <span className="dual-val">
+                                <strong>{`R$ ${brl(semStCx)}`}</strong>
+                                <small>CX</small>
+                              </span>
+                            )}
+                          </> : <strong className="c-muted">—</strong>}
+                        </span>
+                        <span className="sc-num">
+                          {p.sellerPrice !== undefined ? <>
+                            <span className="dual-val">
+                              <strong>{`R$ ${brl(p.sellerPrice)}`}</strong>
+                              <small>UN</small>
+                            </span>
+                            {comStCx !== undefined && (
+                              <span className="dual-val">
+                                <strong>{`R$ ${brl(comStCx)}`}</strong>
+                                <small>CX</small>
+                              </span>
+                            )}
+                          </> : <strong className="c-muted">—</strong>}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {selected && (
+                  <aside className="stock-detail">
+                    <div className="sd-header">
+                      <div className="sd-title-area">
+                        <h3 className="sd-name">{selected.description ?? '—'}</h3>
+                        <div className="sd-codes">
+                          {selected.internalCode && <span>Cód. <strong>{selected.internalCode}</strong></span>}
+                          {selected.manufacturerCode && <span>Fab. <strong>{selected.manufacturerCode}</strong></span>}
+                          {selected.ean && <span>EAN <strong>{selected.ean}</strong></span>}
+                        </div>
+                      </div>
+                      <button type="button" className="close" onClick={() => setSelected(null)}>×</button>
+                    </div>
+
+                    <div className="sd-tags">
+                      <button type="button" className={`tag-pill${tags[selected.id]?.launch ? ' tl' : ''}`} onClick={() => toggleTag(selected.id, 'launch')}>
+                        {tags[selected.id]?.launch ? '★ Lançamento' : '☆ Lançamento'}
+                      </button>
+                      <button type="button" className={`tag-pill${tags[selected.id]?.pex ? ' tp' : ''}`} onClick={() => toggleTag(selected.id, 'pex')}>
+                        {tags[selected.id]?.pex ? '★ PEX' : '☆ PEX'}
+                      </button>
+                    </div>
+
+                    <div className="sd-section">
+                      <div className="sd-section-title">Estoque</div>
+                      <div className="sd-grid">
+                        <DI label="Disponível" value={(selected.availableStock ?? 0).toLocaleString('pt-BR')} hi={(selected.availableStock ?? 0) > 0} />
+                        <DI label="Total" value={(selected.totalStock ?? 0).toLocaleString('pt-BR')} />
+                        <DI label="Reservado" value={(selected.reservedStock ?? 0).toLocaleString('pt-BR')} />
+                        <DI label="Bloqueado" value={(selected.blockedStock ?? 0).toLocaleString('pt-BR')} />
+                        {(selected.damagedStock ?? 0) > 0 && <DI label="Avariado" value={(selected.damagedStock ?? 0).toLocaleString('pt-BR')} />}
+                        <DI label="Ind. em estoque" value={(selected.industryQuantity ?? 0).toLocaleString('pt-BR')} />
+                      </div>
+                    </div>
+
+                    {(selected.inTransitQuantity ?? 0) > 0 && (
+                      <div className="sd-section">
+                        <div className="sd-section-title">Carteira (a chegar)</div>
+                        <div className="sd-grid">
+                          <DI label="Quantidade" value={(selected.inTransitQuantity ?? 0).toLocaleString('pt-BR')} hi />
+                          <DI label="Valor" value={selected.inTransitValue !== undefined ? `R$ ${brl(selected.inTransitValue)}` : '—'} />
+                        </div>
+                      </div>
+                    )}
+
+                    {lastReceipt && (
+                      <div className="sd-section">
+                        <div className="sd-section-title">Última entrada</div>
+                        <div className="sd-grid">
+                          <DI label="Data" value={lastReceipt.entryDate ?? '—'} />
+                          <DI label="Nota" value={lastReceipt.invoice ?? '—'} />
+                          <DI label="Quantidade" value={(lastReceipt.quantity ?? 0).toLocaleString('pt-BR')} />
+                          <DI label="Custo unit." value={lastReceipt.unitPrice !== undefined ? `R$ ${brl(lastReceipt.unitPrice)}` : '—'} />
+                          <DI label="Fornecedor" value={lastReceipt.supplierName ?? '—'} />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="sd-section">
+                      <div className="sd-section-title">Preços e custos</div>
+                      <div className="sd-grid">
+                        <DI label="Preço com ST" value={selected.sellerPrice !== undefined ? `R$ ${brl(selected.sellerPrice)}` : '—'} hi={selected.sellerPrice !== undefined} />
+                        <DI label="Preço sem ST" value={selected.sellerPriceWithoutTax !== undefined ? `R$ ${brl(selected.sellerPriceWithoutTax)}` : '—'} />
+                        <DI label="Custo financeiro" value={selected.financialCost !== undefined ? `R$ ${brl(selected.financialCost)}` : '—'} />
+                        <DI label="Custo real" value={selected.realCost !== undefined ? `R$ ${brl(selected.realCost)}` : '—'} />
+                        <DI label="Margem bruta" value={selected.margin !== undefined ? `${selected.margin.toFixed(1)}%` : '—'} hi={selected.margin !== undefined && selected.margin >= 30} />
+                        <DI label="Giro diário" value={selected.dailyTurnover !== undefined ? selected.dailyTurnover.toString() : '—'} />
+                        <DI label="Cobertura" value={selected.stockCoverage !== undefined ? `${selected.stockCoverage} dias` : '—'} />
+                        {selected.industryBasePrice !== undefined && <DI label="Ref. indústria" value={`R$ ${brl(selected.industryBasePrice)}`} />}
+                      </div>
+                    </div>
+
+                    <div className="sd-section">
+                      <div className="sd-section-title">Sortimento</div>
+                      <DI label="Status" value={selected.sortimentStatus ?? '—'} />
+                      <DI label="Ciclo de vida" value={selected.lifestageStatus ?? '—'} />
+                      {selected.sortimentChannels && Object.keys(selected.sortimentChannels).length > 0 && (
+                        <div className="channel-grid" style={{ marginTop: 8 }}>
+                          {Object.entries(selected.sortimentChannels)
+                            .sort((a, b) => b[1] - a[1])
+                            .map(([ch, lv]) => (
+                              <div key={ch} className={`channel-item ${channelClass(lv)}`}>
+                                <span className="ch-name">{ch}</span>
+                                <span className="ch-level">{channelLevel(lv)}</span>
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {(selected.category || selected.brand || selected.subBrand || selected.department) && (
+                      <div className="sd-section">
+                        <div className="sd-section-title">Classificação</div>
+                        <div className="sd-grid">
+                          {selected.brand && <DI label="Marca" value={selected.brand} />}
+                          {selected.subBrand && <DI label="Sub-marca" value={selected.subBrand} />}
+                          {selected.category && <DI label="Categoria" value={selected.category} />}
+                          {selected.subcategory && <DI label="Subcategoria" value={selected.subcategory} />}
+                          {selected.department && <DI label="Departamento" value={selected.department} />}
+                          {selected.ncm && <DI label="NCM" value={selected.ncm} />}
+                          {selected.taxClassification && <DI label="Tributação" value={selected.taxClassification} />}
+                          {selected.buyer && <DI label="Comprador" value={selected.buyer} />}
+                        </div>
+                      </div>
+                    )}
+
+                    {selected.unitsPerBox && (
+                      <div className="sd-section">
+                        <div className="sd-section-title">Embalagem</div>
+                        <div className="sd-grid">
+                          <DI label="Un. por caixa" value={selected.unitsPerBox.toString()} />
+                          {selected.boxesPerPallet !== undefined && <DI label="Cx. por palete" value={selected.boxesPerPallet.toString()} />}
+                          {selected.grossWeightUnit !== undefined && <DI label="Peso bruto unit." value={`${selected.grossWeightUnit} kg`} />}
+                          {selected.netWeightUnit !== undefined && <DI label="Peso líq. unit." value={`${selected.netWeightUnit} kg`} />}
+                        </div>
+                      </div>
+                    )}
+                  </aside>
+                )}
+              </div>
+            )}
           </>
         )}
       </section>
