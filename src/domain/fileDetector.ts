@@ -9,7 +9,7 @@ export type FileDetection =
   | { motor: 'produtos'; slot: 'internal' | 'industry' | 'stock' | 'price' | 'pricesheet' | 'subbrands' | 'sortiment' }
   | { motor: 'clientes'; slot: 'internal' | 'portfolio' | 'premises' }
   | { motor: 'movimentacoes'; slot: 'sales' | 'cuts' }
-  | { motor: 'historico'; slot: 'sales' | 'summary' | 'catalog' }
+  | { motor: 'historico'; slot: 'sales' | 'catalog' }
   | { motor: 'recebimentos'; slot: 'legacy' | 'current' | 'portfolio' }
   | null
 
@@ -19,8 +19,6 @@ export async function detectFile(file: File): Promise<FileDetection> {
       const content = (await file.text()).replace(/\u0000/g, '')
       if (/vendas\s+\d{2}\/[A-Z]{3}\/\d{4}\s+a\s+\d{2}\/[A-Z]{3}\/\d{4}\s+analitico\s+detalhado/i.test(content))
         return { motor: 'historico', slot: 'sales' }
-      if (/compras\s+por\s+cliente/i.test(content))
-        return { motor: 'historico', slot: 'summary' }
       if (/RELACAO\s+COMPLEMENTAR\s+-\s+CADASTRO\s+DE\s+ITENS/i.test(content) && /MILENIO/i.test(content))
         return { motor: 'historico', slot: 'catalog' }
       if (/relacao\s+de\s+notas\s+fiscais/i.test(content))

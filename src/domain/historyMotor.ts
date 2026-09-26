@@ -65,7 +65,6 @@ export async function processHistoryMotor(files: File[], options?: { catalogFile
   const seen = new Set<string>()
   const competenceSet = new Set<string>()
   let detailedFiles = 0
-  let summaries = 0
   let duplicates = 0
   let firstDate: string | undefined
   let lastDate: string | undefined
@@ -82,10 +81,6 @@ export async function processHistoryMotor(files: File[], options?: { catalogFile
 
   for (const file of files) {
     const content = (await file.text()).replace(/\u0000/g, '')
-    if (/compras\s+por\s+cliente/i.test(content)) {
-      summaries++
-      continue
-    }
     if (!/vendas\s+\d{2}\/[A-Z]{3}\/\d{4}\s+a\s+\d{2}\/[A-Z]{3}\/\d{4}\s+analitico\s+detalhado/i.test(content)) {
       audits.push(audit(`history-layout-${crypto.randomUUID()}`, 'Um arquivo não foi reconhecido', 'Envie o relatório detalhado de vendas do legado.', 'O arquivo não contém o cabeçalho esperado para vendas detalhadas. Nenhum dado dele foi usado.', 'action'))
       continue
@@ -144,7 +139,6 @@ export async function processHistoryMotor(files: File[], options?: { catalogFile
   const canonicalBase = base.sort((a, b) => a.date.localeCompare(b.date) || a.customerCode.localeCompare(b.customerCode) || a.productCode.localeCompare(b.productCode))
   const competencies = [...competenceSet].sort()
   if (detailedFiles) audits.push(audit('history-sales-ready', 'Vendas históricas organizadas', `${competencies.length} competência(s) — ${canonicalBase.length.toLocaleString('pt-BR')} linhas individuais.`, `Cada linha de venda foi mantida com data exata, CNPJ do cliente e código do vendedor.`))
-  if (summaries) audits.push(audit('history-summary-ready', 'Consolidado por cliente reconhecido', 'Use este relatório como conferência das vendas.', 'O consolidado não possui a data de cada venda e não entra na base de linhas.'))
   if (duplicates) audits.push(audit('history-duplicates', 'Linhas repetidas foram ignoradas', 'Confira os arquivos se a repetição não era esperada.', `${duplicates.toLocaleString('pt-BR')} linha(s) idêntica(s) não foram duplicadas.`, 'attention'))
   if (legacyToEan.size > 0) {
     const unmatched = canonicalBase.length - catalogHits - prefixHits
