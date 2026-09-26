@@ -48,9 +48,8 @@ function resolveCommercialLine(p: { groupFamily?: string; description?: string; 
   return classifyCommercialLine(p.description, p.category, p.subcategory)
 }
 
-function resolveSubBrand(p: { subBrand?: string; groupName?: string; description?: string; brand?: string; category?: string; subcategory?: string; productLine?: string }): string {
+function resolveSubBrand(p: { subBrand?: string; description?: string; brand?: string; category?: string; subcategory?: string; productLine?: string }): string {
   if (p.subBrand) return p.subBrand
-  if (p.groupName) return p.groupName.replace(/^COLGATE\s*-\s*/i, '').trim()
   const up = (s?: string) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase()
   const h = [p.description, p.brand, p.category, p.subcategory, p.productLine].filter(Boolean).map(v => up(v)).join(' ')
   if (/FIO DENTAL|DENTAL FLOSS/.test(h)) return 'Fio Dental'
