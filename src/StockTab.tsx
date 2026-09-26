@@ -208,10 +208,13 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
     const custoVenda = (productIndicators?.stockAtSalePrice != null)
       ? productIndicators.stockAtSalePrice
       : productBase.reduce((s, p) => { const a = p.availableStock ?? 0; return a > 0 && p.sellerPrice != null ? s + a * p.sellerPrice : s }, 0)
-    const resolvedCarteira = (productIndicators?.inTransitTotalValue != null)
+    // Carteira vem do motor de recebimentos (receiptBase), não do motor de produtos.
+    // Só usa productIndicators quando o motor de produtos efetivamente processou uma
+    // carteira própria (inTransit > 0); caso contrário o loop acima já usa receiptBase.
+    const resolvedCarteira = (productIndicators?.inTransit != null && productIndicators.inTransit > 0)
       ? productIndicators.inTransitTotalValue
       : carteiraCusto
-    const resolvedEmTransito = (productIndicators?.inTransit != null)
+    const resolvedEmTransito = (productIndicators?.inTransit != null && productIndicators.inTransit > 0)
       ? productIndicators.inTransit
       : emTransito
     const projetadoCusto = custoCusto + resolvedCarteira
