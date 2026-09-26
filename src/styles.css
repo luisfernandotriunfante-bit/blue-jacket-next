@@ -122,7 +122,7 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 .stock-charts-right { display: flex; flex-direction: column; gap: 12px; flex: 1; min-width: 220px; }
 
 /* SKU overview row */
-.stock-sku-overview { display: flex; align-items: flex-start; gap: 24px; margin-bottom: 28px; padding: 20px 20px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; flex-wrap: wrap; }
+.stock-sku-overview { display: flex; align-items: center; justify-content: center; gap: 24px; margin-bottom: 28px; padding: 20px 20px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; flex-wrap: wrap; }
 .cov-divider { width: 1px; background: var(--border); align-self: stretch; flex-shrink: 0; }
 .stock-sku-stats { display: flex; flex-direction: column; gap: 14px; flex: 1; min-width: 220px; }
 .sku-stat { display: grid; grid-template-columns: 3.6rem 1fr; grid-template-rows: auto 4px auto; column-gap: 10px; align-items: center; }
