@@ -1145,10 +1145,10 @@ function KpiCard({ label, value, accent, sub, percent, pctLabel }: {
 }) {
   return (
     <div className={`kpi-card${accent ? ` kpi-${accent}` : ''}`}>
-      <div className="kpi-card-body">
-        <div className="kpi-label">{label}</div>
-        <div className="kpi-val">{value}</div>
-        {(pctLabel || sub) && <div className="kpi-pct">{pctLabel ?? sub}</div>}
+      <div className="kpi-card-body" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px 14px 12px', gap: 5 }}>
+        <div className="kpi-label" style={{ textAlign: 'center', width: '100%' }}>{label}</div>
+        <div className="kpi-val" style={{ textAlign: 'center', width: '100%' }}>{value}</div>
+        {(pctLabel || sub) && <div className="kpi-pct" style={{ textAlign: 'center', width: '100%' }}>{pctLabel ?? sub}</div>}
       </div>
       <div className="kpi-bar">
         <div className="kpi-bar-fill" style={{ width: percent !== undefined ? `${Math.min(100, percent)}%` : '0%' }} />
