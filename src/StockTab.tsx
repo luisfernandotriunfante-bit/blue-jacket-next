@@ -188,28 +188,32 @@ export function StockTab({ productBase, receiptBase }: {
                     )}
                   </span>
                   <span className="sc-num sc-hide-sm">
-                    <span className="dual-val">
-                      <strong>{p.sellerPriceWithoutTax !== undefined ? `R$ ${brl(p.sellerPriceWithoutTax)}` : '—'}</strong>
-                      <small>UN</small>
-                    </span>
-                    {semStCx !== undefined && (
+                    {p.sellerPriceWithoutTax !== undefined ? <>
                       <span className="dual-val">
-                        <strong>{`R$ ${brl(semStCx)}`}</strong>
-                        <small>CX</small>
+                        <strong>{`R$ ${brl(p.sellerPriceWithoutTax)}`}</strong>
+                        <small>UN</small>
                       </span>
-                    )}
+                      {semStCx !== undefined && (
+                        <span className="dual-val">
+                          <strong>{`R$ ${brl(semStCx)}`}</strong>
+                          <small>CX</small>
+                        </span>
+                      )}
+                    </> : <strong className="c-muted">—</strong>}
                   </span>
                   <span className="sc-num">
-                    <span className="dual-val">
-                      <strong>{p.sellerPrice !== undefined ? `R$ ${brl(p.sellerPrice)}` : '—'}</strong>
-                      <small>UN</small>
-                    </span>
-                    {comStCx !== undefined && (
+                    {p.sellerPrice !== undefined ? <>
                       <span className="dual-val">
-                        <strong>{`R$ ${brl(comStCx)}`}</strong>
-                        <small>CX</small>
+                        <strong>{`R$ ${brl(p.sellerPrice)}`}</strong>
+                        <small>UN</small>
                       </span>
-                    )}
+                      {comStCx !== undefined && (
+                        <span className="dual-val">
+                          <strong>{`R$ ${brl(comStCx)}`}</strong>
+                          <small>CX</small>
+                        </span>
+                      )}
+                    </> : <strong className="c-muted">—</strong>}
                   </span>
                 </div>
               )
