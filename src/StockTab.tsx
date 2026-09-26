@@ -282,14 +282,18 @@ export function StockTab({ productBase, receiptBase }: {
                     >
                       <span className="sc-desc">
                         <span className="p-name">{p.description ?? '—'}</span>
+                        {(p.package || p.netWeightUnit !== undefined) && (
+                          <span className="p-pkg-line">
+                            {p.package && <span className="p-pack">{p.package}</span>}
+                            {p.netWeightUnit !== undefined && fmtWeight(p.netWeightUnit) && (
+                              <span className="p-weight">{fmtWeight(p.netWeightUnit)}</span>
+                            )}
+                          </span>
+                        )}
                         <span className="p-meta">
                           {p.internalCode && <code>{p.internalCode}</code>}
                           {p.brand && <span>{p.brand}</span>}
                           {p.groupName && <span className="p-group">{p.groupName}</span>}
-                          {p.package && <span className="p-pack">{p.package}</span>}
-                          {p.netWeightUnit !== undefined && fmtWeight(p.netWeightUnit) && (
-                            <span className="p-weight">{fmtWeight(p.netWeightUnit)}</span>
-                          )}
                           {tags[p.id]?.launch && <span className="badge-launch">Lançamento</span>}
                           {tags[p.id]?.pex && <span className="badge-pex">PEX</span>}
                         </span>
