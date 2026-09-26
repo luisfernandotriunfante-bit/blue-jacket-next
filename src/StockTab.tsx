@@ -211,14 +211,9 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
     // Carteira vem do motor de recebimentos (receiptBase), não do motor de produtos.
     // Só usa productIndicators quando o motor de produtos efetivamente processou uma
     // carteira própria (inTransit > 0); caso contrário o loop acima já usa receiptBase.
-    const grossCarteira = (productIndicators?.inTransit != null && productIndicators.inTransit > 0)
+    const resolvedCarteira = (productIndicators?.inTransit != null && productIndicators.inTransit > 0)
       ? productIndicators.inTransitTotalValue
       : carteiraCusto
-    // Valor líquido = carteira bruta (Colgate) − notas que já deram entrada no Milênio
-    const receivedTotal = receiptBase
-      .filter(r => r.status === 'recebida')
-      .reduce((s, r) => s + (r.value ?? 0), 0)
-    const resolvedCarteira = Math.max(0, grossCarteira - receivedTotal)
     const resolvedEmTransito = (productIndicators?.inTransit != null && productIndicators.inTransit > 0)
       ? productIndicators.inTransit
       : emTransito
