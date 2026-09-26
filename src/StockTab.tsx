@@ -156,6 +156,14 @@ export function StockTab({ productBase, receiptBase }: {
   }, [tags])
 
   const kpis = useMemo(() => {
+    // Agrega carteira dos receipts em_transito (productCode = código fabricante / material)
+    const transitByMfr = new Map<string, { qty: number; value: number }>()
+    for (const r of receiptBase) {
+      if (r.status !== 'em_transito' || !r.productCode) continue
+      const cur = transitByMfr.get(r.productCode) ?? { qty: 0, value: 0 }
+      transitByMfr.set(r.productCode, { qty: cur.qty + (r.quantity ?? 0), value: cur.value + (r.value ?? 0) })
+    }
+
     let comEstoque = 0, semEstoque = 0, emTransito = 0, comPreco = 0
     let custoCusto = 0, custoVenda = 0, carteiraCusto = 0
     for (const p of productBase) {
@@ -164,11 +172,18 @@ export function StockTab({ productBase, receiptBase }: {
         comEstoque++
         if (p.sellerPrice !== undefined) comPreco++
       } else semEstoque++
-      if ((p.inTransitQuantity ?? 0) > 0) emTransito++
+      // Trânsito: preferência pelo campo do produto (productMotor), fallback pelos receipts
+      const tQty = (p.inTransitQuantity ?? 0) > 0
+        ? (p.inTransitQuantity ?? 0)
+        : (p.manufacturerCode ? transitByMfr.get(p.manufacturerCode)?.qty ?? 0 : 0)
+      const tVal = (p.inTransitValue ?? 0) > 0
+        ? (p.inTransitValue ?? 0)
+        : (p.manufacturerCode ? transitByMfr.get(p.manufacturerCode)?.value ?? 0 : 0)
+      if (tQty > 0) emTransito++
       const cost = p.realCost ?? p.financialCost
       if (cost !== undefined && avail > 0) custoCusto += avail * cost
       if (p.sellerPrice !== undefined && avail > 0) custoVenda += avail * p.sellerPrice
-      carteiraCusto += p.inTransitValue ?? 0
+      carteiraCusto += tVal
     }
     const projetadoCusto = custoCusto + carteiraCusto
     const projetadoVenda = markup > 0 ? projetadoCusto * (1 + markup / 100) : null
@@ -176,7 +191,7 @@ export function StockTab({ productBase, receiptBase }: {
     const marginRatio = custoVenda > 0 ? custoCusto / custoVenda : null
     const transitRatio = projetadoCusto > 0 ? carteiraCusto / projetadoCusto : null
     return { comEstoque, semEstoque, emTransito, comPreco, total: productBase.length, custoCusto, custoVenda, carteiraCusto, projetadoCusto, projetadoVenda, pricedCoverage, marginRatio, transitRatio }
-  }, [productBase, markup])
+  }, [productBase, receiptBase, markup])
 
   const coverageStats = useMemo(() => {
     const now = Date.now()
