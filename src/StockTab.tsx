@@ -19,6 +19,13 @@ const fmtDate = (iso?: string) => {
   return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso
 }
 
+const fmtWeight = (kg: number) => {
+  if (kg <= 0) return null
+  if (kg < 1) return `${Math.round(kg * 1000)}g`
+  const s = kg.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 3 })
+  return `${s}kg`
+}
+
 const normCh = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
 const isBlockedChannel = (ch: string) => {
   const n = normCh(ch)
@@ -279,6 +286,10 @@ export function StockTab({ productBase, receiptBase }: {
                           {p.internalCode && <code>{p.internalCode}</code>}
                           {p.brand && <span>{p.brand}</span>}
                           {p.groupName && <span className="p-group">{p.groupName}</span>}
+                          {p.package && <span className="p-pack">{p.package}</span>}
+                          {p.netWeightUnit !== undefined && fmtWeight(p.netWeightUnit) && (
+                            <span className="p-weight">{fmtWeight(p.netWeightUnit)}</span>
+                          )}
                           {tags[p.id]?.launch && <span className="badge-launch">Lançamento</span>}
                           {tags[p.id]?.pex && <span className="badge-pex">PEX</span>}
                         </span>
