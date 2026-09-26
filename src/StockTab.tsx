@@ -568,7 +568,7 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
               <KpiCard
                 label="Carteira em trânsito"
                 value={kpis.carteiraCusto > 0 ? kpiCurrency(kpis.carteiraCusto) : '—'}
-                accent="white"
+                accent="red"
                 percent={kpis.emTransito > 0 && kpis.total > 0 ? (kpis.emTransito / kpis.total) * 100 : undefined}
                 pctLabel={kpis.emTransito > 0 ? `${kpis.emTransito.toLocaleString('pt-BR')} SKUs em trânsito` : 'Sem Carteira em aberto'}
               />
