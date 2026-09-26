@@ -119,7 +119,6 @@ export function StockTab({ productBase, receiptBase }: {
   const [filterMarcacao, setFilterMarcacao] = useState<'all' | 'mandatory' | 'important'>('all')
   const [selected, setSelected] = useState<CanonicalProduct | null>(null)
   const [tags, setTags] = useState<Tags>(loadTags)
-  const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null)
   const [markup, setMarkup] = useState<number>(() => {
     try { return Number(localStorage.getItem('rj-markup-pct') ?? '0') || 0 }
     catch { return 0 }
@@ -258,6 +257,27 @@ export function StockTab({ productBase, receiptBase }: {
       totalValue: items.reduce((s, r) => s + (r.value ?? 0), 0),
     }))
   }, [receiptBase])
+
+  const arrivalBuckets = useMemo(() => {
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const todayMs = today.getTime()
+    const buckets = [
+      { key: 'atrasadas', label: 'Atrasadas', count: 0, value: 0 },
+      { key: 'ate7', label: 'Até 7 dias', count: 0, value: 0 },
+      { key: 'ate15', label: '8 a 15 dias', count: 0, value: 0 },
+      { key: 'mais16', label: '16+ dias', count: 0, value: 0 },
+      { key: 'semdata', label: 'Sem previsão', count: 0, value: 0 },
+    ]
+    for (const inv of arrivalInvoices) {
+      if (!inv.date) { buckets[4].count++; buckets[4].value += inv.totalValue; continue }
+      const diff = Math.round((new Date(inv.date).setHours(0,0,0,0) - todayMs) / 86_400_000)
+      if (diff < 0) { buckets[0].count++; buckets[0].value += inv.totalValue }
+      else if (diff <= 7) { buckets[1].count++; buckets[1].value += inv.totalValue }
+      else if (diff <= 15) { buckets[2].count++; buckets[2].value += inv.totalValue }
+      else { buckets[3].count++; buckets[3].value += inv.totalValue }
+    }
+    return buckets
+  }, [arrivalInvoices])
 
   const availableChannels = useMemo(() => {
     const seen = new Set<string>()
@@ -414,61 +434,31 @@ export function StockTab({ productBase, receiptBase }: {
 
             <StockTreemap data={treemapData} />
 
-            <div className="stock-arrivals">
-              <div className="arrivals-head">
-                Carteira em trânsito
-                {arrivalInvoices.length > 0 && (
-                  <span className="arrivals-count">{arrivalInvoices.length} nota{arrivalInvoices.length !== 1 ? 's' : ''}</span>
-                )}
+            <div className="arrivals-panel">
+              <div className="arrivals-panel-head">
+                <span className="arrivals-panel-label">Entradas previstas</span>
+                <span className="arrivals-panel-total">
+                  {arrivalInvoices.length > 0
+                    ? `${arrivalInvoices.length} NF${arrivalInvoices.length !== 1 ? 's' : ''} · R$ ${brl(arrivalInvoices.reduce((s, i) => s + i.totalValue, 0))}`
+                    : 'Sem carteira em aberto'}
+                </span>
               </div>
-              {arrivalInvoices.length === 0 ? (
-                <p className="empty" style={{ padding: '24px 16px' }}>
-                  Sem entradas previstas. Importe a carteira em Administração.
-                </p>
-              ) : arrivalInvoices.map(inv => (
-                <div key={inv.invoice} className="arrival-invoice">
-                  <button
-                    type="button"
-                    className={`arrival-inv-btn${expandedInvoice === inv.invoice ? ' open' : ''}`}
-                    onClick={() => setExpandedInvoice(ex => ex === inv.invoice ? null : inv.invoice)}
-                  >
-                    <span className="arr-inv-note">
-                      <span className="arr-inv-code">{inv.displayInvoice}</span>
-                      <span className="arr-inv-items-count">{inv.items.length} ite{inv.items.length !== 1 ? 'ns' : 'm'}</span>
-                    </span>
-                    <span className="arr-inv-date">{fmtDate(inv.date)}</span>
-                    <span className="arr-inv-supplier">{inv.supplier ?? '—'}</span>
-                    <span className="arr-inv-totals">
-                      <strong>{inv.totalQty.toLocaleString('pt-BR')} UN</strong>
-                      {inv.totalValue > 0 && <small>R$ {brl(inv.totalValue)}</small>}
-                    </span>
-                    <span className="arr-inv-chevron" aria-hidden="true">▾</span>
-                  </button>
-                  {expandedInvoice === inv.invoice && (
-                    <div className="arrival-inv-items">
-                      {inv.items.map((r, i) => {
-                        const prod = productBase.find(p => p.internalCode === r.productCode)
-                        const desc = r.description ?? prod?.description ?? r.productCode ?? '—'
-                        return (
-                          <div key={i} className="arrival-row">
-                            <span className="arr-desc">
-                              <span>{desc}</span>
-                              {r.productCode && <code className="arr-code">{r.productCode}</code>}
-                            </span>
-                            <span className="arr-qty">
-                              <strong>{(r.quantity ?? 0).toLocaleString('pt-BR')}</strong>
-                              <small>UN</small>
-                            </span>
-                            <span className="arr-val">
-                              {r.value ? `R$ ${brl(r.value)}` : '—'}
-                            </span>
-                          </div>
-                        )
-                      })}
+              <div className="arrivals-buckets">
+                {arrivalBuckets.map((b, idx) => (
+                  <div key={b.key} className={`arrivals-bucket${b.key === 'atrasadas' && b.count > 0 ? ' is-late' : ''}`}>
+                    {idx > 0 && <div className="arrivals-bucket-sep" />}
+                    <div className="arrivals-bucket-label">{b.label}</div>
+                    <div className="arrivals-bucket-count">
+                      {b.count > 0
+                        ? <><strong>{b.count}</strong> <span>NF{b.count !== 1 ? 's' : ''}</span></>
+                        : <span className="arrivals-bucket-empty">—</span>}
                     </div>
-                  )}
-                </div>
-              ))}
+                    {b.value > 0 && (
+                      <div className="arrivals-bucket-value">R$ {brl(b.value)}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </>
         ) : (
