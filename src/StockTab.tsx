@@ -47,6 +47,38 @@ function resolveCommercialLine(p: { groupFamily?: string; description?: string; 
   }
   return classifyCommercialLine(p.description, p.category, p.subcategory)
 }
+
+function resolveSubBrand(p: { subBrand?: string; groupName?: string; description?: string; brand?: string; category?: string; subcategory?: string; productLine?: string }): string {
+  if (p.subBrand) return p.subBrand
+  if (p.groupName) return p.groupName.replace(/^COLGATE\s*-\s*/i, '').trim()
+  const up = (s?: string) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase()
+  const h = [p.description, p.brand, p.category, p.subcategory, p.productLine].filter(Boolean).map(v => up(v)).join(' ')
+  if (/FIO DENTAL|DENTAL FLOSS/.test(h)) return 'Fio Dental'
+  if (/ENXAG|MOUTHWASH/.test(h)) return 'Enxaguantes'
+  if (/COLGATE.*TOTAL|\bCD TOTAL\b/.test(h)) return 'CD Total'
+  if (/SORRISO/.test(h) && /ESCOVA|\bTB\b/.test(h)) return 'Escova Sorriso'
+  if (/SORRISO/.test(h) && !/ESCOVA|\bTB\b/.test(h)) return 'Creme Sorriso'
+  if (/LUMINOUS|TT12|NATURALS|PREMIUM/.test(h)) return 'CD Premium'
+  if (/ESCOVA.*DENTAL|TOOTHBRUSH/.test(h)) return 'Escovas'
+  if (/\bESCOVA\b/.test(h)) return 'Escovas'
+  if (/AJAX/.test(h)) return 'Ajax'
+  if (/PINHO SOL|\bPINHO\b/.test(h)) return 'Pinho Sol'
+  if (/\bOLA\b/.test(h)) return 'Ola'
+  if (/PROTEX/.test(h)) return 'Protex'
+  if (/PALMOLIVE/.test(h) && /SHAMPOO|\bSH\b/.test(h)) return 'Shampoo Palmolive'
+  if (/PALMOLIVE/.test(h) && /CONDICIONADOR|\bCOND\b/.test(h)) return 'Condicionador Palmolive'
+  if (/PALMOLIVE/.test(h) && /SAB|SOAP/.test(h)) return 'Palmolive Sabonete'
+  if (/PALMOLIVE/.test(h)) return 'Palmolive'
+  if (/DARLING/.test(h) && /SHAMPOO|\bSH\b/.test(h)) return 'Shampoo Darling'
+  if (/DARLING/.test(h) && /CONDICIONADOR|\bCOND\b/.test(h)) return 'Condicionador Darling'
+  if (/DARLING/.test(h)) return 'Darling'
+  if (/CONDICIONADOR|\bCOND\b/.test(h)) return 'Condicionador'
+  if (/SHAMPOO|\bSH\b/.test(h)) return 'Shampoo'
+  if (/CREME DENTAL|TOOTHPASTE|\bCD\b/.test(h)) return 'Creme Dental'
+  if (/\bSAB\b|SABONETE|SOAP/.test(h)) return 'Sabonetes'
+  if (/LIMPADOR|DESINFETANTE|DESINF|LIMP/.test(h)) return 'Limpeza'
+  return '(sem sub-brand)'
+}
 const brl = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const kpiCurrency = (n: number) => {
   if (n >= 1_000_000) return `R$ ${(n / 1_000_000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}M`
@@ -131,8 +163,7 @@ export function StockTab({ productBase, receiptBase }: {
     for (const p of productBase) {
       const line = resolveCommercialLine(p)
       if (!line) continue
-      // Prefere subBrand do 8013; se não existir, usa groupName (produto agrupado automaticamente)
-      const sub = p.subBrand ?? p.groupName ?? '(sem sub-brand)'
+      const sub = resolveSubBrand(p)
       const avail = p.availableStock ?? 0
       const val = avail > 0 && p.sellerPrice !== undefined ? avail * p.sellerPrice : 0
       if (!lineMap.has(line)) lineMap.set(line, new Map())
