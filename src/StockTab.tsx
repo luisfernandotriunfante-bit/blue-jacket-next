@@ -178,7 +178,7 @@ export function StockTab({ productBase, receiptBase }: {
 
   const coverageStats = useMemo(() => {
     const now = Date.now()
-    // taxa de reposição por código de produto (proxy de consumo diário)
+    // Acumula qtd recebida por código Winthor (productCode nas notas de entrada = internalCode do produto)
     const acc = new Map<string, { qty: number; firstMs: number }>()
     for (const r of receiptBase) {
       if (r.status !== 'recebida' || !r.productCode || !r.quantity || !r.entryDate) continue
@@ -188,17 +188,19 @@ export function StockTab({ productBase, receiptBase }: {
       if (!cur) acc.set(r.productCode, { qty: r.quantity, firstMs: ms })
       else { cur.qty += r.quantity; if (ms < cur.firstMs) cur.firstMs = ms }
     }
+    // taxa de reposição diária: unidades recebidas / dias desde a primeira entrada
     const dailyRate = new Map<string, number>()
-    for (const [code, s] of acc) {
+    for (const [c, s] of acc) {
       const span = Math.max(1, (now - s.firstMs) / 86_400_000)
-      dailyRate.set(code, s.qty / span)
+      dailyRate.set(c, s.qty / span)
     }
     let critico = 0, adequado = 0, excesso = 0, semHistorico = 0
     const [low, high] = covDays
     for (const p of productBase) {
       const avail = p.availableStock ?? 0
       if (avail <= 0) { critico++; continue }
-      const rate = p.manufacturerCode ? dailyRate.get(p.manufacturerCode) : undefined
+      // match por internalCode (código Winthor = productCode nas notas de entrada)
+      const rate = p.internalCode ? dailyRate.get(p.internalCode) : undefined
       if (!rate) { semHistorico++; continue }
       const dias = avail / rate
       if (dias < low) critico++
