@@ -21,20 +21,20 @@ const motors: Array<{ id: Exclude<SourceArea, 'diario'>; name: string }> = [
 
 const areaName: Record<SourceArea, string> = { diario: 'Diários', produtos: 'Produtos', clientes: 'Clientes', movimentacoes: 'Movimentações', recebimentos: 'Chegada de notas', historico: 'Histórico' }
 const clientSources = [
-  { id: 'internal', label: 'Cadastro interno' },
-  { id: 'portfolio', label: 'Carteira' },
-  { id: 'premises', label: 'Premissas' },
+  { id: 'internal', label: 'Cadastro de clientes (1203)' },
+  { id: 'portfolio', label: 'Carteira de clientes' },
+  { id: 'premises', label: 'Premissas de clientes' },
 ] as const
 const productSources = [
-  { id: 'internal', label: 'Cadastro interno' }, { id: 'industry', label: 'Lista da indústria' }, { id: 'stock', label: 'Estoque atual' }, { id: 'price', label: 'Preço de venda (8011)' }, { id: 'pricesheet', label: 'Planilha de preços (PREÇO UND / com ST)' }, { id: 'subbrands', label: 'Sub-marcas (8013)' }, { id: 'sortiment', label: 'Sortimento' },
+  { id: 'internal', label: 'Cadastro de produtos (286)' }, { id: 'industry', label: 'Lista SAP da indústria' }, { id: 'stock', label: 'Estoque atual (1118)' }, { id: 'price', label: 'Preço de venda (8011)' }, { id: 'pricesheet', label: 'Planilha de preços (PREÇO UND / com ST)' }, { id: 'subbrands', label: 'Sub-marcas (8013)' }, { id: 'sortiment', label: 'Sortimento SAP' },
 ] as const
 const historySources = [
-  { id: 'sales', label: 'Vendas detalhadas do legado' }, { id: 'catalog', label: 'Catálogo Milênio (de-para)' },
+  { id: 'sales', label: 'Vendas detalhadas do legado (.txt)' }, { id: 'catalog', label: 'Catálogo Milênio — de-para (12.322)' },
 ] as const
 const movementSources = [
-  { id: 'sales', label: 'Vendas atuais' }, { id: 'cuts', label: 'Cortes por cliente' },
+  { id: 'sales', label: 'Vendas atuais (8022)' }, { id: 'cuts', label: 'Corte de mercadorias (1454)' },
 ] as const
-const receiptSources = [{ id: 'legacy', label: 'Notas do legado' }, { id: 'current', label: 'Entradas atuais por nota' }, { id: 'portfolio', label: 'Carteira da Colgate' }] as const
+const receiptSources = [{ id: 'legacy', label: 'Relação de notas fiscais (.txt)' }, { id: 'current', label: 'Entrada de mercadoria (218)' }, { id: 'portfolio', label: 'Carteira SAP (Excel)' }] as const
 type ClientIndicators = { totalClients: number; internal: number; portfolio: number; premises: number; complete: number }
 type SavedClientMotor = { base: CanonicalClient[]; audit: AuditItem[]; indicators: ClientIndicators | null; slots: Partial<Record<(typeof clientSources)[number]['id'], UploadedFile>> }
 type SavedProductMotor = { base: CanonicalProduct[]; audit: AuditItem[]; indicators: ProductIndicators | null; slots: Partial<Record<(typeof productSources)[number]['id'], UploadedFile>> }
