@@ -76,12 +76,18 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 .stock-toolbar { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
 .stock-search { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 14px; }
 .stock-search:focus { outline: none; border-color: var(--red); }
-.stock-filters { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
-.filter-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.filter-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; min-width: 74px; flex-shrink: 0; }
-.chip { padding: 4px 11px; border: 1px solid var(--border); border-radius: 20px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
-.chip.on { border-color: var(--red); background: var(--red); color: #fff; }
-.chip:hover:not(.on) { border-color: var(--text); color: var(--text); }
+/* Product filters — mirrored from old system */
+.pf-bar { display: flex; gap: 10px; margin-bottom: 12px; }
+.pf-input, .pf-select { min-height: 40px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); padding: 0 13px; font: inherit; font-size: 14px; }
+.pf-input { flex: 1; }
+.pf-select { min-width: 165px; cursor: pointer; }
+.pf-input:focus, .pf-select:focus { outline: none; border-color: var(--red); }
+.pf-range { margin: 0 0 12px; padding: 0; border: 0; }
+.pf-range legend { display: block; margin-bottom: 8px; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.pf-range > div { display: flex; flex-wrap: wrap; gap: 7px; }
+.pf-range button { min-height: 30px; padding: 0 13px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.pf-range button:hover { border-color: var(--text); color: var(--text); }
+.pf-range button.is-active { border-color: var(--red); background: var(--red); color: #fff; }
 /* KPIs */
 .stock-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 20px; }
 .kpi-card { padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; display: flex; flex-direction: column; gap: 5px; }

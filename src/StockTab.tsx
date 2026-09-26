@@ -198,40 +198,47 @@ export function StockTab({ productBase, receiptBase }: {
         ) : (
           <>
             <div className="stock-toolbar">
-              <input
-                ref={searchRef}
-                className="stock-search"
-                placeholder="Descrição · código interno · 4+ dígitos finais do EAN · cód. fab. (ex: FBR120)…"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
-              <div className="stock-filters">
-                <div className="filter-row">
-                  <span className="filter-label">Status</span>
-                  {(['all', 'com_estoque', 'sem_estoque', 'em_transito'] as const).map(s => (
-                    <button key={s} type="button" className={`chip${filterStatus === s ? ' on' : ''}`} onClick={() => setFilterStatus(s)}>
-                      {s === 'all' ? 'Todos' : s === 'com_estoque' ? 'Com estoque' : s === 'sem_estoque' ? 'Sem estoque' : 'Em trânsito'}
-                    </button>
-                  ))}
-                </div>
-                {availableChannels.length > 0 && (
-                  <div className="filter-row">
-                    <span className="filter-label">Sortimento</span>
-                    <button type="button" className={`chip${filterChannel === '' ? ' on' : ''}`} onClick={() => setFilterChannel('')}>Todos</button>
+              <div className="pf-bar">
+                <input
+                  ref={searchRef}
+                  className="pf-input"
+                  placeholder="Buscar produto, EAN ou código interno…"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                />
+                <select
+                  className="pf-select"
+                  value={filterStatus}
+                  onChange={e => setFilterStatus(e.target.value as StockFilter)}
+                  aria-label="Filtrar situação"
+                >
+                  <option value="all">Todas as situações</option>
+                  <option value="com_estoque">Com estoque</option>
+                  <option value="sem_estoque">Sem estoque</option>
+                  <option value="em_transito">Em trânsito</option>
+                </select>
+              </div>
+              {availableChannels.length > 0 && (
+                <fieldset className="pf-range">
+                  <legend>Sortimento</legend>
+                  <div>
+                    <button type="button" className={filterChannel === '' ? 'is-active' : ''} onClick={() => setFilterChannel('')}>Todos</button>
                     {availableChannels.map(ch => (
-                      <button key={ch} type="button" className={`chip${filterChannel === ch ? ' on' : ''}`} onClick={() => setFilterChannel(ch)}>{ch}</button>
+                      <button key={ch} type="button" className={filterChannel === ch ? 'is-active' : ''} onClick={() => setFilterChannel(ch)}>{ch}</button>
                     ))}
                   </div>
-                )}
-                <div className="filter-row">
-                  <span className="filter-label">Marcação</span>
+                </fieldset>
+              )}
+              <fieldset className="pf-range">
+                <legend>Marcação</legend>
+                <div>
                   {(['all', 'mandatory', 'important'] as const).map(m => (
-                    <button key={m} type="button" className={`chip${filterMarcacao === m ? ' on' : ''}`} onClick={() => setFilterMarcacao(m)}>
+                    <button key={m} type="button" className={filterMarcacao === m ? 'is-active' : ''} onClick={() => setFilterMarcacao(m)}>
                       {m === 'all' ? 'Todos' : m === 'mandatory' ? 'Mandatório' : 'Importante'}
                     </button>
                   ))}
                 </div>
-              </div>
+              </fieldset>
             </div>
 
             <div className="stock-count">
