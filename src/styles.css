@@ -92,14 +92,14 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 /* KPIs */
 .stock-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap: 12px; margin-bottom: 24px; }
 .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; display: flex; flex-direction: column; min-height: 126px; overflow: hidden; }
-.kpi-card-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 16px 14px 12px; gap: 5px; }
-.kpi-label { font-size: 10px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; text-align: center; }
-.kpi-val { font-size: clamp(1.1rem, 1.55vw, 1.62rem); font-weight: 800; line-height: 1.05; font-family: 'Space Grotesk', sans-serif; letter-spacing: -.025em; overflow-wrap: anywhere; color: var(--text); text-align: center; }
+.kpi-card-body { flex: 1; display: grid; place-content: center; padding: 16px 14px 12px; gap: 5px; }
+.kpi-label { font-size: 10px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; text-align: center; width: 100%; }
+.kpi-val { font-size: clamp(1.1rem, 1.55vw, 1.62rem); font-weight: 800; line-height: 1.05; font-family: 'Space Grotesk', sans-serif; letter-spacing: -.025em; overflow-wrap: anywhere; color: var(--text); text-align: center; width: 100%; }
 .kpi-card.kpi-green .kpi-val { color: var(--green); }
 .kpi-card.kpi-red .kpi-val { color: var(--red); }
 .kpi-card.kpi-amber .kpi-val { color: var(--amber); }
-.kpi-pct { font-size: 11px; font-weight: 600; color: var(--muted); line-height: 1.3; text-align: center; }
-.kpi-sub { font-size: 10px; color: var(--muted); text-align: center; }
+.kpi-pct { font-size: 11px; font-weight: 600; color: var(--muted); line-height: 1.3; text-align: center; width: 100%; }
+.kpi-sub { font-size: 10px; color: var(--muted); text-align: center; width: 100%; }
 .kpi-bar { height: 4px; background: var(--border); flex-shrink: 0; }
 .kpi-bar-fill { height: 100%; transition: width 0.8s cubic-bezier(0.4,0,0.2,1); }
 .kpi-card.kpi-green .kpi-bar-fill { background: var(--green); }
