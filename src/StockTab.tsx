@@ -770,21 +770,18 @@ function StockTreemap({ data }: {
   )
 }
 
-function KpiCard({ label, value, accent, sub, percent, pctLabel, big }: {
+function KpiCard({ label, value, accent, sub, percent, pctLabel }: {
   label: string; value: string; accent?: 'green' | 'red' | 'amber'; sub?: string;
-  percent?: number; pctLabel?: string; big?: boolean
+  percent?: number; pctLabel?: string
 }) {
   return (
-    <div className={`kpi-card${accent ? ` kpi-${accent}` : ''}${big ? ' kpi-big' : ''}`}>
-      <div className="kpi-val">{value}</div>
+    <div className={`kpi-card${accent ? ` kpi-${accent}` : ''}`}>
       <div className="kpi-label">{label}</div>
-      {pctLabel && <div className="kpi-pct">{pctLabel}</div>}
-      {sub && <div className="kpi-sub">{sub}</div>}
-      {percent !== undefined && (
-        <div className="kpi-bar">
-          <div className="kpi-bar-fill" style={{ width: `${Math.min(100, percent)}%` }} />
-        </div>
-      )}
+      <div className="kpi-val">{value}</div>
+      {(pctLabel || sub) && <div className="kpi-pct">{pctLabel ?? sub}</div>}
+      <div className="kpi-bar">
+        <div className="kpi-bar-fill" style={{ width: percent !== undefined ? `${Math.min(100, percent)}%` : '0%' }} />
+      </div>
     </div>
   )
 }
@@ -807,7 +804,7 @@ function StockDonut({ segments, total }: {
     <div className="stock-donut-wrap">
       <div className="donut-svg-wrap">
         <svg viewBox="0 0 120 120">
-          <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--border)" strokeWidth="12" />
+          <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="12" />
           <g transform={`rotate(-90 ${cx} ${cy})`}>
             {arcs.map((arc, i) => arc.dash > 0 && (
               <circle key={i} cx={cx} cy={cy} r={r}
