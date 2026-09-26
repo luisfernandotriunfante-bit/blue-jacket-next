@@ -358,7 +358,14 @@ function ConfigTab() {
     try { const v = localStorage.getItem('rj-markup-pct'); return v ? v : '' }
     catch { return '' }
   })
-  const [saved, setSaved] = useState(false)
+  const [savedMarkup, setSavedMarkup] = useState(false)
+
+  const initCovDays = (): [string, string] => {
+    try { const v = JSON.parse(localStorage.getItem('rj-cov-days') ?? 'null'); return v ? [String(v[0]), String(v[1])] : ['30', '90'] }
+    catch { return ['30', '90'] }
+  }
+  const [[covLow, covHigh], setCovInputs] = useState<[string, string]>(initCovDays)
+  const [savedCov, setSavedCov] = useState(false)
 
   function saveMarkup() {
     const val = parseFloat(markupInput.replace(',', '.'))
@@ -366,8 +373,20 @@ function ConfigTab() {
       try {
         localStorage.setItem('rj-markup-pct', String(val))
         window.dispatchEvent(new Event('rj-markup-changed'))
-        setSaved(true)
-        setTimeout(() => setSaved(false), 2000)
+        setSavedMarkup(true)
+        setTimeout(() => setSavedMarkup(false), 2000)
+      } catch { /* quota */ }
+    }
+  }
+
+  function saveCovDays() {
+    const low = parseInt(covLow), high = parseInt(covHigh)
+    if (!isNaN(low) && !isNaN(high) && low >= 1 && high > low && high <= 730) {
+      try {
+        localStorage.setItem('rj-cov-days', JSON.stringify([low, high]))
+        window.dispatchEvent(new Event('rj-covdays-changed'))
+        setSavedCov(true)
+        setTimeout(() => setSavedCov(false), 2000)
       } catch { /* quota */ }
     }
   }
@@ -389,12 +408,46 @@ function ConfigTab() {
             inputMode="decimal"
             placeholder="Ex.: 35"
             value={markupInput}
-            onChange={e => { setMarkupInput(e.target.value); setSaved(false) }}
+            onChange={e => { setMarkupInput(e.target.value); setSavedMarkup(false) }}
             onKeyDown={e => e.key === 'Enter' && saveMarkup()}
           />
           <span className="config-unit">%</span>
           <button className="process-button" style={{ margin: 0 }} type="button" onClick={saveMarkup}>
-            {saved ? 'Salvo ✓' : 'Salvar'}
+            {savedMarkup ? 'Salvo ✓' : 'Salvar'}
+          </button>
+        </div>
+      </div>
+      <div className="config-group">
+        <label className="config-label">Cobertura de estoque — limiares de alerta (dias)</label>
+        <p className="config-help">
+          Define os limiares do donut de cobertura no painel Estoque. Um SKU é classificado como <strong>Crítico</strong> quando
+          seus dias de cobertura estimados ficam abaixo do primeiro limiar, e como <strong>Excesso</strong> acima do segundo.
+          O cálculo usa a taxa de reposição histórica das notas de entrada como proxy de consumo diário.
+        </p>
+        <div className="config-input-row">
+          <span className="config-unit" style={{ marginRight: 2 }}>Crítico &lt;</span>
+          <input
+            className="config-input"
+            style={{ width: 64 }}
+            type="number" min={1} max={365}
+            placeholder="30"
+            value={covLow}
+            onChange={e => { setCovInputs([e.target.value, covHigh]); setSavedCov(false) }}
+            onKeyDown={e => e.key === 'Enter' && saveCovDays()}
+          />
+          <span className="config-unit">d · Excesso &gt;</span>
+          <input
+            className="config-input"
+            style={{ width: 64 }}
+            type="number" min={1} max={730}
+            placeholder="90"
+            value={covHigh}
+            onChange={e => { setCovInputs([covLow, e.target.value]); setSavedCov(false) }}
+            onKeyDown={e => e.key === 'Enter' && saveCovDays()}
+          />
+          <span className="config-unit">d</span>
+          <button className="process-button" style={{ margin: 0 }} type="button" onClick={saveCovDays}>
+            {savedCov ? 'Salvo ✓' : 'Salvar'}
           </button>
         </div>
       </div>

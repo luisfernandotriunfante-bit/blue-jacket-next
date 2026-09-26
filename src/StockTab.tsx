@@ -140,6 +140,15 @@ export function StockTab({ productBase, receiptBase }: {
   }, [])
 
   useEffect(() => {
+    const handler = () => {
+      try { setCovDays(JSON.parse(localStorage.getItem('rj-cov-days') ?? 'null') ?? [30, 90]) }
+      catch { /* */ }
+    }
+    window.addEventListener('rj-covdays-changed', handler)
+    return () => window.removeEventListener('rj-covdays-changed', handler)
+  }, [])
+
+  useEffect(() => {
     try { localStorage.setItem('rj-product-tags', JSON.stringify(tags)) }
     catch { /* quota exceeded */ }
   }, [tags])
@@ -359,6 +368,7 @@ export function StockTab({ productBase, receiptBase }: {
             </div>
 
             <div className="stock-sku-overview">
+              {/* Donut 1 — status físico */}
               <StockDonut
                 segments={[
                   { value: kpis.comEstoque, color: 'var(--green)', label: 'Com estoque' },
@@ -369,55 +379,35 @@ export function StockTab({ productBase, receiptBase }: {
                 centerLabel="SKUs"
               />
               <div className="cov-divider" />
-              <div className="cov-donut-wrap">
-                <StockDonut
-                  segments={coverageStats.hasHistory ? [
-                    { value: coverageStats.critico, color: 'var(--red)', label: `Crítico  <${covDays[0]}d` },
-                    { value: coverageStats.adequado, color: 'var(--green)', label: `Adequado  ${covDays[0]}–${covDays[1]}d` },
-                    { value: coverageStats.excesso, color: 'var(--amber)', label: `Excesso  >${covDays[1]}d` },
-                    ...(coverageStats.semHistorico > 0 ? [{ value: coverageStats.semHistorico, color: 'var(--border)', label: 'Sem histórico' }] : []),
-                  ] : [
-                    { value: 1, color: 'var(--border)', label: 'Sem histórico de entradas' },
-                  ]}
-                  total={coverageStats.total || 1}
-                  centerLabel="Cobertura"
-                />
-                <div className="cov-thresholds">
-                  <span className="cov-thresh-label">Crítico abaixo de</span>
-                  <div className="cov-thresh-row">
-                    <input
-                      type="number" min={1} max={365}
-                      className="cov-thresh-input"
-                      value={covDays[0]}
-                      onChange={e => {
-                        const v = Math.max(1, Math.min(365, Number(e.target.value) || 1))
-                        const next: [number, number] = [v, Math.max(v + 1, covDays[1])]
-                        setCovDays(next)
-                        try { localStorage.setItem('rj-cov-days', JSON.stringify(next)) } catch { /* */ }
-                      }}
-                    />
-                    <span className="cov-thresh-unit">dias</span>
-                  </div>
-                  <span className="cov-thresh-label">Excesso acima de</span>
-                  <div className="cov-thresh-row">
-                    <input
-                      type="number" min={1} max={730}
-                      className="cov-thresh-input"
-                      value={covDays[1]}
-                      onChange={e => {
-                        const v = Math.max(covDays[0] + 1, Math.min(730, Number(e.target.value) || 1))
-                        const next: [number, number] = [covDays[0], v]
-                        setCovDays(next)
-                        try { localStorage.setItem('rj-cov-days', JSON.stringify(next)) } catch { /* */ }
-                      }}
-                    />
-                    <span className="cov-thresh-unit">dias</span>
-                  </div>
-                  {!coverageStats.hasHistory && (
-                    <span className="cov-no-history">Carregue notas de entrada para calcular cobertura</span>
-                  )}
-                </div>
-              </div>
+              {/* Donut 2 — cobertura de dias */}
+              <StockDonut
+                segments={coverageStats.hasHistory ? [
+                  { value: coverageStats.critico, color: 'var(--red)', label: `Crítico  <${covDays[0]}d` },
+                  { value: coverageStats.adequado, color: 'var(--green)', label: `Adequado  ${covDays[0]}–${covDays[1]}d` },
+                  { value: coverageStats.excesso, color: 'var(--amber)', label: `Excesso  >${covDays[1]}d` },
+                  ...(coverageStats.semHistorico > 0 ? [{ value: coverageStats.semHistorico, color: 'var(--border)', label: 'Sem histórico' }] : []),
+                ] : [
+                  { value: 1, color: 'var(--border)', label: 'Sem histórico de entradas' },
+                ]}
+                total={coverageStats.total || 1}
+                centerLabel="Cobertura"
+              />
+              <div className="cov-divider" />
+              {/* Donut 3 — saúde comercial: vendável vs sem preço vs ruptura */}
+              {(() => {
+                const semPreco = kpis.comEstoque - kpis.comPreco
+                return (
+                  <StockDonut
+                    segments={[
+                      { value: kpis.comPreco, color: 'var(--green)', label: 'Vendável' },
+                      ...(semPreco > 0 ? [{ value: semPreco, color: 'var(--amber)', label: 'Sem preço' }] : []),
+                      { value: kpis.semEstoque, color: 'var(--red)', label: 'Ruptura' },
+                    ]}
+                    total={kpis.total}
+                    centerLabel="Comercial"
+                  />
+                )
+              })()}
             </div>
 
             <StockTreemap data={treemapData} />

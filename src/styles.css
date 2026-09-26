@@ -122,14 +122,6 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 /* SKU overview row */
 .stock-sku-overview { display: flex; align-items: flex-start; gap: 24px; margin-bottom: 28px; padding: 20px 20px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; flex-wrap: wrap; }
 .cov-divider { width: 1px; background: var(--border); align-self: stretch; flex-shrink: 0; }
-.cov-donut-wrap { display: flex; gap: 20px; align-items: center; flex: 1; min-width: 280px; }
-.cov-thresholds { display: flex; flex-direction: column; gap: 6px; min-width: 140px; }
-.cov-thresh-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
-.cov-thresh-row { display: flex; align-items: center; gap: 6px; }
-.cov-thresh-input { width: 52px; padding: 4px 8px; background: var(--surface-raised); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font: inherit; font-size: 13px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; text-align: right; }
-.cov-thresh-input:focus { outline: none; border-color: var(--red); }
-.cov-thresh-unit { font-size: 11px; color: var(--muted); font-weight: 600; }
-.cov-no-history { font-size: 10px; color: var(--muted); line-height: 1.4; margin-top: 4px; }
 .stock-sku-stats { display: flex; flex-direction: column; gap: 14px; flex: 1; min-width: 220px; }
 .sku-stat { display: grid; grid-template-columns: 3.6rem 1fr; grid-template-rows: auto 4px auto; column-gap: 10px; align-items: center; }
 .sku-stat-val { font-size: 20px; font-weight: 800; line-height: 1; font-family: 'Space Grotesk', sans-serif; grid-row: 1; }
