@@ -190,7 +190,7 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
         comEstoque++
         if (p.sellerPrice !== undefined) comPreco++
       } else semEstoque++
-      // Trânsito: preferência pelo campo do produto (productMotor), fallback pelos receipts
+      // emTransito e carteiraCusto: usa campos do produto (motor) quando disponíveis
       const tQty = (p.inTransitQuantity ?? 0) > 0
         ? (p.inTransitQuantity ?? 0)
         : (p.manufacturerCode ? transitByMfr.get(p.manufacturerCode)?.qty ?? 0 : 0)
@@ -200,19 +200,25 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
       if (tQty > 0) emTransito++
       carteiraCusto += tVal
     }
-    // Custo e valor à venda vêm do motor; fallback para dados pré-migração sem esses campos
+    // KPIs agregados vêm do motor; fallback para bases sem esses campos (pré-migração)
     const custoCusto = (productIndicators?.stockAtCost != null)
       ? productIndicators.stockAtCost
       : productBase.reduce((s, p) => { const a = p.availableStock ?? 0; return a > 0 && p.financialCost != null ? s + a * p.financialCost : s }, 0)
     const custoVenda = (productIndicators?.stockAtSalePrice != null)
       ? productIndicators.stockAtSalePrice
       : productBase.reduce((s, p) => { const a = p.availableStock ?? 0; return a > 0 && p.sellerPrice != null ? s + a * p.sellerPrice : s }, 0)
-    const projetadoCusto = custoCusto + carteiraCusto
+    const resolvedCarteira = (productIndicators?.inTransitTotalValue != null)
+      ? productIndicators.inTransitTotalValue
+      : carteiraCusto
+    const resolvedEmTransito = (productIndicators?.inTransit != null)
+      ? productIndicators.inTransit
+      : emTransito
+    const projetadoCusto = custoCusto + resolvedCarteira
     const projetadoVenda = markup > 0 ? projetadoCusto * (1 + markup / 100) : null
     const pricedCoverage = comEstoque > 0 ? comPreco / comEstoque : null
     const marginRatio = custoVenda > 0 ? custoCusto / custoVenda : null
-    const transitRatio = projetadoCusto > 0 ? carteiraCusto / projetadoCusto : null
-    return { comEstoque, semEstoque, emTransito, comPreco, total: productBase.length, custoCusto, custoVenda, carteiraCusto, projetadoCusto, projetadoVenda, pricedCoverage, marginRatio, transitRatio }
+    const transitRatio = projetadoCusto > 0 ? resolvedCarteira / projetadoCusto : null
+    return { comEstoque, semEstoque, emTransito: resolvedEmTransito, comPreco, total: productBase.length, custoCusto, custoVenda, carteiraCusto: resolvedCarteira, projetadoCusto, projetadoVenda, pricedCoverage, marginRatio, transitRatio }
   }, [productBase, receiptBase, markup, productIndicators])
 
   const coverageStats = useMemo(() => {
