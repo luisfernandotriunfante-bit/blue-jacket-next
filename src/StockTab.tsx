@@ -130,6 +130,7 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
     try { return Number(localStorage.getItem('rj-notas-seen') ?? '0') } catch { return 0 }
   })
   const [notasSearch, setNotasSearch] = useState('')
+  const [notasDate, setNotasDate] = useState<string>(() => new Date().toISOString().slice(0, 10))
   const [expandedNotas, setExpandedNotas] = useState<Set<string>>(new Set())
   const [markup, setMarkup] = useState<number>(() => {
     try { return Number(localStorage.getItem('rj-markup-pct') ?? '0') || 0 }
@@ -474,8 +475,9 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
   }
 
   function exportReceivedCsv() {
+    const forDay = filteredReceived.filter(inv => (inv.date ?? '') === notasDate)
     const rows: string[] = ['Data,NF,Fornecedor,Código,Descrição,Qtd,Preço Unit.,Valor']
-    for (const inv of filteredReceived) {
+    for (const inv of forDay) {
       for (const r of inv.items) {
         const esc = (s: string | undefined) => `"${(s ?? '').replace(/"/g, '""')}"`
         rows.push([inv.date ?? '', esc(inv.displayInvoice), esc(inv.supplier), r.productCode ?? '', esc(r.description), r.quantity ?? 0, r.unitPrice?.toFixed(2) ?? '', r.value?.toFixed(2) ?? ''].join(','))
@@ -484,7 +486,8 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
     const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url; a.download = 'entradas.csv'; a.click()
+    const dateLabel = notasDate.split('-').reverse().join('-')
+    a.href = url; a.download = `entradas-${dateLabel}.csv`; a.click()
     URL.revokeObjectURL(url)
   }
 
@@ -1204,9 +1207,15 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
                   value={notasSearch}
                   onChange={e => setNotasSearch(e.target.value)}
                 />
-                {filteredReceived.length > 0 && (
+                <input
+                  type="date"
+                  value={notasDate}
+                  onChange={e => setNotasDate(e.target.value)}
+                  style={{ height: 32, fontSize: 12, padding: '0 8px', background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6 }}
+                />
+                {filteredReceived.some(inv => inv.date === notasDate) && (
                   <button type="button" className="secondary-button" style={{ margin: 0, padding: '5px 12px', fontSize: 12 }} onClick={exportReceivedCsv}>
-                    ↓ CSV
+                    ↓ CSV do dia
                   </button>
                 )}
               </div>
