@@ -26,7 +26,7 @@ const clientSources = [
   { id: 'premises', label: 'Premissas' },
 ] as const
 const productSources = [
-  { id: 'internal', label: 'Cadastro interno' }, { id: 'industry', label: 'Lista da indústria' }, { id: 'stock', label: 'Estoque atual' }, { id: 'price', label: 'Preço de venda' }, { id: 'sortiment', label: 'Sortimento' },
+  { id: 'internal', label: 'Cadastro interno' }, { id: 'industry', label: 'Lista da indústria' }, { id: 'stock', label: 'Estoque atual' }, { id: 'price', label: 'Preço de venda (8011)' }, { id: 'pricesheet', label: 'Planilha de preços (PREÇO UND / com ST)' }, { id: 'subbrands', label: 'Sub-marcas (8013)' }, { id: 'sortiment', label: 'Sortimento' },
 ] as const
 const historySources = [
   { id: 'sales', label: 'Vendas detalhadas do legado' }, { id: 'summary', label: 'Consolidado por cliente' }, { id: 'catalog', label: 'Catálogo Milênio (de-para)' },

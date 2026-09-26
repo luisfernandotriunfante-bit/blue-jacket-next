@@ -305,8 +305,8 @@ export function StockTab({ productBase, clientBase, receiptBase }: {
             <div className="sd-section">
               <div className="sd-section-title">Preços e custos</div>
               <div className="sd-grid">
-                <DI label="Preço vendedor" value={selected.sellerPrice !== undefined ? `R$ ${brl(selected.sellerPrice)}` : '—'} />
-                <DI label="Preço s/ imposto" value={selected.sellerPriceWithoutTax !== undefined ? `R$ ${brl(selected.sellerPriceWithoutTax)}` : '—'} />
+                <DI label="Preço com ST" value={selected.sellerPrice !== undefined ? `R$ ${brl(selected.sellerPrice)}` : '—'} hi={selected.sellerPrice !== undefined} />
+                <DI label="Preço sem ST" value={selected.sellerPriceWithoutTax !== undefined ? `R$ ${brl(selected.sellerPriceWithoutTax)}` : '—'} />
                 <DI label="Custo financeiro" value={selected.financialCost !== undefined ? `R$ ${brl(selected.financialCost)}` : '—'} />
                 <DI label="Custo real" value={selected.realCost !== undefined ? `R$ ${brl(selected.realCost)}` : '—'} />
                 <DI label="Margem bruta" value={selected.margin !== undefined ? `${selected.margin.toFixed(1)}%` : '—'} hi={selected.margin !== undefined && selected.margin >= 30} />
@@ -337,11 +337,12 @@ export function StockTab({ productBase, clientBase, receiptBase }: {
               )}
             </div>
 
-            {(selected.category || selected.brand || selected.department) && (
+            {(selected.category || selected.brand || selected.subBrand || selected.department) && (
               <div className="sd-section">
                 <div className="sd-section-title">Classificação</div>
                 <div className="sd-grid">
                   {selected.brand && <DI label="Marca" value={selected.brand} />}
+                  {selected.subBrand && <DI label="Sub-marca" value={selected.subBrand} />}
                   {selected.category && <DI label="Categoria" value={selected.category} />}
                   {selected.subcategory && <DI label="Subcategoria" value={selected.subcategory} />}
                   {selected.department && <DI label="Departamento" value={selected.department} />}

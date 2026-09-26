@@ -6,7 +6,7 @@ const headerAt = (rows: Row[], expected: Record<number, string>) =>
   rows.findIndex(row => Object.entries(expected).every(([index, label]) => norm(row[Number(index)]) === label))
 
 export type FileDetection =
-  | { motor: 'produtos'; slot: 'internal' | 'industry' | 'stock' | 'price' | 'sortiment' }
+  | { motor: 'produtos'; slot: 'internal' | 'industry' | 'stock' | 'price' | 'pricesheet' | 'subbrands' | 'sortiment' }
   | { motor: 'clientes'; slot: 'internal' | 'portfolio' | 'premises' }
   | { motor: 'movimentacoes'; slot: 'sales' | 'cuts' }
   | { motor: 'historico'; slot: 'sales' | 'summary' | 'catalog' }
@@ -41,6 +41,10 @@ export async function detectFile(file: File): Promise<FileDetection> {
         return { motor: 'produtos', slot: 'stock' }
       if (headerAt(rows, { 2: 'codprod', 3: 'descricao', 6: 'ean', 10: 'preco' }) >= 0)
         return { motor: 'produtos', slot: 'price' }
+      if (headerAt(rows, { 0: 'cod', 1: 'ean', 4: 'precound', 5: 'precoundst' }) >= 0)
+        return { motor: 'produtos', slot: 'pricesheet' }
+      if (headerAt(rows, { 0: 'nomedistribuidor', 3: 'subbrands', 4: 'codigodoprodutoean13' }) >= 0)
+        return { motor: 'produtos', slot: 'subbrands' }
       if (headerAt(rows, { 0: 'materialsap', 16: 'st', 18: 'lifestage' }) >= 0)
         return { motor: 'produtos', slot: 'sortiment' }
       if (rows.some(row => norm(row[2]) === 'datamovimento' && norm(row[3]) === 'codcliente' && norm(row[24]) === 'codprodwinthor'))
