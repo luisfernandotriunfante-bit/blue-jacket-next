@@ -211,25 +211,23 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
     // Carteira vem do motor de recebimentos (receiptBase), não do motor de produtos.
     // Só usa productIndicators quando o motor de produtos efetivamente processou uma
     // carteira própria (inTransit > 0); caso contrário o loop acima já usa receiptBase.
-    // Valor bruto total da carteira (direto do receiptBase, independente do catálogo)
-    const grossCarteira = receiptBase
-      .filter(r => r.status === 'em_transito')
-      .reduce((s, r) => s + (r.value ?? 0), 0)
-    // NFs da carteira Colgate — normaliza para match (002951330-1 → 2951330, *2951330 → 2951330)
+    // NFs já recebidas no Milênio (qualquer sistema: atual ou legado)
+    // Normaliza: '002951330-1' → '2951330', '*2951330' → '2951330'
     const normNf = (nf: string) => nf.replace(/\*/g, '').replace(/^0+/, '').split('-')[0] ?? ''
-    const carteiraInvoices = new Set(
+    const receivedNFs = new Set(
       receiptBase
-        .filter(r => r.status === 'em_transito' && r.invoice)
+        .filter(r => r.status === 'recebida' && r.invoice)
         .map(r => normNf(r.invoice!))
         .filter(Boolean)
     )
-    // Abate só as NFs da carteira que já deram entrada no Milênio (um valor por NF — o value do atual é repetido por item)
-    const receivedNFValues = new Map<string, number>()
-    receiptBase
-      .filter(r => r.status === 'recebida' && r.invoice && carteiraInvoices.has(normNf(r.invoice)))
-      .forEach(r => { const nf = normNf(r.invoice!); if (!receivedNFValues.has(nf)) receivedNFValues.set(nf, r.value ?? 0) })
-    const receivedCarteiraValue = Array.from(receivedNFValues.values()).reduce((s, v) => s + v, 0)
-    const resolvedCarteira = Math.max(0, grossCarteira - receivedCarteiraValue)
+    // Carteira pendente = soma dos itens SAP cujo NF ainda não entrou no Milênio
+    // (usa valor SAP por item, não valor Milênio — evita distorção de custos fiscais adicionais)
+    const resolvedCarteira = receiptBase
+      .filter(r => r.status === 'em_transito')
+      .reduce((s, r) => {
+        const nf = r.invoice ? normNf(r.invoice) : null
+        return s + ((!nf || !receivedNFs.has(nf)) ? (r.value ?? 0) : 0)
+      }, 0)
     const resolvedEmTransito = (productIndicators?.inTransit != null && productIndicators.inTransit > 0)
       ? productIndicators.inTransit
       : emTransito
