@@ -181,7 +181,9 @@ export function App() {
     setFiles(current => [...current.filter(item => item.id !== productSlots[source]?.id), uploaded]); setRawFiles(current => ({ ...current, [uploaded.id]: file })); setProductSlots(current => ({ ...current, [source]: uploaded }))
   }
   function historySourceChange(source: (typeof historySources)[number]['id'], event: ChangeEvent<HTMLInputElement>) {
-    const incoming = Array.from(event.target.files ?? []); event.target.value = ''
+    const all = Array.from(event.target.files ?? []); event.target.value = ''
+    if (!all.length) return
+    const incoming = source === 'catalog' ? all : all.filter(file => !findInSlot(historySlots[source], file))
     if (!incoming.length) return
     const uploaded = incoming.map(file => ({ id: `${file.name}-${file.size}-${crypto.randomUUID()}`, name: file.name, size: file.size, area: 'historico' as const, receivedAt: new Date().toLocaleString('pt-BR'), lastModified: file.lastModified }))
     setFiles(current => [...current, ...uploaded])
@@ -189,14 +191,16 @@ export function App() {
     setHistorySlots(current => ({ ...current, [source]: source === 'catalog' ? uploaded : [...(current[source] ?? []), ...uploaded] }))
   }
   function movementSourceChange(source: (typeof movementSources)[number]['id'], event: ChangeEvent<HTMLInputElement>) {
-    const incoming = Array.from(event.target.files ?? []); event.target.value = ''
+    const all = Array.from(event.target.files ?? []); event.target.value = ''
+    if (!all.length) return
+    const incoming = all.filter(file => !findInSlot(movementSlots[source], file))
     if (!incoming.length) return
     const uploaded = incoming.map(file => ({ id: `${file.name}-${file.size}-${crypto.randomUUID()}`, name: file.name, size: file.size, area: 'movimentacoes' as const, receivedAt: new Date().toLocaleString('pt-BR'), lastModified: file.lastModified }))
     setFiles(current => [...current, ...uploaded])
     setRawFiles(current => ({ ...current, ...Object.fromEntries(uploaded.map((item, index) => [item.id, incoming[index]])) }))
     setMovementSlots(current => ({ ...current, [source]: [...(current[source] ?? []), ...uploaded] }))
   }
-  function receiptSourceChange(source: (typeof receiptSources)[number]['id'], event: ChangeEvent<HTMLInputElement>) { const incoming=Array.from(event.target.files??[]);event.target.value='';if(!incoming.length)return;const uploaded=incoming.map(file=>({id:`${file.name}-${file.size}-${crypto.randomUUID()}`,name:file.name,size:file.size,area:'recebimentos' as const,receivedAt:new Date().toLocaleString('pt-BR'),lastModified:file.lastModified}));setFiles(current=>[...current,...uploaded]);setRawFiles(current=>({...current,...Object.fromEntries(uploaded.map((item,index)=>[item.id,incoming[index]]))}));setReceiptSlots(current=>({...current,[source]:[...(current[source]??[]),...uploaded]})) }
+  function receiptSourceChange(source: (typeof receiptSources)[number]['id'], event: ChangeEvent<HTMLInputElement>) { const all=Array.from(event.target.files??[]);event.target.value='';if(!all.length)return;const incoming=all.filter(file=>!findInSlot(receiptSlots[source],file));if(!incoming.length)return;const uploaded=incoming.map(file=>({id:`${file.name}-${file.size}-${crypto.randomUUID()}`,name:file.name,size:file.size,area:'recebimentos' as const,receivedAt:new Date().toLocaleString('pt-BR'),lastModified:file.lastModified}));setFiles(current=>[...current,...uploaded]);setRawFiles(current=>({...current,...Object.fromEntries(uploaded.map((item,index)=>[item.id,incoming[index]]))}));setReceiptSlots(current=>({...current,[source]:[...(current[source]??[]),...uploaded]})) }
   function drop(area: SourceArea, event: DragEvent<HTMLDivElement>) { event.preventDefault(); addFiles(area, event.dataTransfer.files) }
   function removeFile(id: string) { setFiles(current => current.filter(file => file.id !== id)); setRawFiles(current => { const next = { ...current }; delete next[id]; return next }) }
   function removeHistoryFile(id: string) { removeFile(id); setHistorySlots(current => Object.fromEntries(Object.entries(current).map(([source, files]) => [source, files?.filter(file => file.id !== id)]))) }

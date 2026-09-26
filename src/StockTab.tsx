@@ -561,14 +561,14 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
               <KpiCard
                 label="Estoque à venda"
                 value={kpis.custoVenda > 0 ? kpiCurrency(kpis.custoVenda) : '—'}
-                accent="green"
+                accent="blue"
                 percent={kpis.pricedCoverage !== null ? kpis.pricedCoverage * 100 : undefined}
                 pctLabel={kpis.pricedCoverage !== null ? `${(kpis.pricedCoverage * 100).toFixed(0)}% dos SKUs com saldo têm preço` : 'Sem SKUs com saldo'}
               />
               <KpiCard
                 label="Carteira em trânsito"
                 value={kpis.carteiraCusto > 0 ? kpiCurrency(kpis.carteiraCusto) : '—'}
-                accent="amber"
+                accent="white"
                 percent={kpis.emTransito > 0 && kpis.total > 0 ? (kpis.emTransito / kpis.total) * 100 : undefined}
                 pctLabel={kpis.emTransito > 0 ? `${kpis.emTransito.toLocaleString('pt-BR')} SKUs em trânsito` : 'Sem Carteira em aberto'}
               />
@@ -581,7 +581,7 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
               <KpiCard
                 label="Projetado à venda"
                 value={kpis.projetadoVenda !== null ? kpiCurrency(kpis.projetadoVenda) : '—'}
-                accent={kpis.projetadoVenda !== null ? 'green' : undefined}
+                accent={kpis.projetadoVenda !== null ? 'blue' : undefined}
                 percent={markup > 0 ? Math.min(markup, 100) : undefined}
                 pctLabel={markup === 0 ? 'Configure markup em Administração' : `markup ${markup.toLocaleString('pt-BR')}%`}
               />
@@ -591,9 +591,9 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
               {/* Donut 1 — status físico */}
               <StockDonut
                 segments={[
-                  { value: kpis.comEstoque, color: 'var(--green)', label: 'Com estoque' },
+                  { value: kpis.comEstoque, color: 'var(--blue)', label: 'Com estoque' },
                   { value: kpis.semEstoque, color: 'var(--red)', label: 'Sem estoque' },
-                  ...(kpis.emTransito > 0 ? [{ value: kpis.emTransito, color: 'var(--amber)', label: 'Em trânsito' }] : []),
+                  ...(kpis.emTransito > 0 ? [{ value: kpis.emTransito, color: 'var(--white)', label: 'Em trânsito' }] : []),
                 ]}
                 total={kpis.total}
                 centerLabel="SKUs"
@@ -603,8 +603,8 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
               <StockDonut
                 segments={coverageStats.hasHistory ? [
                   { value: coverageStats.critico, color: 'var(--red)', label: `Crítico  <${covDays[0]}d` },
-                  { value: coverageStats.adequado, color: 'var(--green)', label: `Adequado  ${covDays[0]}–${covDays[1]}d` },
-                  { value: coverageStats.excesso, color: 'var(--amber)', label: `Excesso  >${covDays[1]}d` },
+                  { value: coverageStats.adequado, color: 'var(--blue)', label: `Adequado  ${covDays[0]}–${covDays[1]}d` },
+                  { value: coverageStats.excesso, color: 'var(--white)', label: `Excesso  >${covDays[1]}d` },
                   ...(coverageStats.semHistorico > 0 ? [{ value: coverageStats.semHistorico, color: 'var(--border)', label: 'Sem histórico' }] : []),
                 ] : [
                   { value: 1, color: 'var(--border)', label: 'Sem histórico de entradas' },
@@ -619,8 +619,8 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
                 return (
                   <StockDonut
                     segments={[
-                      { value: kpis.comPreco, color: 'var(--green)', label: 'Vendável' },
-                      ...(semPreco > 0 ? [{ value: semPreco, color: 'var(--amber)', label: 'Sem preço' }] : []),
+                      { value: kpis.comPreco, color: 'var(--blue)', label: 'Vendável' },
+                      ...(semPreco > 0 ? [{ value: semPreco, color: 'var(--white)', label: 'Sem preço' }] : []),
                       { value: kpis.semEstoque, color: 'var(--red)', label: 'Ruptura' },
                     ]}
                     total={kpis.total}
@@ -757,12 +757,12 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
                       </span>
                       <span className="sc-num">
                         <span className="dual-val">
-                          <strong className={avail > 0 ? 'c-green' : 'c-muted'}>{avail.toLocaleString('pt-BR')}</strong>
+                          <strong className={avail > 0 ? 'c-blue' : 'c-muted'}>{avail.toLocaleString('pt-BR')}</strong>
                           <small>UN</small>
                         </span>
                         {availCx !== undefined && (
                           <span className="dual-val">
-                            <strong className={availCx > 0 ? 'c-green' : 'c-muted'}>{availCx.toLocaleString('pt-BR')}</strong>
+                            <strong className={availCx > 0 ? 'c-blue' : 'c-muted'}>{availCx.toLocaleString('pt-BR')}</strong>
                             <small>CX</small>
                           </span>
                         )}
@@ -1019,12 +1019,12 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
                         </span>
                         <span className="sc-num">
                           <span className="dual-val">
-                            <strong className={avail > 0 ? 'c-green' : 'c-muted'}>{avail.toLocaleString('pt-BR')}</strong>
+                            <strong className={avail > 0 ? 'c-blue' : 'c-muted'}>{avail.toLocaleString('pt-BR')}</strong>
                             <small>UN</small>
                           </span>
                           {availCx !== undefined && (
                             <span className="dual-val">
-                              <strong className={availCx > 0 ? 'c-green' : 'c-muted'}>{availCx.toLocaleString('pt-BR')}</strong>
+                              <strong className={availCx > 0 ? 'c-blue' : 'c-muted'}>{availCx.toLocaleString('pt-BR')}</strong>
                               <small>CX</small>
                             </span>
                           )}
@@ -1190,20 +1190,20 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
               <KpiCard
                 label="Carteira"
                 value={notasKpis.cartNfs > 0 ? `${notasKpis.cartNfs} NF${notasKpis.cartNfs !== 1 ? 's' : ''}` : '—'}
-                accent="amber"
+                accent="white"
                 pctLabel={notasKpis.cartVal > 0 ? `R$ ${brl(notasKpis.cartVal)}` : 'Sem carteira em aberto'}
                 percent={notasKpis.cartNfs + notasKpis.recNfs > 0 ? (notasKpis.cartNfs / (notasKpis.cartNfs + notasKpis.recNfs)) * 100 : 0}
               />
               <KpiCard
                 label="SKUs em carteira"
                 value={notasKpis.cartQty > 0 ? notasKpis.cartQty.toLocaleString('pt-BR') : '—'}
-                accent={notasKpis.cartQty > 0 ? 'amber' : undefined}
+                accent={notasKpis.cartQty > 0 ? 'white' : undefined}
                 pctLabel="unidades a chegar"
               />
               <KpiCard
                 label="Notas recebidas"
                 value={notasKpis.recNfs > 0 ? `${notasKpis.recNfs} NF${notasKpis.recNfs !== 1 ? 's' : ''}` : '—'}
-                accent={notasKpis.recNfs > 0 ? 'green' : undefined}
+                accent={notasKpis.recNfs > 0 ? 'blue' : undefined}
                 pctLabel={notasKpis.recVal > 0 ? `R$ ${brl(notasKpis.recVal)}` : 'Nenhuma nota recebida'}
                 percent={notasKpis.cartNfs + notasKpis.recNfs > 0 ? (notasKpis.recNfs / (notasKpis.cartNfs + notasKpis.recNfs)) * 100 : 0}
               />
@@ -1420,7 +1420,7 @@ function StockTreemap({ data }: {
 }
 
 function KpiCard({ label, value, accent, sub, percent, pctLabel }: {
-  label: string; value: string; accent?: 'green' | 'red' | 'amber'; sub?: string;
+  label: string; value: string; accent?: 'blue' | 'red' | 'white'; sub?: string;
   percent?: number; pctLabel?: string
 }) {
   return (
@@ -1490,7 +1490,7 @@ function DI({ label, value, hi }: { label: string; value: string; hi?: boolean }
   return (
     <div className="di">
       <span className="di-label">{label}</span>
-      <strong className={hi ? 'c-green' : ''}>{value}</strong>
+      <strong className={hi ? 'c-blue' : ''}>{value}</strong>
     </div>
   )
 }
