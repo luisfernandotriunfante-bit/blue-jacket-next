@@ -50,8 +50,13 @@ export function StockTab({ productBase, clientBase, receiptBase }: {
         const mixed = /[A-Za-z]/.test(q) && /\d/.test(q) && !q.includes(' ')
         if (allDigits) {
           if (q.length === 13) { if ((p.ean ?? '') !== q) return false }
-          else if (q.length >= 7) { if (!(p.ean ?? '').startsWith(q)) return false }
-          else { if (!(p.internalCode ?? '').startsWith(q)) return false }
+          else if (q.length >= 7) { if (!(p.ean ?? '').endsWith(q)) return false }
+          else {
+            // ≤6 dígitos: código interno (prefixo) OU sufixo de EAN
+            const byCode = (p.internalCode ?? '').startsWith(q)
+            const byEan = q.length >= 4 && (p.ean ?? '').endsWith(q)
+            if (!byCode && !byEan) return false
+          }
         } else if (mixed) {
           if (!norm(p.manufacturerCode).startsWith(norm(q))) return false
         } else {
@@ -104,7 +109,7 @@ export function StockTab({ productBase, clientBase, receiptBase }: {
         <input
           ref={searchRef}
           className="stock-search"
-          placeholder="Descrição · código interno (ex: 915) · EAN 7+ dígitos · cód. fab. (ex: FBR120)…"
+          placeholder="Descrição · código interno (ex: 915) · 4+ dígitos finais do EAN · cód. fab. (ex: FBR120)…"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
