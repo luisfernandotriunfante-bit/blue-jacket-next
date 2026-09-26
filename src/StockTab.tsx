@@ -180,7 +180,7 @@ export function StockTab({ productBase, receiptBase }: {
 
   const coverageStats = useMemo(() => {
     const now = Date.now()
-    // Acumula qtd recebida por código Winthor (productCode nas notas de entrada = internalCode do produto)
+    // Taxa de reposição por internalCode a partir das entradas "atual" (têm productCode)
     const acc = new Map<string, { qty: number; firstMs: number }>()
     for (const r of receiptBase) {
       if (r.status !== 'recebida' || !r.productCode || !r.quantity || !r.entryDate) continue
@@ -190,19 +190,21 @@ export function StockTab({ productBase, receiptBase }: {
       if (!cur) acc.set(r.productCode, { qty: r.quantity, firstMs: ms })
       else { cur.qty += r.quantity; if (ms < cur.firstMs) cur.firstMs = ms }
     }
-    // taxa de reposição diária: unidades recebidas / dias desde a primeira entrada
-    const dailyRate = new Map<string, number>()
+    const receiptRate = new Map<string, number>()
     for (const [c, s] of acc) {
       const span = Math.max(1, (now - s.firstMs) / 86_400_000)
-      dailyRate.set(c, s.qty / span)
+      receiptRate.set(c, s.qty / span)
     }
     let critico = 0, adequado = 0, excesso = 0, semHistorico = 0
     const [low, high] = covDays
     for (const p of productBase) {
       const avail = p.availableStock ?? 0
       if (avail <= 0) { critico++; continue }
-      // match por internalCode (código Winthor = productCode nas notas de entrada)
-      const rate = p.internalCode ? dailyRate.get(p.internalCode) : undefined
+      // Fonte 1: dailyTurnover do Winthor (campo nativo, mais preciso)
+      // Fonte 2: taxa de reposição derivada dos recebimentos com productCode
+      const rate = (p.dailyTurnover && p.dailyTurnover > 0)
+        ? p.dailyTurnover
+        : (p.internalCode ? receiptRate.get(p.internalCode) : undefined)
       if (!rate) { semHistorico++; continue }
       const dias = avail / rate
       if (dias < low) critico++
@@ -210,7 +212,7 @@ export function StockTab({ productBase, receiptBase }: {
       else excesso++
     }
     const total = critico + adequado + excesso + semHistorico
-    return { critico, adequado, excesso, semHistorico, total, hasHistory: dailyRate.size > 0 }
+    return { critico, adequado, excesso, semHistorico, total, hasHistory: total > semHistorico }
   }, [productBase, receiptBase, covDays])
 
   const treemapData = useMemo(() => {
