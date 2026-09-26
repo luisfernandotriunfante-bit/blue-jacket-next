@@ -1199,67 +1199,69 @@ export function StockTab({ productBase, receiptBase }: {
                   </button>
                 )}
               </div>
-              {filteredReceived.length === 0 && (
-                <p className="empty compact" style={{ padding: '28px 18px' }}>
-                  {receivedInvoices.length === 0 ? 'Nenhuma nota recebida importada ainda.' : 'Nenhuma nota encontrada para a busca.'}
-                </p>
-              )}
-              {(() => {
-                const days = new Map<string, typeof filteredReceived>()
-                for (const inv of filteredReceived) {
-                  const d = inv.date ?? '(sem data)'
-                  if (!days.has(d)) days.set(d, [])
-                  days.get(d)!.push(inv)
-                }
-                return Array.from(days.entries()).map(([day, invs]) => (
-                  <div key={day} className="notas-day-group">
-                    <div className="notas-day-head">{day !== '(sem data)' ? fmtDate(day) : 'Sem data'}</div>
-                    {invs.map(inv => (
-                      <div key={inv.invoice}>
-                        <div
-                          className="notas-inv-row"
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => toggleExpanded(inv.invoice)}
-                          onKeyDown={e => e.key === 'Enter' && toggleExpanded(inv.invoice)}
-                        >
-                          <span className={`notas-inv-toggle${expandedNotas.has(inv.invoice) ? ' open' : ''}`}>▶</span>
-                          <span className="notas-inv-num">NF {inv.displayInvoice}</span>
-                          <span className="notas-inv-supplier">{inv.supplier ?? '—'}</span>
-                          <span className="notas-inv-qty">{inv.totalQty.toLocaleString('pt-BR')} UN</span>
-                          <span className="notas-inv-val">R$ {brl(inv.totalValue)}</span>
-                        </div>
-                        {expandedNotas.has(inv.invoice) && (
-                          <div className="notas-inv-items">
-                            <table className="notas-items-table">
-                              <thead>
-                                <tr>
-                                  <th>Código</th>
-                                  <th>Descrição</th>
-                                  <th className="n-right">Qtd</th>
-                                  <th className="n-right">Preço unit.</th>
-                                  <th className="n-right">Valor</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {inv.items.map((r, i) => (
-                                  <tr key={i}>
-                                    <td><code style={{ fontSize: 11 }}>{r.productCode ?? '—'}</code></td>
-                                    <td>{r.description ?? '—'}</td>
-                                    <td className="n-right">{(r.quantity ?? 0).toLocaleString('pt-BR')}</td>
-                                    <td className="n-right">{r.unitPrice !== undefined ? `R$ ${brl(r.unitPrice)}` : '—'}</td>
-                                    <td className="n-right">{r.value !== undefined ? `R$ ${brl(r.value)}` : '—'}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
+              <div className="notas-section-body">
+                {filteredReceived.length === 0 && (
+                  <p className="empty compact" style={{ padding: '28px 18px' }}>
+                    {receivedInvoices.length === 0 ? 'Nenhuma nota recebida importada ainda.' : 'Nenhuma nota encontrada para a busca.'}
+                  </p>
+                )}
+                {(() => {
+                  const days = new Map<string, typeof filteredReceived>()
+                  for (const inv of filteredReceived) {
+                    const d = inv.date ?? '(sem data)'
+                    if (!days.has(d)) days.set(d, [])
+                    days.get(d)!.push(inv)
+                  }
+                  return Array.from(days.entries()).map(([day, invs]) => (
+                    <div key={day} className="notas-day-group">
+                      <div className="notas-day-head">{day !== '(sem data)' ? fmtDate(day) : 'Sem data'}</div>
+                      {invs.map(inv => (
+                        <div key={inv.invoice}>
+                          <div
+                            className="notas-inv-row"
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => toggleExpanded(inv.invoice)}
+                            onKeyDown={e => e.key === 'Enter' && toggleExpanded(inv.invoice)}
+                          >
+                            <span className={`notas-inv-toggle${expandedNotas.has(inv.invoice) ? ' open' : ''}`}>▶</span>
+                            <span className="notas-inv-num">NF {inv.displayInvoice}</span>
+                            <span className="notas-inv-supplier">{inv.supplier ?? '—'}</span>
+                            <span className="notas-inv-qty">{inv.totalQty.toLocaleString('pt-BR')} UN</span>
+                            <span className="notas-inv-val">R$ {brl(inv.totalValue)}</span>
                           </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ))
-              })()}
+                          {expandedNotas.has(inv.invoice) && (
+                            <div className="notas-inv-items">
+                              <table className="notas-items-table">
+                                <thead>
+                                  <tr>
+                                    <th>Código</th>
+                                    <th>Descrição</th>
+                                    <th className="n-right">Qtd</th>
+                                    <th className="n-right">Preço unit.</th>
+                                    <th className="n-right">Valor</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {inv.items.map((r, i) => (
+                                    <tr key={i}>
+                                      <td><code style={{ fontSize: 11 }}>{r.productCode ?? '—'}</code></td>
+                                      <td>{r.description ?? '—'}</td>
+                                      <td className="n-right">{(r.quantity ?? 0).toLocaleString('pt-BR')}</td>
+                                      <td className="n-right">{r.unitPrice !== undefined ? `R$ ${brl(r.unitPrice)}` : '—'}</td>
+                                      <td className="n-right">{r.value !== undefined ? `R$ ${brl(r.value)}` : '—'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ))
+                })()}
+              </div>
             </div>
 
             <div className="notas-section">
@@ -1271,24 +1273,26 @@ export function StockTab({ productBase, receiptBase }: {
                     : 'Vazia'}
                 </span>
               </div>
-              {arrivalInvoices.length === 0 && (
-                <p className="empty compact" style={{ padding: '28px 18px' }}>Carteira vazia. Importe um arquivo de carteira no motor de notas.</p>
-              )}
-              {arrivalInvoices.map(inv => (
-                <div key={inv.invoice} className="notas-cart-row">
-                  <span className="notas-cart-num">NF {inv.displayInvoice}</span>
-                  <span className="notas-cart-supplier">{inv.supplier ?? '—'}</span>
-                  <span className="notas-cart-qty">{inv.totalQty.toLocaleString('pt-BR')} UN</span>
-                  <span className="notas-cart-val">R$ {brl(inv.totalValue)}</span>
-                  <input
-                    type="date"
-                    className="notas-cart-date"
-                    value={notaPrev[inv.invoice] ?? ''}
-                    onChange={e => setNotaPrev(prev => ({ ...prev, [inv.invoice]: e.target.value }))}
-                    title="Previsão de chegada"
-                  />
-                </div>
-              ))}
+              <div className="notas-section-body">
+                {arrivalInvoices.length === 0 && (
+                  <p className="empty compact" style={{ padding: '28px 18px' }}>Carteira vazia. Importe um arquivo de carteira no motor de notas.</p>
+                )}
+                {arrivalInvoices.map(inv => (
+                  <div key={inv.invoice} className="notas-cart-row">
+                    <span className="notas-cart-num">NF {inv.displayInvoice}</span>
+                    <span className="notas-cart-supplier">{inv.supplier ?? '—'}</span>
+                    <span className="notas-cart-qty">{inv.totalQty.toLocaleString('pt-BR')} UN</span>
+                    <span className="notas-cart-val">R$ {brl(inv.totalValue)}</span>
+                    <input
+                      type="date"
+                      className="notas-cart-date"
+                      value={notaPrev[inv.invoice] ?? ''}
+                      onChange={e => setNotaPrev(prev => ({ ...prev, [inv.invoice]: e.target.value }))}
+                      title="Previsão de chegada"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           </>
         )}

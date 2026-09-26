@@ -268,8 +268,9 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 
 /* ── Notas tab ──────────────────────────────────────────── */
 .notas-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
-.notas-section { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; margin-bottom: 20px; }
-.notas-section-head { display: flex; align-items: center; gap: 12px; padding: 13px 18px 12px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.notas-section { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; margin-bottom: 20px; display: flex; flex-direction: column; max-height: 420px; }
+.notas-section-head { display: flex; align-items: center; gap: 12px; padding: 13px 18px 12px; border-bottom: 1px solid var(--border); flex-wrap: wrap; flex-shrink: 0; }
+.notas-section-body { overflow-y: auto; flex: 1; }
 .notas-section-title { font-size: 10px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .09em; flex: 1; min-width: 120px; }
 .notas-day-group { border-bottom: 1px solid var(--border); }
 .notas-day-group:last-child { border-bottom: 0; }
