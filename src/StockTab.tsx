@@ -211,9 +211,23 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
     // Carteira vem do motor de recebimentos (receiptBase), não do motor de produtos.
     // Só usa productIndicators quando o motor de produtos efetivamente processou uma
     // carteira própria (inTransit > 0); caso contrário o loop acima já usa receiptBase.
-    const resolvedCarteira = (productIndicators?.inTransit != null && productIndicators.inTransit > 0)
-      ? productIndicators.inTransitTotalValue
-      : carteiraCusto
+    // Valor bruto total da carteira (direto do receiptBase, independente do catálogo)
+    const grossCarteira = receiptBase
+      .filter(r => r.status === 'em_transito')
+      .reduce((s, r) => s + (r.value ?? 0), 0)
+    // NFs da carteira Colgate — normaliza para match (002951330-1 → 2951330, *2951330 → 2951330)
+    const normNf = (nf: string) => nf.replace(/\*/g, '').replace(/^0+/, '').split('-')[0] ?? ''
+    const carteiraInvoices = new Set(
+      receiptBase
+        .filter(r => r.status === 'em_transito' && r.invoice)
+        .map(r => normNf(r.invoice!))
+        .filter(Boolean)
+    )
+    // Abate só as NFs da carteira que já deram entrada no Milênio
+    const receivedCarteiraValue = receiptBase
+      .filter(r => r.status === 'recebida' && r.invoice && carteiraInvoices.has(normNf(r.invoice)))
+      .reduce((s, r) => s + (r.value ?? 0), 0)
+    const resolvedCarteira = Math.max(0, grossCarteira - receivedCarteiraValue)
     const resolvedEmTransito = (productIndicators?.inTransit != null && productIndicators.inTransit > 0)
       ? productIndicators.inTransit
       : emTransito
