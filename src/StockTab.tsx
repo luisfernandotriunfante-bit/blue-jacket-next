@@ -7,6 +7,46 @@ type Tags = Record<string, ProductTag>
 type StockFilter = 'all' | 'com_estoque' | 'sem_estoque' | 'em_transito'
 
 const norm = (v: unknown) => String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
+
+const COMMERCIAL_LINES = ['Creme Dental', 'Esc + Enx + Fio', 'Sabonetes', 'Hair', 'Limpeza'] as const
+type CommercialLine = (typeof COMMERCIAL_LINES)[number]
+
+const FAMILY_TO_LINE: Record<string, CommercialLine> = {
+  'CREME DENTAL': 'Creme Dental',
+  'ESCOVA': 'Esc + Enx + Fio',
+  'ENXAGUANTES': 'Esc + Enx + Fio',
+  'FIO DENTAL': 'Esc + Enx + Fio',
+  'SABONETE EM BARRA': 'Sabonetes',
+  'SABONETE LÍQUIDO': 'Sabonetes',
+  'SHAMPOO': 'Hair',
+  'CONDICIONADOR': 'Hair',
+  'LIMPEZA': 'Limpeza',
+}
+
+function classifyCommercialLine(description?: string, category?: string, subcategory?: string): CommercialLine | null {
+  const up = (s?: string) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase()
+  const sub = up(subcategory), cat = up(category), d = up(description)
+  if (sub.includes('TOOTHPASTE')) return 'Creme Dental'
+  if (sub.includes('MANUAL TB') || sub.includes('TOOTHBRUSH') || sub.includes('MOUTHWASH') || sub.includes('INTERDENTAL') || sub.includes('FLOSS')) return 'Esc + Enx + Fio'
+  if (sub.includes('BAR SOAP') || sub.includes('LIQUID SOAP') || sub.includes('HAND SOAP') || sub.includes('BODY WASH')) return 'Sabonetes'
+  if (sub.includes('SHAMPOO') || sub.includes('CONDITIONER') || sub.includes('HAIR')) return 'Hair'
+  if (sub.includes('CLEAN') || sub.includes('LAUNDRY') || sub.includes('FABRIC')) return 'Limpeza'
+  if (/^CD\b/.test(d) || d.includes('CREME DENTAL') || d.includes('DENTIFRICIO')) return 'Creme Dental'
+  if (/^(ED|ENX|ENXAG|FITA DENT|FIO|GD)\b/.test(d) || d.includes('ESCOVA DENTAL') || d.includes('ENXAGUANTE') || d.includes('FIO DENTAL')) return 'Esc + Enx + Fio'
+  if (/^SAB\b/.test(d) || d.includes('SABONETE')) return 'Sabonetes'
+  if (/^(SH|COND|CR PENT|KIT SH)\b/.test(d) || d.includes('SHAMPOO') || d.includes('CONDICIONADOR')) return 'Hair'
+  if (/^(PINHO SOL|LIMP|LAVA ROUPA|AJAX|DESINF|DESENG)\b/.test(d) || d.includes('LIMPADOR') || d.includes('DESINFETANTE')) return 'Limpeza'
+  if (cat.includes('HOME CARE')) return 'Limpeza'
+  return null
+}
+
+function resolveCommercialLine(p: { groupFamily?: string; description?: string; category?: string; subcategory?: string }): CommercialLine | null {
+  if (p.groupFamily) {
+    const fromFamily = FAMILY_TO_LINE[p.groupFamily]
+    if (fromFamily) return fromFamily
+  }
+  return classifyCommercialLine(p.description, p.category, p.subcategory)
+}
 const brl = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const kpiCurrency = (n: number) => {
   if (n >= 1_000_000) return `R$ ${(n / 1_000_000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}M`
@@ -87,27 +127,30 @@ export function StockTab({ productBase, receiptBase }: {
   }, [productBase, markup])
 
   const treemapData = useMemo(() => {
-    const lineMap = new Map<string, Map<string, { value: number; items: number }>>()
+    const lineMap = new Map<CommercialLine, Map<string, { value: number; items: number }>>()
     for (const p of productBase) {
-      if (!p.groupName) continue
+      const line = resolveCommercialLine(p)
+      if (!line) continue
       const sub = p.subBrand ?? '(sem sub-brand)'
       const avail = p.availableStock ?? 0
       const val = avail > 0 && p.sellerPrice !== undefined ? avail * p.sellerPrice : 0
-      if (!lineMap.has(p.groupName)) lineMap.set(p.groupName, new Map())
-      const sm = lineMap.get(p.groupName)!
+      if (!lineMap.has(line)) lineMap.set(line, new Map())
+      const sm = lineMap.get(line)!
       const cur = sm.get(sub) ?? { value: 0, items: 0 }
       sm.set(sub, { value: cur.value + val, items: cur.items + 1 })
     }
-    return Array.from(lineMap.entries())
-      .map(([line, sm]) => {
+    return COMMERCIAL_LINES
+      .map(line => {
+        const sm = lineMap.get(line)
+        if (!sm) return null
         const tiles = Array.from(sm.entries())
           .map(([label, d]) => ({ key: label, label, ...d }))
           .filter(t => t.value > 0)
           .sort((a, b) => b.value - a.value)
-        return { line, totalValue: tiles.reduce((s, t) => s + t.value, 0), subbrands: sm.size, tiles }
+        const totalValue = tiles.reduce((s, t) => s + t.value, 0)
+        return { line, totalValue, subbrands: sm.size, tiles }
       })
-      .filter(g => g.totalValue > 0)
-      .sort((a, b) => b.totalValue - a.totalValue)
+      .filter((g): g is NonNullable<typeof g> => g !== null && g.totalValue > 0)
   }, [productBase])
 
   const arrivalInvoices = useMemo(() => {
