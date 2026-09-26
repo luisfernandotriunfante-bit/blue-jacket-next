@@ -7,8 +7,8 @@ export type ReceiptMotorResult = { canonicalBase: CanonicalReceipt[]; audit: Aud
 type Row = unknown[]
 const norm=(v:unknown)=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'')
 const text=(v:unknown)=>{const x=String(v??'').trim();return x||undefined}
-const code=(v:unknown)=>{const x=String(v??'').replace(/\.0$/,'').replace(/\s/g,'').replace(/^0+(?=\d)/,'');return x||undefined}
-const num=(v:unknown)=>{const x=String(v??'').trim();const y=x.includes(',')&&x.includes('.')?(x.lastIndexOf(',')<x.lastIndexOf('.')?x.replace(/,/g,''):x.replace(/\./g,'').replace(',','.')):x.replace(',','.');const n=Number(y);return Number.isFinite(n)?n:undefined}
+const code=(v:unknown)=>{const x=String(v??'').replace(/\*/g,'').replace(/\.0$/,'').replace(/\s/g,'').replace(/^0+(?=\d)/,'');return x||undefined}
+const num=(v:unknown)=>{const x=String(v??'').replace(/\*/g,'').trim();const y=x.includes(',')&&x.includes('.')?(x.lastIndexOf(',')<x.lastIndexOf('.')?x.replace(/,/g,''):x.replace(/\./g,'').replace(',','.')):x.replace(',','.');const n=Number(y);return Number.isFinite(n)?n:undefined}
 const date=(v:unknown)=>{const m=String(v??'').match(/^(\d{2})\/(\d{2})\/(\d{2,4})/);return m?`${m[3].length===2?'20'+m[3]:m[3]}-${m[2]}-${m[1]}`:undefined}
 const audit=(id:string,title:string,instruction:string,detail:string,level:AuditItem['level']='ok'):AuditItem=>({id,title,instruction,detail,level,area:'recebimentos'})
 
