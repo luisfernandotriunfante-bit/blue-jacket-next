@@ -43,15 +43,22 @@ export function StockTab({ productBase, clientBase, receiptBase }: {
   }, [activeClient, clientBase])
 
   const filtered = useMemo(() => {
-    const q = norm(search)
-    const ean = search.replace(/\D/g, '')
+    const q = search.trim()
     return productBase.filter(p => {
       if (q) {
-        const byDesc = norm(p.description).includes(q)
-        const byEan = ean.length >= 3 && (p.ean ?? '').includes(ean)
-        const byCode = (p.internalCode ?? '').startsWith(search.trim())
-        const byMfr = norm(p.manufacturerCode).includes(q)
-        if (!byDesc && !byEan && !byCode && !byMfr) return false
+        const allDigits = /^\d+$/.test(q)
+        const mixed = /[A-Za-z]/.test(q) && /\d/.test(q) && !q.includes(' ')
+        if (allDigits) {
+          if (q.length === 13) { if ((p.ean ?? '') !== q) return false }
+          else if (q.length >= 7) { if (!(p.ean ?? '').startsWith(q)) return false }
+          else { if (!(p.internalCode ?? '').startsWith(q)) return false }
+        } else if (mixed) {
+          if (!norm(p.manufacturerCode).startsWith(norm(q))) return false
+        } else {
+          const words = q.split(/\s+/).filter(Boolean).map(norm)
+          const desc = norm(p.description)
+          if (!words.every(w => desc.includes(w))) return false
+        }
       }
       if (filterStatus !== 'all' && p.status !== filterStatus) return false
       if (filterInStock && (p.availableStock ?? 0) <= 0) return false
@@ -97,7 +104,7 @@ export function StockTab({ productBase, clientBase, receiptBase }: {
         <input
           ref={searchRef}
           className="stock-search"
-          placeholder="Buscar por descrição, EAN (parcial), código interno ou fabricante…"
+          placeholder="Descrição · código interno (ex: 915) · EAN 7+ dígitos · cód. fab. (ex: FBR120)…"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
