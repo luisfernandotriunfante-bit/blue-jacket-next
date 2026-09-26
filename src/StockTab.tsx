@@ -49,7 +49,20 @@ export function StockTab({ productBase, receiptBase }: {
   const [selected, setSelected] = useState<CanonicalProduct | null>(null)
   const [tags, setTags] = useState<Tags>(loadTags)
   const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null)
+  const [markup, setMarkup] = useState<number>(() => {
+    try { return Number(localStorage.getItem('rj-markup-pct') ?? '0') || 0 }
+    catch { return 0 }
+  })
   const searchRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const handler = () => {
+      try { setMarkup(Number(localStorage.getItem('rj-markup-pct') ?? '0') || 0) }
+      catch { /* */ }
+    }
+    window.addEventListener('rj-markup-changed', handler)
+    return () => window.removeEventListener('rj-markup-changed', handler)
+  }, [])
 
   useEffect(() => {
     try { localStorage.setItem('rj-product-tags', JSON.stringify(tags)) }
@@ -58,15 +71,43 @@ export function StockTab({ productBase, receiptBase }: {
 
   const kpis = useMemo(() => {
     let comEstoque = 0, semEstoque = 0, emTransito = 0
-    let valorEstoque = 0, valorTransito = 0
+    let custoCusto = 0, custoVenda = 0, carteiraCusto = 0
     for (const p of productBase) {
       const avail = p.availableStock ?? 0
       if (avail > 0) comEstoque++; else semEstoque++
       if ((p.inTransitQuantity ?? 0) > 0) emTransito++
-      if (p.sellerPrice !== undefined) valorEstoque += avail * p.sellerPrice
-      valorTransito += p.inTransitValue ?? 0
+      const cost = p.realCost ?? p.financialCost
+      if (cost !== undefined && avail > 0) custoCusto += avail * cost
+      if (p.sellerPrice !== undefined && avail > 0) custoVenda += avail * p.sellerPrice
+      carteiraCusto += p.inTransitValue ?? 0
     }
-    return { comEstoque, semEstoque, emTransito, valorEstoque, valorTransito, total: productBase.length }
+    const projetadoCusto = custoCusto + carteiraCusto
+    const projetadoVenda = markup > 0 ? projetadoCusto * (1 + markup / 100) : null
+    return { comEstoque, semEstoque, emTransito, total: productBase.length, custoCusto, custoVenda, carteiraCusto, projetadoCusto, projetadoVenda }
+  }, [productBase, markup])
+
+  const treemapData = useMemo(() => {
+    const lineMap = new Map<string, Map<string, { value: number; items: number }>>()
+    for (const p of productBase) {
+      if (!p.groupName) continue
+      const sub = p.subBrand ?? '(sem sub-brand)'
+      const avail = p.availableStock ?? 0
+      const val = avail > 0 && p.sellerPrice !== undefined ? avail * p.sellerPrice : 0
+      if (!lineMap.has(p.groupName)) lineMap.set(p.groupName, new Map())
+      const sm = lineMap.get(p.groupName)!
+      const cur = sm.get(sub) ?? { value: 0, items: 0 }
+      sm.set(sub, { value: cur.value + val, items: cur.items + 1 })
+    }
+    return Array.from(lineMap.entries())
+      .map(([line, sm]) => {
+        const tiles = Array.from(sm.entries())
+          .map(([label, d]) => ({ key: label, label, ...d }))
+          .filter(t => t.value > 0)
+          .sort((a, b) => b.value - a.value)
+        return { line, totalValue: tiles.reduce((s, t) => s + t.value, 0), subbrands: sm.size, tiles }
+      })
+      .filter(g => g.totalValue > 0)
+      .sort((a, b) => b.totalValue - a.totalValue)
   }, [productBase])
 
   const arrivalInvoices = useMemo(() => {
@@ -165,30 +206,21 @@ export function StockTab({ productBase, receiptBase }: {
         {subTab === 'estoque' ? (
           <>
             <div className="stock-kpis">
-              <KpiCard label="Total de SKUs" value={kpis.total.toLocaleString('pt-BR')} />
+              <KpiCard label="Estoque a custo" value={kpis.custoCusto > 0 ? kpiCurrency(kpis.custoCusto) : '—'} />
+              <KpiCard label="Estoque à venda" value={kpis.custoVenda > 0 ? kpiCurrency(kpis.custoVenda) : '—'} accent="green" />
               <KpiCard
-                label="Com estoque"
-                value={kpis.comEstoque.toLocaleString('pt-BR')}
-                accent="green"
-                percent={kpis.total > 0 ? (kpis.comEstoque / kpis.total) * 100 : 0}
-                pctLabel={kpis.total > 0 ? `${((kpis.comEstoque / kpis.total) * 100).toFixed(0)}% dos SKUs` : ''}
+                label="Carteira em trânsito"
+                value={kpis.carteiraCusto > 0 ? kpiCurrency(kpis.carteiraCusto) : '—'}
+                accent="amber"
+                sub={kpis.emTransito > 0 ? `${kpis.emTransito.toLocaleString('pt-BR')} SKUs em trânsito` : undefined}
               />
+              <KpiCard label="Projetado a custo" value={kpis.projetadoCusto > 0 ? kpiCurrency(kpis.projetadoCusto) : '—'} />
               <KpiCard
-                label="Sem estoque"
-                value={kpis.semEstoque.toLocaleString('pt-BR')}
-                accent="red"
-                percent={kpis.total > 0 ? (kpis.semEstoque / kpis.total) * 100 : 0}
-                pctLabel={kpis.total > 0 ? `${((kpis.semEstoque / kpis.total) * 100).toFixed(0)}% dos SKUs` : ''}
+                label="Projetado à venda"
+                value={kpis.projetadoVenda !== null ? kpiCurrency(kpis.projetadoVenda) : '—'}
+                accent={kpis.projetadoVenda !== null ? 'green' : undefined}
+                sub={markup === 0 ? 'Configure markup em Administração' : `markup ${markup.toLocaleString('pt-BR')}%`}
               />
-              {kpis.emTransito > 0 && (
-                <KpiCard
-                  label="Em trânsito"
-                  value={kpis.emTransito.toLocaleString('pt-BR')}
-                  accent="amber"
-                  percent={kpis.total > 0 ? (kpis.emTransito / kpis.total) * 100 : 0}
-                  pctLabel={kpis.total > 0 ? `${((kpis.emTransito / kpis.total) * 100).toFixed(0)}% dos SKUs` : ''}
-                />
-              )}
             </div>
 
             <div className="stock-charts">
@@ -203,14 +235,20 @@ export function StockTab({ productBase, receiptBase }: {
                 />
               </div>
               <div className="stock-charts-right">
-                {kpis.valorEstoque > 0 && (
-                  <KpiCard label="Valor em estoque" value={kpiCurrency(kpis.valorEstoque)} sub="preço com ST × disponível" big />
-                )}
-                {kpis.valorTransito > 0 && (
-                  <KpiCard label="Valor a chegar" value={kpiCurrency(kpis.valorTransito)} accent="amber" sub="custo da carteira" big />
-                )}
+                <KpiCard label="Com estoque" value={kpis.comEstoque.toLocaleString('pt-BR')} accent="green"
+                  percent={kpis.total > 0 ? (kpis.comEstoque / kpis.total) * 100 : 0}
+                  pctLabel={kpis.total > 0 ? `${((kpis.comEstoque / kpis.total) * 100).toFixed(0)}% dos SKUs` : ''}
+                  big
+                />
+                <KpiCard label="Sem estoque" value={kpis.semEstoque.toLocaleString('pt-BR')} accent="red"
+                  percent={kpis.total > 0 ? (kpis.semEstoque / kpis.total) * 100 : 0}
+                  pctLabel={kpis.total > 0 ? `${((kpis.semEstoque / kpis.total) * 100).toFixed(0)}% dos SKUs` : ''}
+                  big
+                />
               </div>
             </div>
+
+            <StockTreemap data={treemapData} />
 
             <div className="stock-arrivals">
               <div className="arrivals-head">
@@ -534,6 +572,85 @@ export function StockTab({ productBase, receiptBase }: {
         )}
       </section>
     </>
+  )
+}
+
+const LINE_HUES = [351, 207, 148, 272, 38]
+function tileBg(lineIdx: number, tileIdx: number): string {
+  const hue = LINE_HUES[lineIdx % LINE_HUES.length]!
+  const shift = (tileIdx % 4) * 4
+  return `linear-gradient(145deg, hsl(${hue} ${58 - shift}% ${32 + shift}% / .98), hsl(${hue + 10} ${48 - shift}% ${22 + shift}% / .99))`
+}
+
+function squarifiedLayout(
+  items: Array<{ id: string; value: number }>,
+  x: number, y: number, w: number, h: number
+): Array<{ id: string; x: number; y: number; w: number; h: number }> {
+  if (items.length === 0) return []
+  if (items.length === 1) return [{ id: items[0].id, x, y, w, h }]
+  const total = items.reduce((s, it) => s + it.value, 0)
+  if (total === 0) return []
+  let acc = 0
+  const half = total / 2
+  let split = items.length - 1
+  for (let i = 0; i < items.length - 1; i++) {
+    acc += items[i].value
+    if (acc >= half) { split = i + 1; break }
+  }
+  const first = items.slice(0, split)
+  const rest = items.slice(split)
+  const frac = first.reduce((s, it) => s + it.value, 0) / total
+  if (w >= h) {
+    return [...squarifiedLayout(first, x, y, w * frac, h), ...squarifiedLayout(rest, x + w * frac, y, w * (1 - frac), h)]
+  }
+  return [...squarifiedLayout(first, x, y, w, h * frac), ...squarifiedLayout(rest, x, y + h * frac, w, h * (1 - frac))]
+}
+
+function StockTreemap({ data }: {
+  data: Array<{ line: string; totalValue: number; subbrands: number; tiles: Array<{ key: string; label: string; value: number }> }>
+}) {
+  const totalAll = data.reduce((s, g) => s + g.totalValue, 0)
+  const pct = (n: number, t: number) => t > 0 ? `${((n / t) * 100).toFixed(1)}%` : '—'
+  if (data.length === 0) return (
+    <div className="stock-treemap-empty">Sem estoque valorizado por linha. Configure grupos de produto e sub-brands.</div>
+  )
+  return (
+    <div className="stock-treemap-section">
+      <div className="stock-treemap-header">
+        <span className="stock-treemap-eyebrow">Estoque por linha</span>
+        <span className="stock-treemap-title">Composição por sub-brand</span>
+      </div>
+      <div className="stock-line-list">
+        {data.map((group, lineIdx) => {
+          const rects = squarifiedLayout(group.tiles.map(t => ({ id: t.key, value: t.value })), 0, 0, 100, 100)
+          const rectMap = new Map(rects.map(r => [r.id, r]))
+          return (
+            <section key={group.line} className="stock-line-card">
+              <header className="stock-line-head">
+                <strong>{group.line}</strong>
+                <span>{kpiCurrency(group.totalValue)}</span>
+                <small>{group.subbrands} sub-brand{group.subbrands !== 1 ? 's' : ''} · {pct(group.totalValue, totalAll)} do estoque</small>
+              </header>
+              <div className="stock-subbrand-treemap">
+                {group.tiles.map((tile, tileIdx) => {
+                  const rect = rectMap.get(tile.key)
+                  if (!rect) return null
+                  const label = `${tile.label}: ${kpiCurrency(tile.value)} · ${pct(tile.value, group.totalValue)}`
+                  return (
+                    <div key={tile.key} className="stock-tile" title={label}
+                      style={{ left: `${rect.x}%`, top: `${rect.y}%`, width: `${rect.w}%`, height: `${rect.h}%`, background: tileBg(lineIdx, tileIdx) }}>
+                      <strong>{tile.label}</strong>
+                      <span>{kpiCurrency(tile.value)}</span>
+                      <small>{pct(tile.value, group.totalValue)}</small>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 

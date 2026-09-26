@@ -48,7 +48,7 @@ const dedupeList = (files: UploadedFile[] | undefined) => (files ?? []).filter((
 export function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
   const [section, setSection] = useState<'administracao' | 'estoque'>('administracao')
-  const [tab, setTab] = useState<'uploads' | 'auditoria'>('uploads')
+  const [tab, setTab] = useState<'uploads' | 'auditoria' | 'config'>('uploads')
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [rawFiles, setRawFiles] = useState<Record<string, File>>({})
   const [activeNotice, setActiveNotice] = useState<AuditItem | null>(null)
@@ -331,6 +331,7 @@ export function App() {
       <header className="topbar stock-topbar" aria-label="Administração">
         <button type="button" className={`stock-nav-btn${tab === 'uploads' ? ' on' : ''}`} onClick={() => setTab('uploads')}>Uploads</button>
         <button type="button" className={`stock-nav-btn${tab === 'auditoria' ? ' on' : ''}`} onClick={() => setTab('auditoria')}>Auditoria</button>
+        <button type="button" className={`stock-nav-btn${tab === 'config' ? ' on' : ''}`} onClick={() => setTab('config')}>Configurações</button>
       </header>
       {tab === 'uploads' ? <section className="content">
         <h2>ARQUIVOS DIÁRIOS</h2>
@@ -340,14 +341,65 @@ export function App() {
         <h2 className="section-title">MOTORES</h2>
         <div className="motor-grid">{motors.map(motor => <article className="motor-card" key={motor.id}><h3>{motor.name}</h3>{motor.id === 'produtos' ? <><div className="client-source-list">{productSources.map(source => { const uploaded = productSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded ? <small style={{display:'flex',gap:'6px',alignItems:'center'}}>{uploaded.name} <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeProductSlotFile(source.id, uploaded.id)}>Remover</button></small> : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => productSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={productProcessing || !Object.values(productSlots).some(file => file && rawFiles[file.id])} onClick={processProducts}>{productProcessing ? 'Conferindo arquivos' : 'Criar base de produtos'}</button>{productIndicators ? <div className="indicators"><span>{productIndicators.total.toLocaleString('pt-BR')} produtos</span><span>{productIndicators.inTransit.toLocaleString('pt-BR')} em trânsito</span><button type="button" onClick={downloadProductBase}>Baixar JSON</button><button type="button" onClick={downloadProductExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'clientes' ? <><div className="client-source-list">{clientSources.map(source => { const uploaded = clientSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded ? <small style={{display:'flex',gap:'6px',alignItems:'center'}}>{uploaded.name} <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeClientSlotFile(source.id, uploaded.id)}>Remover</button></small> : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => clientSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={clientProcessing || !Object.values(clientSlots).some(file => file && rawFiles[file.id])} onClick={processClients}>{clientProcessing ? 'Conferindo arquivos' : 'Criar base de clientes'}</button>{clientIndicators ? <div className="indicators"><span>{clientIndicators.totalClients.toLocaleString('pt-BR')} clientes</span><span>{clientIndicators.complete.toLocaleString('pt-BR')} completos</span><button type="button" onClick={downloadClientBase}>Baixar JSON</button><button type="button" onClick={downloadClientExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'historico' ? <><div className="client-source-list">{historySources.map(source => { const uploaded = historySlots[source.id] ?? []; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file => <small key={file.id} style={{display:'flex',gap:'6px',alignItems:'center'}}>{file.name} <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeHistoryFile(file.id)}>Remover</button></small>) : <small>{source.id === 'summary' || source.id === 'catalog' ? 'Opcional' : 'Ainda não enviado'}</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".txt" multiple={source.id !== 'catalog'} onChange={event => historySourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={historyProcessing || ![...(historySlots.sales ?? []), ...(historySlots.summary ?? [])].some(f => rawFiles[f.id])} onClick={processHistory}>{historyProcessing ? 'Conferindo arquivos' : 'Criar base histórica'}</button>{historyIndicators ? <div className="indicators"><span>{historyIndicators.competencies.toLocaleString('pt-BR')} competências</span><span>{historyIndicators.salesLines.toLocaleString('pt-BR')} vendas</span><button type="button" onClick={downloadHistoryBase}>Baixar JSON</button><button type="button" onClick={downloadHistoryExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'movimentacoes' ? <><div className="client-source-list">{movementSources.map(source => { const uploaded = movementSlots[source.id] ?? []; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file => <small key={file.id} style={{display:'flex',gap:'6px',alignItems:'center'}}>{file.name} <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeMovementFile(file.id)}>Remover</button></small>) : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" multiple onChange={event => movementSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={movementProcessing || !Object.values(movementSlots).flat().some(file => rawFiles[file.id])} onClick={processMovements}>{movementProcessing ? 'Conferindo arquivos' : 'Criar base de movimentações'}</button>{movementIndicators ? <div className="indicators"><span>{movementIndicators.sales.toLocaleString('pt-BR')} vendas faturadas</span><span>{movementIndicators.pendingRetyping.toLocaleString('pt-BR')} para redigitar</span><button type="button" onClick={downloadMovementBase}>Baixar JSON</button><button type="button" onClick={downloadMovementExcel}>Baixar Excel</button></div> : null}</> : <><button type="button" className="add-button" onClick={() => motorInputs.current[motor.id]?.click()}>Adicionar arquivos</button><input ref={element => { motorInputs.current[motor.id] = element }} aria-label={`Adicionar arquivos de ${motor.name}`} type="file" multiple onChange={event => fileChange(motor.id, event)} /><FileList files={filesIn(motor.id)} onRemove={removeFile} compact /></>}</article>)}</div>
         <article className="motor-card"><h3>Chegada de notas</h3><div className="client-source-list">{receiptSources.map(source => { const uploaded=receiptSlots[source.id]??[]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file=><small key={file.id} style={{display:'flex',gap:'6px',alignItems:'center'}}>{file.name} <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeReceiptFile(file.id)}>Remover</button></small>) : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input type="file" multiple accept={source.id==='legacy'?'.txt':'.xls,.xlsx'} onChange={event=>receiptSourceChange(source.id,event)} /></label></div>})}</div><button className="process-button" type="button" disabled={receiptProcessing||!Object.values(receiptSlots).flat().some(file=>rawFiles[file.id])} onClick={processReceipts}>{receiptProcessing?'Conferindo arquivos':'Criar base de chegada'}</button>{receiptIndicators?<div className="indicators"><span>{receiptIndicators.received.toLocaleString('pt-BR')} recebimentos</span><span>{receiptIndicators.inTransit.toLocaleString('pt-BR')} em trânsito</span><button type="button" onClick={downloadReceiptBase}>Baixar JSON</button><button type="button" onClick={downloadReceiptExcel}>Baixar Excel</button></div>:null}</article>
-      </section> : <section className="content">
+      </section> : tab === 'auditoria' ? <section className="content">
         <div className="audit-heading"><h2>AUDITORIA</h2><button className="secondary-button" type="button" onClick={downloadAiJson}>Gerar resumo para IA</button></div>
         <div className="notice-list">{audit.map(item => <button className={`notice ${item.level}`} key={item.id} type="button" onClick={() => setActiveNotice(item)}><span>{item.title}</span><small>{item.instruction}</small></button>)}</div>
+      </section> : <section className="content">
+        <ConfigTab />
       </section>}
       </>}
     </main>
     {activeNotice ? <div className="modal-backdrop" onMouseDown={() => setActiveNotice(null)}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="notice-title" onMouseDown={event => event.stopPropagation()}><button className="close" aria-label="Fechar" type="button" onClick={() => setActiveNotice(null)}>×</button><h2 id="notice-title">{activeNotice.title}</h2><p>{activeNotice.detail}</p><strong>{activeNotice.instruction}</strong></section></div> : null}
   </div>
+}
+
+function ConfigTab() {
+  const [markupInput, setMarkupInput] = useState<string>(() => {
+    try { const v = localStorage.getItem('rj-markup-pct'); return v ? v : '' }
+    catch { return '' }
+  })
+  const [saved, setSaved] = useState(false)
+
+  function saveMarkup() {
+    const val = parseFloat(markupInput.replace(',', '.'))
+    if (!isNaN(val) && val >= 0 && val <= 9999) {
+      try {
+        localStorage.setItem('rj-markup-pct', String(val))
+        window.dispatchEvent(new Event('rj-markup-changed'))
+        setSaved(true)
+        setTimeout(() => setSaved(false), 2000)
+      } catch { /* quota */ }
+    }
+  }
+
+  return (
+    <div className="config-page">
+      <h2>CONFIGURAÇÕES MANUAIS</h2>
+      <div className="config-group">
+        <label className="config-label" htmlFor="cfg-markup">Markup médio (%)</label>
+        <p className="config-help">
+          Percentual de markup aplicado sobre o custo para calcular o KPI <strong>Projetado à venda</strong>.
+          Representa o acréscimo médio sobre o custo de aquisição (ex.: 35 = 35% sobre o custo total projetado).
+        </p>
+        <div className="config-input-row">
+          <input
+            id="cfg-markup"
+            className="config-input"
+            type="text"
+            inputMode="decimal"
+            placeholder="Ex.: 35"
+            value={markupInput}
+            onChange={e => { setMarkupInput(e.target.value); setSaved(false) }}
+            onKeyDown={e => e.key === 'Enter' && saveMarkup()}
+          />
+          <span className="config-unit">%</span>
+          <button className="process-button" style={{ margin: 0 }} type="button" onClick={saveMarkup}>
+            {saved ? 'Salvo ✓' : 'Salvar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function FileList({ files, onRemove, compact = false }: { files: UploadedFile[]; onRemove: (id: string) => void; compact?: boolean }) {
