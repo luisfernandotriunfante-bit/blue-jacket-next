@@ -103,28 +103,34 @@ export function StockTab({ productBase, receiptBase }: {
           onChange={e => setSearch(e.target.value)}
         />
         <div className="stock-filters">
-          <span className="filter-label">Status</span>
-          {(['all', 'active', 'in_transit'] as const).map(s => (
-            <button key={s} type="button" className={`chip${filterStatus === s ? ' on' : ''}`} onClick={() => setFilterStatus(s)}>
-              {s === 'all' ? 'Todos' : s === 'active' ? 'Ativo' : 'Em trânsito'}
-            </button>
-          ))}
-          {availableChannels.length > 0 && <>
-            <span className="filter-label" style={{ marginLeft: 10 }}>Sortimento</span>
-            <button type="button" className={`chip${filterChannel === '' ? ' on' : ''}`} onClick={() => setFilterChannel('')}>Todos</button>
-            {availableChannels.map(ch => (
-              <button key={ch} type="button" className={`chip${filterChannel === ch ? ' on' : ''}`} onClick={() => setFilterChannel(ch)}>{ch}</button>
+          <div className="filter-row">
+            <span className="filter-label">Status</span>
+            {(['all', 'active', 'in_transit'] as const).map(s => (
+              <button key={s} type="button" className={`chip${filterStatus === s ? ' on' : ''}`} onClick={() => setFilterStatus(s)}>
+                {s === 'all' ? 'Todos' : s === 'active' ? 'Ativo' : 'Em trânsito'}
+              </button>
             ))}
-          </>}
-          <span className="filter-label" style={{ marginLeft: 10 }}>Marcação</span>
-          {(['all', 'mandatory', 'important'] as const).map(m => (
-            <button key={m} type="button" className={`chip${filterMarcacao === m ? ' on' : ''}`} onClick={() => setFilterMarcacao(m)}>
-              {m === 'all' ? 'Todos' : m === 'mandatory' ? 'Mandatório' : 'Importante'}
+            <button type="button" className={`chip${filterInStock ? ' on' : ''}`} style={{ marginLeft: 'auto' }} onClick={() => setFilterInStock(v => !v)}>
+              Com estoque
             </button>
-          ))}
-          <button type="button" className={`chip${filterInStock ? ' on' : ''}`} style={{ marginLeft: 10 }} onClick={() => setFilterInStock(v => !v)}>
-            Com estoque
-          </button>
+          </div>
+          {availableChannels.length > 0 && (
+            <div className="filter-row">
+              <span className="filter-label">Sortimento</span>
+              <button type="button" className={`chip${filterChannel === '' ? ' on' : ''}`} onClick={() => setFilterChannel('')}>Todos</button>
+              {availableChannels.map(ch => (
+                <button key={ch} type="button" className={`chip${filterChannel === ch ? ' on' : ''}`} onClick={() => setFilterChannel(ch)}>{ch}</button>
+              ))}
+            </div>
+          )}
+          <div className="filter-row">
+            <span className="filter-label">Marcação</span>
+            {(['all', 'mandatory', 'important'] as const).map(m => (
+              <button key={m} type="button" className={`chip${filterMarcacao === m ? ' on' : ''}`} onClick={() => setFilterMarcacao(m)}>
+                {m === 'all' ? 'Todos' : m === 'mandatory' ? 'Mandatório' : 'Importante'}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
