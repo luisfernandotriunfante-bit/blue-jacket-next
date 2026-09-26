@@ -331,32 +331,42 @@ export function StockTab({ productBase, receiptBase }: {
                 total={kpis.total}
               />
               <div className="stock-sku-stats">
-                <div className="sku-stat sku-stat-green">
-                  <span className="sku-stat-val">{kpis.comEstoque.toLocaleString('pt-BR')}</span>
-                  <span className="sku-stat-label">com estoque</span>
-                  <div className="sku-stat-bar"><div className="sku-stat-fill" style={{ width: `${kpis.total > 0 ? (kpis.comEstoque / kpis.total) * 100 : 0}%` }} /></div>
-                  <span className="sku-stat-pct">{kpis.total > 0 ? `${((kpis.comEstoque / kpis.total) * 100).toFixed(0)}% dos SKUs` : ''}</span>
-                </div>
-                <div className="sku-stat sku-stat-red">
-                  <span className="sku-stat-val">{kpis.semEstoque.toLocaleString('pt-BR')}</span>
-                  <span className="sku-stat-label">sem estoque</span>
-                  <div className="sku-stat-bar"><div className="sku-stat-fill" style={{ width: `${kpis.total > 0 ? (kpis.semEstoque / kpis.total) * 100 : 0}%` }} /></div>
-                  <span className="sku-stat-pct">{kpis.total > 0 ? `${((kpis.semEstoque / kpis.total) * 100).toFixed(0)}% dos SKUs` : ''}</span>
-                </div>
+                {/* Cobertura de preço — complementa o donut, mostra saúde comercial */}
+                {(() => {
+                  const semPreco = kpis.comEstoque - kpis.comPreco
+                  const pct = kpis.comEstoque > 0 ? (semPreco / kpis.comEstoque) * 100 : 0
+                  return semPreco > 0 ? (
+                    <div className="sku-stat sku-stat-red">
+                      <span className="sku-stat-val">{semPreco.toLocaleString('pt-BR')}</span>
+                      <span className="sku-stat-label">sem preço de venda</span>
+                      <div className="sku-stat-bar"><div className="sku-stat-fill" style={{ width: `${pct}%` }} /></div>
+                      <span className="sku-stat-pct">{pct.toFixed(0)}% dos SKUs com saldo não têm preço cadastrado</span>
+                    </div>
+                  ) : kpis.comEstoque > 0 ? (
+                    <div className="sku-stat sku-stat-green">
+                      <span className="sku-stat-val">100%</span>
+                      <span className="sku-stat-label">cobertura de preço</span>
+                      <div className="sku-stat-bar"><div className="sku-stat-fill" style={{ width: '100%' }} /></div>
+                      <span className="sku-stat-pct">todos os {kpis.comEstoque.toLocaleString('pt-BR')} SKUs com saldo têm preço cadastrado</span>
+                    </div>
+                  ) : null
+                })()}
+                {/* Ruptura — SKUs sem nenhum saldo */}
+                {kpis.total > 0 && (
+                  <div className="sku-stat sku-stat-red">
+                    <span className="sku-stat-val">{kpis.semEstoque.toLocaleString('pt-BR')}</span>
+                    <span className="sku-stat-label">ruptura</span>
+                    <div className="sku-stat-bar"><div className="sku-stat-fill" style={{ width: `${(kpis.semEstoque / kpis.total) * 100}%` }} /></div>
+                    <span className="sku-stat-pct">{((kpis.semEstoque / kpis.total) * 100).toFixed(0)}% do portfólio sem nenhum saldo físico</span>
+                  </div>
+                )}
+                {/* Carteira — quantidade E valor em trânsito */}
                 {kpis.emTransito > 0 && (
                   <div className="sku-stat sku-stat-amber">
                     <span className="sku-stat-val">{kpis.emTransito.toLocaleString('pt-BR')}</span>
-                    <span className="sku-stat-label">em trânsito</span>
+                    <span className="sku-stat-label">a receber</span>
                     <div className="sku-stat-bar"><div className="sku-stat-fill" style={{ width: `${kpis.total > 0 ? (kpis.emTransito / kpis.total) * 100 : 0}%` }} /></div>
-                    <span className="sku-stat-pct">{kpis.total > 0 ? `${((kpis.emTransito / kpis.total) * 100).toFixed(0)}% dos SKUs` : ''}</span>
-                  </div>
-                )}
-                {kpis.comPreco > 0 && (
-                  <div className="sku-stat">
-                    <span className="sku-stat-val">{kpis.comPreco.toLocaleString('pt-BR')}</span>
-                    <span className="sku-stat-label">com preço de venda</span>
-                    <div className="sku-stat-bar"><div className="sku-stat-fill sku-stat-fill-muted" style={{ width: `${kpis.total > 0 ? (kpis.comPreco / kpis.total) * 100 : 0}%` }} /></div>
-                    <span className="sku-stat-pct">{kpis.comEstoque > 0 ? `${((kpis.comPreco / kpis.comEstoque) * 100).toFixed(0)}% dos com saldo` : ''}</span>
+                    <span className="sku-stat-pct">{kpiCurrency(kpis.carteiraCusto)} em Carteira confirmada</span>
                   </div>
                 )}
               </div>
@@ -804,7 +814,7 @@ function StockDonut({ segments, total }: {
     <div className="stock-donut-wrap">
       <div className="donut-svg-wrap">
         <svg viewBox="0 0 120 120">
-          <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="12" />
+          <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--border)" strokeWidth="12" />
           <g transform={`rotate(-90 ${cx} ${cy})`}>
             {arcs.map((arc, i) => arc.dash > 0 && (
               <circle key={i} cx={cx} cy={cy} r={r}
