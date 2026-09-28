@@ -153,8 +153,6 @@ export async function processProductMotor(files: File[]): Promise<ProductMotorRe
   for (const [key, source] of sortiment) { const productId = byManufacturer.get(key); if (!productId) continue; const product = ensure(productId); merge(product, source) }
   // Canais de sortimento (quais formatos de loja podem comprar cada produto).
   for (const [key, channels] of sortimentChannels) { const productId = byManufacturer.get(key); if (!productId) continue; const product = products.get(productId); if (product && !product.sortimentChannels) product.sortimentChannels = channels }
-  // Sub-marcas do sortiment (fallback quando 8013 não cobre o produto por EAN).
-  for (const [key, sub] of sortimentSubBrands) { const productId = byManufacturer.get(key) ?? products.get(`WINTHOR:${key}`)?.id; if (!productId) continue; const product = products.get(productId); if (product && !product.subBrand) product.subBrand = sub }
   // Sub-marcas do 8013 enriquecem produtos pelo EAN ou pelo código de fabricante.
   for (const [ean, source] of subBrands) { const productId = byEan.get(ean) ?? byManufacturer.get(ean); if (!productId) continue; const product = products.get(productId); if (product && !product.subBrand) { product.subBrand = source.subBrand; if (!product.category) product.category = source.category } }
   const canonicalBase = [...products.values()].map(product => {

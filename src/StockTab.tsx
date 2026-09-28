@@ -48,36 +48,6 @@ function resolveCommercialLine(p: { groupFamily?: string; description?: string; 
   return classifyCommercialLine(p.description, p.category, p.subcategory)
 }
 
-function resolveSubBrand(p: { subBrand?: string; description?: string; brand?: string; category?: string; subcategory?: string; productLine?: string }): string {
-  if (p.subBrand) return p.subBrand
-  const up = (s?: string) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase()
-  const h = [p.description, p.brand, p.category, p.subcategory, p.productLine].filter(Boolean).map(v => up(v)).join(' ')
-  if (/FIO DENTAL|DENTAL FLOSS/.test(h)) return 'Fio Dental'
-  if (/ENXAG|MOUTHWASH/.test(h)) return 'Enxaguantes'
-  if (/COLGATE.*TOTAL|\bCD TOTAL\b/.test(h)) return 'CD Total'
-  if (/SORRISO/.test(h) && /ESCOVA|\bTB\b/.test(h)) return 'Escova Sorriso'
-  if (/SORRISO/.test(h) && !/ESCOVA|\bTB\b/.test(h)) return 'Creme Sorriso'
-  if (/LUMINOUS|TT12|NATURALS|PREMIUM/.test(h)) return 'CD Premium'
-  if (/ESCOVA.*DENTAL|TOOTHBRUSH/.test(h)) return 'Escovas'
-  if (/\bESCOVA\b/.test(h)) return 'Escovas'
-  if (/AJAX/.test(h)) return 'Ajax'
-  if (/PINHO SOL|\bPINHO\b/.test(h)) return 'Pinho Sol'
-  if (/\bOLA\b/.test(h)) return 'Ola'
-  if (/PROTEX/.test(h)) return 'Protex'
-  if (/PALMOLIVE/.test(h) && /SHAMPOO|\bSH\b/.test(h)) return 'Shampoo Palmolive'
-  if (/PALMOLIVE/.test(h) && /CONDICIONADOR|\bCOND\b/.test(h)) return 'Condicionador Palmolive'
-  if (/PALMOLIVE/.test(h) && /SAB|SOAP/.test(h)) return 'Palmolive Sabonete'
-  if (/PALMOLIVE/.test(h)) return 'Palmolive'
-  if (/DARLING/.test(h) && /SHAMPOO|\bSH\b/.test(h)) return 'Shampoo Darling'
-  if (/DARLING/.test(h) && /CONDICIONADOR|\bCOND\b/.test(h)) return 'Condicionador Darling'
-  if (/DARLING/.test(h)) return 'Darling'
-  if (/CONDICIONADOR|\bCOND\b/.test(h)) return 'Condicionador'
-  if (/SHAMPOO|\bSH\b/.test(h)) return 'Shampoo'
-  if (/CREME DENTAL|TOOTHPASTE|\bCD\b/.test(h)) return 'Creme Dental'
-  if (/\bSAB\b|SABONETE|SOAP/.test(h)) return 'Sabonetes'
-  if (/LIMPADOR|DESINFETANTE|DESINF|LIMP/.test(h)) return 'Limpeza'
-  return '(sem sub-brand)'
-}
 const brl = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const kpiCurrency = (n: number) => {
   if (n >= 1_000_000) return `R$ ${(n / 1_000_000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}M`
@@ -241,33 +211,25 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
 
   const coverageStats = useMemo(() => {
     const now = Date.now()
-    // Taxa de reposição por internalCode a partir das entradas "atual" (têm productCode)
-    const acc = new Map<string, { qty: number; firstMs: number }>()
+    const cutoff12m = now - 365 * 86_400_000
+    // Taxa diária baseada nos últimos 12 meses de entradas recebidas
+    const qty12m = new Map<string, number>()
     for (const r of receiptBase) {
       if (r.status !== 'recebida' || !r.productCode || !r.quantity || !r.entryDate) continue
       const ms = new Date(r.entryDate).getTime()
-      if (!Number.isFinite(ms)) continue
-      const cur = acc.get(r.productCode)
-      if (!cur) acc.set(r.productCode, { qty: r.quantity, firstMs: ms })
-      else { cur.qty += r.quantity; if (ms < cur.firstMs) cur.firstMs = ms }
+      if (!Number.isFinite(ms) || ms < cutoff12m) continue
+      qty12m.set(r.productCode, (qty12m.get(r.productCode) ?? 0) + r.quantity)
     }
     const receiptRate = new Map<string, number>()
-    for (const [c, s] of acc) {
-      const span = Math.max(1, (now - s.firstMs) / 86_400_000)
-      receiptRate.set(c, s.qty / span)
-    }
+    for (const [c, qty] of qty12m) receiptRate.set(c, qty / 365)
     let critico = 0, adequado = 0, excesso = 0, semHistorico = 0
     const [low, high] = covDays
     for (const p of productBase) {
       const avail = p.availableStock ?? 0
       if (avail <= 0) { critico++; continue }
-      // Usa stockCoverage pré-computado pelo motor; fallback: taxa derivada dos recebimentos
-      const dias = p.stockCoverage !== undefined
-        ? p.stockCoverage
-        : (() => {
-            const rate = p.internalCode ? receiptRate.get(p.internalCode) : undefined
-            return rate ? avail / rate : undefined
-          })()
+      // Prefere taxa 12 meses dos recebimentos; fallback para giro do motor (286)
+      const rate = p.internalCode ? receiptRate.get(p.internalCode) : undefined
+      const dias = rate !== undefined ? avail / rate : p.stockCoverage
       if (dias === undefined) { semHistorico++; continue }
       if (dias < low) critico++
       else if (dias <= high) adequado++
@@ -282,7 +244,7 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
     for (const p of productBase) {
       const line = resolveCommercialLine(p)
       if (!line) continue
-      const sub = resolveSubBrand(p)
+      const sub = p.subBrand ?? 'Outros'
       const avail = p.availableStock ?? 0
       const val = avail > 0 && p.sellerPrice !== undefined ? avail * p.sellerPrice : 0
       if (!lineMap.has(line)) lineMap.set(line, new Map())
@@ -588,18 +550,19 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
             </div>
 
             <div className="stock-sku-overview">
-              {/* Donut 1 — status físico */}
+              {/* Donut 1 — status físico: segmentos somam ao total real de SKUs */}
               <StockDonut
                 segments={[
                   { value: kpis.comEstoque, color: 'var(--blue)', label: 'Com estoque' },
                   { value: kpis.semEstoque, color: 'var(--red)', label: 'Sem estoque' },
                   ...(kpis.emTransito > 0 ? [{ value: kpis.emTransito, color: 'var(--white)', label: 'Em trânsito' }] : []),
                 ]}
-                total={kpis.total}
+                total={kpis.comEstoque + kpis.semEstoque + kpis.emTransito}
+                centerValue={kpis.total}
                 centerLabel="SKUs"
               />
               <div className="cov-divider" />
-              {/* Donut 2 — cobertura de dias */}
+              {/* Donut 2 — cobertura de dias (janela 12 meses) */}
               <StockDonut
                 segments={coverageStats.hasHistory ? [
                   { value: coverageStats.critico, color: 'var(--red)', label: `Crítico  <${covDays[0]}d` },
@@ -612,22 +575,6 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
                 total={coverageStats.total || 1}
                 centerLabel="Cobertura"
               />
-              <div className="cov-divider" />
-              {/* Donut 3 — saúde comercial: vendável vs sem preço vs ruptura */}
-              {(() => {
-                const semPreco = kpis.comEstoque - kpis.comPreco
-                return (
-                  <StockDonut
-                    segments={[
-                      { value: kpis.comPreco, color: 'var(--blue)', label: 'Vendável' },
-                      ...(semPreco > 0 ? [{ value: semPreco, color: 'var(--white)', label: 'Sem preço' }] : []),
-                      { value: kpis.semEstoque, color: 'var(--red)', label: 'Ruptura' },
-                    ]}
-                    total={kpis.total}
-                    centerLabel="Comercial"
-                  />
-                )
-              })()}
             </div>
 
             <StockTreemap data={treemapData} />
@@ -1451,10 +1398,11 @@ function KpiCard({ label, value, accent, sub, percent, pctLabel }: {
   )
 }
 
-function StockDonut({ segments, total, centerLabel }: {
+function StockDonut({ segments, total, centerLabel, centerValue }: {
   segments: Array<{ value: number; color: string; label: string }>
   total: number
   centerLabel?: string
+  centerValue?: number
 }) {
   const r = 48, cx = 60, cy = 60
   const circ = 2 * Math.PI * r
@@ -1483,7 +1431,7 @@ function StockDonut({ segments, total, centerLabel }: {
           </g>
         </svg>
         <div className="donut-center">
-          <span className="donut-center-val">{total.toLocaleString('pt-BR')}</span>
+          <span className="donut-center-val">{(centerValue ?? total).toLocaleString('pt-BR')}</span>
           <span className="donut-center-label">{centerLabel ?? 'SKUs'}</span>
         </div>
       </div>
