@@ -43,7 +43,7 @@ function TwoSegmentDonut({ label, segA, segALabel, segAVal, segB, segBLabel, seg
   segB: number; segBLabel: string; segBVal: string
   meta: number | null; metaLabel: string
 }) {
-  const denominator = meta ?? (segA + segB) || 1
+  const denominator = (meta ?? (segA + segB)) || 1
   const r = 54, cx = 66, cy = 66, circ = 2 * Math.PI * r
   const clampA = Math.min(segA / denominator, 1)
   const clampAB = Math.min((segA + segB) / denominator, 1)
