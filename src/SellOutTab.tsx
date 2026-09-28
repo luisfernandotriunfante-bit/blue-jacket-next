@@ -21,33 +21,25 @@ const LINE_COLOR: Partial<Record<CommercialLine, string>> = {
   'Creme Dental': 'var(--blue)', 'Esc + Enx + Fio': '#10b981',
   'Sabonetes': '#f59e0b', 'Hair': '#a78bfa', 'Limpeza': '#64748b',
 }
+const MOV_LABEL: Partial<Record<string, string>> = {
+  venda_faturada: 'Faturado', a_faturar: 'A faturar', devolucao: 'Devolução',
+  bonificacao: 'Bonificação', corte: 'Corte', entrada: 'Entrada',
+}
 
 /* ── localStorage helper ────────────────────────────────── */
 function readNum(key: string): number | null {
   try { const v = localStorage.getItem(key); return v !== null ? parseFloat(v) : null }
   catch { return null }
 }
-function saveNum(key: string, val: number, event: string) {
-  try { localStorage.setItem(key, String(val)); window.dispatchEvent(new Event(event)) }
-  catch { /* quota */ }
-}
 
-/* ── MetaDonut (hero card com edição inline de meta) ────── */
-function MetaDonut({ label, value, meta, pct, color, onSetMeta, isCount }: {
+/* ── MetaDonut ── read-only; meta é definida em Configurações */
+function MetaDonut({ label, value, meta, pct, color, isCount }: {
   label: string; value: string; meta: number | null; pct: number | null
-  color: string; onSetMeta: (v: number) => void; isCount?: boolean
+  color: string; isCount?: boolean
 }) {
-  const [editing, setEditing] = useState(false)
-  const [input, setInput] = useState('')
   const r = 42, cx = 54, cy = 54, circ = 2 * Math.PI * r
   const clamped = pct !== null ? Math.min(120, Math.max(0, pct)) : null
   const filled = clamped !== null ? Math.min((clamped / 100) * circ, circ - 3) : 0
-
-  function submit() {
-    const raw = input.replace(/[^\d,.]/g, '').replace(/\./g, '').replace(',', '.')
-    const v = parseFloat(raw)
-    if (!isNaN(v) && v > 0) { onSetMeta(v); setEditing(false); setInput('') }
-  }
 
   return (
     <div className="so-hero-card">
@@ -62,8 +54,10 @@ function MetaDonut({ label, value, meta, pct, color, onSetMeta, isCount }: {
             </g>
           )}
           {clamped !== null
-            ? <><text x={cx} y={cy - 4} textAnchor="middle" fontSize={15} fontWeight={800} fill={color} fontFamily="Space Grotesk, sans-serif">{Math.round(pct!)}%</text>
-               <text x={cx} y={cy + 10} textAnchor="middle" fontSize={9} fill="var(--muted)" fontFamily="Space Grotesk, sans-serif">da meta</text></>
+            ? <>
+                <text x={cx} y={cy - 4} textAnchor="middle" fontSize={15} fontWeight={800} fill={color} fontFamily="Space Grotesk, sans-serif">{Math.round(pct!)}%</text>
+                <text x={cx} y={cy + 10} textAnchor="middle" fontSize={9} fill="var(--muted)" fontFamily="Space Grotesk, sans-serif">da meta</text>
+              </>
             : <text x={cx} y={cy + 4} textAnchor="middle" fontSize={9} fill="var(--muted)" fontFamily="Space Grotesk, sans-serif">sem meta</text>
           }
         </svg>
@@ -71,28 +65,21 @@ function MetaDonut({ label, value, meta, pct, color, onSetMeta, isCount }: {
       <div className="so-hero-value" style={{ color }}>{value}</div>
       {meta !== null
         ? <div className="so-hero-sub">meta: {isCount ? fmtNum(meta) : kpiCurrency(meta)}</div>
-        : editing
-          ? <div className="so-hero-edit">
-              <input className="so-hero-input" type="text" autoFocus
-                placeholder={isCount ? 'Ex.: 200' : 'Ex.: 1200000'}
-                value={input} onChange={e => setInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') setEditing(false) }} />
-              <button className="so-hero-save" type="button" onClick={submit}>✓</button>
-              <button className="so-hero-cancel" type="button" onClick={() => setEditing(false)}>✕</button>
-            </div>
-          : <button className="so-hero-meta-btn" type="button" onClick={() => setEditing(true)}>+ Definir meta</button>
+        : <div className="so-hero-sub so-hero-no-meta">definir em Configurações</div>
       }
     </div>
   )
 }
 
-/* ── SplitDonut (faturado vs a faturar) ─────────────────── */
+/* ── SplitDonut — azul (faturado) × vermelho (a faturar) ── */
 function SplitDonut({ fat, afat }: { fat: number; afat: number }) {
   const total = fat + afat
   if (total <= 0) return (
     <div className="so-hero-card">
       <div className="so-hero-label">Faturado vs A faturar</div>
-      <div className="so-hero-svg-wrap"><svg viewBox="0 0 108 108"><circle cx={54} cy={54} r={42} fill="none" stroke="var(--border)" strokeWidth={11} /></svg></div>
+      <div className="so-hero-svg-wrap">
+        <svg viewBox="0 0 108 108"><circle cx={54} cy={54} r={42} fill="none" stroke="var(--border)" strokeWidth={11} /></svg>
+      </div>
       <div className="so-hero-value" style={{ color: 'var(--muted)' }}>—</div>
       <div className="so-hero-sub">sem dados</div>
     </div>
@@ -108,14 +95,14 @@ function SplitDonut({ fat, afat }: { fat: number; afat: number }) {
           <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--border)" strokeWidth={11} />
           <g transform={`rotate(-90 ${cx} ${cy})`}>
             {fd > 0 && <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--blue)" strokeWidth={11} strokeDasharray={`${fd} ${circ}`} strokeLinecap="round" />}
-            {ad > 0 && <circle cx={cx} cy={cy} r={r} fill="none" stroke="#f59e0b" strokeWidth={11} strokeDasharray={`${ad} ${circ}`} strokeDashoffset={-fp * circ} strokeLinecap="round" />}
+            {ad > 0 && <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--red)" strokeWidth={11} strokeDasharray={`${ad} ${circ}`} strokeDashoffset={-fp * circ} strokeLinecap="round" />}
           </g>
           <text x={cx} y={cy - 4} textAnchor="middle" fontSize={15} fontWeight={800} fill="var(--blue)" fontFamily="Space Grotesk, sans-serif">{Math.round(fp * 100)}%</text>
           <text x={cx} y={cy + 10} textAnchor="middle" fontSize={9} fill="var(--muted)" fontFamily="Space Grotesk, sans-serif">faturado</text>
         </svg>
       </div>
       <div className="so-hero-value" style={{ color: 'var(--blue)' }}>{kpiCurrency(fat)}</div>
-      <div className="so-hero-sub" style={{ color: '#f59e0b' }}>+{kpiCurrency(afat)} a faturar</div>
+      <div className="so-hero-sub" style={{ color: 'var(--red)' }}>+{kpiCurrency(afat)} a faturar</div>
     </div>
   )
 }
@@ -133,9 +120,15 @@ function KpiCard({ label, value, accent, sub }: { label: string; value: string; 
   )
 }
 
-/* ── utilidade: construir path SVG ──────────────────────── */
+/* ── SVG path helpers ────────────────────────────────────── */
 function linePath(vals: number[], xFn: (i: number) => number, yFn: (v: number) => number) {
   return vals.map((v, i) => `${i === 0 ? 'M' : 'L'} ${xFn(i).toFixed(1)} ${yFn(v).toFixed(1)}`).join(' ')
+}
+function areaPath(vals: number[], xFn: (i: number) => number, yFn: (v: number) => number, yBase: number) {
+  if (vals.length === 0) return ''
+  const pts = vals.map((v, i) => `${i === 0 ? 'M' : 'L'} ${xFn(i).toFixed(1)} ${yFn(v).toFixed(1)}`).join(' ')
+  const n = vals.length
+  return `${pts} L ${xFn(n - 1).toFixed(1)} ${yBase.toFixed(1)} L ${xFn(0).toFixed(1)} ${yBase.toFixed(1)} Z`
 }
 
 /* ── SellOutTab ─────────────────────────────────────────── */
@@ -145,6 +138,7 @@ export function SellOutTab({ movementBase, productBase }: {
 }) {
   const [windowOffset, setWindowOffset] = useState(0)
   const [compact, setCompact] = useState(false)
+  const [selectedDay, setSelectedDay] = useState<string | null>(null)
   const [selloutMeta, setSelloutMeta] = useState<number | null>(() => readNum('rj-sellout-meta'))
   const [positivMeta, setPositivMeta] = useState<number | null>(() => readNum('rj-positiv-meta'))
 
@@ -153,7 +147,10 @@ export function SellOutTab({ movementBase, productBase }: {
     const b = () => setPositivMeta(readNum('rj-positiv-meta'))
     window.addEventListener('rj-sellout-meta-changed', a)
     window.addEventListener('rj-positiv-meta-changed', b)
-    return () => { window.removeEventListener('rj-sellout-meta-changed', a); window.removeEventListener('rj-positiv-meta-changed', b) }
+    return () => {
+      window.removeEventListener('rj-sellout-meta-changed', a)
+      window.removeEventListener('rj-positiv-meta-changed', b)
+    }
   }, [])
 
   const { monthStart, monthEnd, monthLabel } = useMemo(() => {
@@ -178,7 +175,6 @@ export function SellOutTab({ movementBase, productBase }: {
     movementBase.filter(m => { const d = m.movementDate ?? ''; return d >= monthStart && d <= monthEnd })
   , [movementBase, monthStart, monthEnd])
 
-  // KPIs do mês inteiro
   const kpis = useMemo(() => {
     let fat = 0, afat = 0, dev = 0, bon = 0, cortes = 0
     const cFat = new Set<string>(), cTot = new Set<string>(), ped = new Set<string>()
@@ -198,7 +194,6 @@ export function SellOutTab({ movementBase, productBase }: {
     return { fat, afat, dev, bon, cortes, posFat: cFat.size, posTotal: cTot.size, pedidos: ped.size, ticket: ped.size > 0 ? fat / ped.size : null }
   }, [monthBase])
 
-  // Dados por dia (todos os dias do mês)
   const allDays = useMemo(() => {
     const map = new Map<string, { fat: number; afat: number; cFat: Set<string>; cTot: Set<string> }>()
     for (const m of monthBase) {
@@ -218,7 +213,6 @@ export function SellOutTab({ movementBase, productBase }: {
     }))
   }, [monthBase])
 
-  // Janela deslizante
   const maxOffset = Math.max(0, allDays.length - WINDOW)
   const clampedOffset = Math.min(windowOffset, maxOffset)
   const windowDays = useMemo(() => {
@@ -230,13 +224,11 @@ export function SellOutTab({ movementBase, productBase }: {
   const winStart = windowDays[0]?.date ?? ''
   const winEnd = windowDays[windowDays.length - 1]?.date ?? ''
 
-  // Acumulados da janela
   const winTotals = useMemo(() => windowDays.reduce(
     (acc, d) => ({ sellOut: acc.sellOut + d.sellOut, fat: acc.fat + d.fat, afat: acc.afat + d.afat, posFat: acc.posFat + d.posFat, posTotal: acc.posTotal + d.posTotal }),
     { sellOut: 0, fat: 0, afat: 0, posFat: 0, posTotal: 0 }
   ), [windowDays])
 
-  // KPIs por linha comercial
   const lineKpis = useMemo(() => {
     const map = new Map<CommercialLine, { fat: number; afat: number; pos: Set<string> }>()
     for (const m of monthBase) {
@@ -256,6 +248,16 @@ export function SellOutTab({ movementBase, productBase }: {
       .sort((a, b) => b.fat - a.fat)
   }, [monthBase, productByCode])
 
+  const selectedDayMovements = useMemo(() => {
+    if (!selectedDay) return []
+    return monthBase
+      .filter(m => m.movementDate === selectedDay)
+      .sort((a, b) => {
+        const order: Record<string, number> = { venda_faturada: 0, a_faturar: 1, devolucao: 2, bonificacao: 3, corte: 4, entrada: 5 }
+        return (order[a.movementType] ?? 9) - (order[b.movementType] ?? 9)
+      })
+  }, [monthBase, selectedDay])
+
   if (!movementBase.length) {
     return (
       <>
@@ -265,22 +267,21 @@ export function SellOutTab({ movementBase, productBase }: {
     )
   }
 
-  // Geometria dos gráficos de linha
-  const W = 540, H_FIN = 148, H_POS = 110, PAD = { l: 54, r: 10, t: 8, b: 26 }
+  // Geometria dos gráficos
+  const W = 560, H_FIN = 170, H_POS = 130, PAD = { l: 62, r: 14, t: 12, b: 28 }
   const iW = W - PAD.l - PAD.r
   const n = windowDays.length
   const xFn = (i: number) => PAD.l + (n > 1 ? (i / (n - 1)) * iW : iW / 2)
 
-  // Gráfico financeiro (sellOut, fat, afat)
   const finVals = windowDays.flatMap(d => [d.sellOut, d.fat, d.afat])
   const maxFin = Math.max(...finVals, 0.01), minFin = Math.min(...finVals, 0)
   const ranFin = maxFin - minFin || 1, iHF = H_FIN - PAD.t - PAD.b
   const yFin = (v: number) => PAD.t + iHF - ((v - minFin) / ranFin) * iHF
-  const y0Fin = yFin(0)
+  const yBaseFin = yFin(Math.max(0, minFin))
 
-  // Gráfico positivação
   const maxPos = Math.max(...windowDays.map(d => d.posTotal), 0.01), iHP = H_POS - PAD.t - PAD.b
   const yPos = (v: number) => PAD.t + iHP * (1 - v / maxPos)
+  const yBasePos = PAD.t + iHP
 
   const faturadoPct = selloutMeta ? (kpis.fat / selloutMeta) * 100 : null
   const positivPct = positivMeta ? (kpis.posTotal / positivMeta) * 100 : null
@@ -292,14 +293,12 @@ export function SellOutTab({ movementBase, productBase }: {
       </header>
 
       <section className="content">
-        {/* ── Hero: 3 donuts de meta ───────────────────────── */}
+        {/* ── Hero donuts ─────────────────────────────────── */}
         <div className="so-hero-row">
           <MetaDonut label="Faturado" value={kpiCurrency(kpis.fat)} meta={selloutMeta}
-            pct={faturadoPct} color="var(--blue)"
-            onSetMeta={v => { saveNum('rj-sellout-meta', v, 'rj-sellout-meta-changed'); setSelloutMeta(v) }} />
+            pct={faturadoPct} color="var(--blue)" />
           <MetaDonut label="Positivações" value={fmtNum(kpis.posTotal)} meta={positivMeta}
-            pct={positivPct} color="#10b981" isCount
-            onSetMeta={v => { saveNum('rj-positiv-meta', v, 'rj-positiv-meta-changed'); setPositivMeta(v) }} />
+            pct={positivPct} color="var(--red)" isCount />
           <SplitDonut fat={kpis.fat} afat={kpis.afat} />
         </div>
 
@@ -314,24 +313,31 @@ export function SellOutTab({ movementBase, productBase }: {
         {/* ── Fechamento diário ────────────────────────────── */}
         {allDays.length > 0 && (
           <div className="notas-section so-detail-section" style={{ maxHeight: 'none', marginBottom: 20 }}>
-            {/* nav bar */}
+            {/* barra de navegação */}
             <div className="so-window-bar">
               <div className="so-window-info">
                 <span className="so-window-tag">JANELA SINCRONIZADA · {WINDOW} DIAS</span>
                 {winStart && <span className="so-window-range">{fmtDay(winStart)} — {fmtDay(winEnd)}</span>}
               </div>
               <div className="so-window-nav">
-                <button type="button" className="so-nav-btn" onClick={() => setWindowOffset(o => Math.min(maxOffset, o + 1))} disabled={clampedOffset >= maxOffset}>‹</button>
-                <button type="button" className={`so-nav-btn so-nav-atual${clampedOffset === 0 ? ' active' : ''}`} onClick={() => setWindowOffset(0)}>Atual</button>
-                <button type="button" className="so-nav-btn" onClick={() => setWindowOffset(o => Math.max(0, o - 1))} disabled={clampedOffset <= 0}>›</button>
+                <button type="button" className="so-nav-btn"
+                  onClick={() => setWindowOffset(o => Math.min(maxOffset, o + 1))}
+                  disabled={clampedOffset >= maxOffset}>‹</button>
+                <button type="button"
+                  className={`so-nav-btn so-nav-atual${clampedOffset === 0 ? ' active' : ''}`}
+                  onClick={() => setWindowOffset(0)}>Atual</button>
+                <button type="button" className="so-nav-btn"
+                  onClick={() => setWindowOffset(o => Math.max(0, o - 1))}
+                  disabled={clampedOffset <= 0}>›</button>
               </div>
             </div>
 
-            {/* grid: gráficos + planilha */}
+            {/* grid: gráficos (esq) + planilha (dir) */}
             <div className="so-detail-grid">
-              {/* coluna esquerda: 2 gráficos */}
+              {/* coluna esquerda: gráficos */}
               <div className="so-charts-col">
-                {/* gráfico financeiro */}
+
+                {/* MOVIMENTO FINANCEIRO */}
                 <div className="so-chart-block">
                   <div className="so-chart-head">
                     <div>
@@ -339,30 +345,56 @@ export function SellOutTab({ movementBase, productBase }: {
                       <div className="so-chart-title">Sell Out diário</div>
                     </div>
                     <div className="so-chart-legend">
-                      <span className="so-leg-item"><span style={{ borderBottom: '2px solid var(--text)', display: 'inline-block', width: 14, marginBottom: 1 }} /> Sell Out</span>
-                      <span className="so-leg-item"><span style={{ borderBottom: '2px solid var(--blue)', display: 'inline-block', width: 14, marginBottom: 1 }} /> Faturado</span>
-                      <span className="so-leg-item"><span style={{ borderBottom: '2px dashed #f59e0b', display: 'inline-block', width: 14, marginBottom: 1 }} /> A Faturar</span>
+                      <span className="so-leg-item"><span className="so-leg-line" style={{ background: 'var(--text)' }} />Sell Out</span>
+                      <span className="so-leg-item"><span className="so-leg-line" style={{ background: 'var(--blue)' }} />Faturado</span>
+                      <span className="so-leg-item"><span className="so-leg-line so-leg-dash" style={{ background: 'var(--red)' }} />A Faturar</span>
                     </div>
                   </div>
                   <div style={{ overflowX: 'auto' }}>
-                    <svg viewBox={`0 0 ${W} ${H_FIN + PAD.t + PAD.b}`} width="100%" style={{ display: 'block', minWidth: Math.max(240, n * 32) }}>
+                    <svg viewBox={`0 0 ${W} ${H_FIN + PAD.t + PAD.b}`} width="100%"
+                      style={{ display: 'block', minWidth: Math.max(260, n * 38) }}>
+                      <defs>
+                        <linearGradient id="gso" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="var(--text)" stopOpacity="0.18" />
+                          <stop offset="100%" stopColor="var(--text)" stopOpacity="0" />
+                        </linearGradient>
+                        <linearGradient id="gfat" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="var(--blue)" stopOpacity="0.35" />
+                          <stop offset="100%" stopColor="var(--blue)" stopOpacity="0" />
+                        </linearGradient>
+                      </defs>
                       {[0, 0.25, 0.5, 0.75, 1].map(p => {
                         const v = minFin + ranFin * p, yv = yFin(v)
-                        return <g key={p}><line x1={PAD.l} y1={yv} x2={W - PAD.r} y2={yv} stroke="var(--border)" strokeWidth={0.7} />
-                          <text x={PAD.l - 4} y={yv + 3} textAnchor="end" fontSize={9} fill="var(--muted)" fontFamily="Space Grotesk, sans-serif">{kpiCurrency(v)}</text></g>
+                        return (
+                          <g key={p}>
+                            <line x1={PAD.l} y1={yv} x2={W - PAD.r} y2={yv} stroke="var(--border)" strokeWidth={0.7} />
+                            <text x={PAD.l - 5} y={yv + 3} textAnchor="end" fontSize={9} fill="var(--muted)" fontFamily="Space Grotesk, sans-serif">{kpiCurrency(v)}</text>
+                          </g>
+                        )
                       })}
-                      {minFin < 0 && <line x1={PAD.l} y1={y0Fin} x2={W - PAD.r} y2={y0Fin} stroke="var(--muted)" strokeWidth={1} strokeDasharray="3 2" />}
-                      {n > 0 && <path d={linePath(windowDays.map(d => d.sellOut), xFn, yFin)} fill="none" stroke="var(--text)" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />}
-                      {n > 0 && <path d={linePath(windowDays.map(d => d.fat), xFn, yFin)} fill="none" stroke="var(--blue)" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />}
-                      {n > 0 && <path d={linePath(windowDays.map(d => d.afat), xFn, yFin)} fill="none" stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="5 3" strokeLinecap="round" />}
+                      {minFin < 0 && <line x1={PAD.l} y1={yBaseFin} x2={W - PAD.r} y2={yBaseFin} stroke="var(--muted)" strokeWidth={1} strokeDasharray="3 2" />}
+                      {n > 0 && <path d={areaPath(windowDays.map(d => d.fat), xFn, yFin, yBaseFin)} fill="url(#gfat)" />}
+                      {n > 0 && <path d={areaPath(windowDays.map(d => d.sellOut), xFn, yFin, yBaseFin)} fill="url(#gso)" />}
+                      {n > 0 && <path d={linePath(windowDays.map(d => d.sellOut), xFn, yFin)} fill="none" stroke="var(--text)" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />}
+                      {n > 0 && <path d={linePath(windowDays.map(d => d.fat), xFn, yFin)} fill="none" stroke="var(--blue)" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />}
+                      {n > 0 && <path d={linePath(windowDays.map(d => d.afat), xFn, yFin)} fill="none" stroke="var(--red)" strokeWidth={1.8} strokeDasharray="6 3" strokeLinecap="round" />}
+                      {/* pontos no último dia */}
+                      {n > 0 && (() => {
+                        const last = windowDays[n - 1]
+                        return <>
+                          <circle cx={xFn(n - 1)} cy={yFin(last.sellOut)} r={3.5} fill="var(--text)" />
+                          <circle cx={xFn(n - 1)} cy={yFin(last.fat)} r={3.5} fill="var(--blue)" />
+                          {last.afat > 0 && <circle cx={xFn(n - 1)} cy={yFin(last.afat)} r={3} fill="var(--red)" />}
+                        </>
+                      })()}
                       {windowDays.map((d, i) => (
-                        <text key={d.date} x={xFn(i)} y={PAD.t + H_FIN + 18} textAnchor="middle" fontSize={9} fill="var(--muted)" fontFamily="Space Grotesk, sans-serif">{fmtDay(d.date)}</text>
+                        <text key={d.date} x={xFn(i)} y={PAD.t + H_FIN + 21} textAnchor="middle" fontSize={9} fill="var(--muted)" fontFamily="Space Grotesk, sans-serif">{fmtDay(d.date)}</text>
                       ))}
                     </svg>
                   </div>
                 </div>
 
-                {/* gráfico positivação */}
+                {/* MOVIMENTO DE POSITIVAÇÃO */}
                 <div className="so-chart-block">
                   <div className="so-chart-head">
                     <div>
@@ -370,36 +402,61 @@ export function SellOutTab({ movementBase, productBase }: {
                       <div className="so-chart-title">Clientes positivados por dia</div>
                     </div>
                     <div className="so-chart-legend">
-                      <span className="so-leg-item"><span style={{ borderBottom: '2px solid #a78bfa', display: 'inline-block', width: 14, marginBottom: 1 }} /> Pos. total</span>
-                      <span className="so-leg-item"><span style={{ borderBottom: '2px solid #10b981', display: 'inline-block', width: 14, marginBottom: 1 }} /> Pos. faturada</span>
+                      <span className="so-leg-item"><span className="so-leg-line" style={{ background: 'var(--text)' }} />Pos. total</span>
+                      <span className="so-leg-item"><span className="so-leg-line" style={{ background: 'var(--blue)' }} />Pos. faturada</span>
                     </div>
                   </div>
                   <div style={{ overflowX: 'auto' }}>
-                    <svg viewBox={`0 0 ${W} ${H_POS + PAD.t + PAD.b}`} width="100%" style={{ display: 'block', minWidth: Math.max(240, n * 32) }}>
+                    <svg viewBox={`0 0 ${W} ${H_POS + PAD.t + PAD.b}`} width="100%"
+                      style={{ display: 'block', minWidth: Math.max(260, n * 38) }}>
+                      <defs>
+                        <linearGradient id="gpostot" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="var(--text)" stopOpacity="0.14" />
+                          <stop offset="100%" stopColor="var(--text)" stopOpacity="0" />
+                        </linearGradient>
+                        <linearGradient id="gposfat" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="var(--blue)" stopOpacity="0.3" />
+                          <stop offset="100%" stopColor="var(--blue)" stopOpacity="0" />
+                        </linearGradient>
+                      </defs>
                       {[0, 0.5, 1].map(p => {
                         const v = Math.round(maxPos * p), yv = yPos(v)
-                        return <g key={p}><line x1={PAD.l} y1={yv} x2={W - PAD.r} y2={yv} stroke="var(--border)" strokeWidth={0.7} />
-                          <text x={PAD.l - 4} y={yv + 3} textAnchor="end" fontSize={9} fill="var(--muted)" fontFamily="Space Grotesk, sans-serif">{v}</text></g>
+                        return (
+                          <g key={p}>
+                            <line x1={PAD.l} y1={yv} x2={W - PAD.r} y2={yv} stroke="var(--border)" strokeWidth={0.7} />
+                            <text x={PAD.l - 5} y={yv + 3} textAnchor="end" fontSize={9} fill="var(--muted)" fontFamily="Space Grotesk, sans-serif">{v}</text>
+                          </g>
+                        )
                       })}
-                      {n > 0 && <path d={linePath(windowDays.map(d => d.posTotal), xFn, yPos)} fill="none" stroke="#a78bfa" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />}
-                      {n > 0 && <path d={linePath(windowDays.map(d => d.posFat), xFn, yPos)} fill="none" stroke="#10b981" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />}
+                      {n > 0 && <path d={areaPath(windowDays.map(d => d.posTotal), xFn, yPos, yBasePos)} fill="url(#gpostot)" />}
+                      {n > 0 && <path d={areaPath(windowDays.map(d => d.posFat), xFn, yPos, yBasePos)} fill="url(#gposfat)" />}
+                      {n > 0 && <path d={linePath(windowDays.map(d => d.posTotal), xFn, yPos)} fill="none" stroke="var(--text)" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />}
+                      {n > 0 && <path d={linePath(windowDays.map(d => d.posFat), xFn, yPos)} fill="none" stroke="var(--blue)" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />}
+                      {n > 0 && (() => {
+                        const last = windowDays[n - 1]
+                        return <>
+                          <circle cx={xFn(n - 1)} cy={yPos(last.posTotal)} r={3.5} fill="var(--text)" />
+                          <circle cx={xFn(n - 1)} cy={yPos(last.posFat)} r={3.5} fill="var(--blue)" />
+                        </>
+                      })()}
                       {windowDays.map((d, i) => (
-                        <text key={d.date} x={xFn(i)} y={PAD.t + H_POS + 18} textAnchor="middle" fontSize={9} fill="var(--muted)" fontFamily="Space Grotesk, sans-serif">{fmtDay(d.date)}</text>
+                        <text key={d.date} x={xFn(i)} y={PAD.t + H_POS + 21} textAnchor="middle" fontSize={9} fill="var(--muted)" fontFamily="Space Grotesk, sans-serif">{fmtDay(d.date)}</text>
                       ))}
                     </svg>
                   </div>
                 </div>
               </div>
 
-              {/* coluna direita: planilha diária */}
+              {/* coluna direita: planilha */}
               <div className="so-table-col">
                 <div className="so-table-head">
                   <div>
                     <div className="so-chart-tag">PLANILHA DIÁRIA</div>
-                    <div className="so-chart-title">Financeiro + positivação</div>
+                    <div className="so-chart-title">Clique num dia para ver detalhes</div>
                     {winStart && <div className="so-window-sub">{fmtDay(winStart)} — {fmtDay(winEnd)}</div>}
                   </div>
-                  <button type="button" className={`so-compact-btn${compact ? ' active' : ''}`} onClick={() => setCompact(v => !v)}>
+                  <button type="button" className={`so-compact-btn${compact ? ' active' : ''}`}
+                    onClick={() => setCompact(v => !v)}>
                     {compact ? 'Expandir' : 'Compactar'}
                   </button>
                 </div>
@@ -412,21 +469,23 @@ export function SellOutTab({ movementBase, productBase }: {
                           <th className="n-right">SELL OUT</th>
                           <th className="n-right">FATURADO</th>
                           <th className="n-right">A FATURAR</th>
-                          <th className="n-right">POS. FAT.</th>
-                          <th className="n-right">POS. TOTAL</th>
+                          <th className="n-right">P.FAT</th>
+                          <th className="n-right">P.TOT</th>
                         </tr>
                       </thead>
                     )}
                     <tbody>
                       {[...windowDays].reverse().map(d => (
-                        <tr key={d.date}>
+                        <tr key={d.date}
+                          className={`so-dt-row${selectedDay === d.date ? ' so-dt-selected' : ''}`}
+                          onClick={() => setSelectedDay(selectedDay === d.date ? null : d.date)}>
                           <td className="so-dt-date">{fmtDay(d.date)}</td>
                           <td className={`n-right so-dt-sellout${d.sellOut < 0 ? ' neg' : ''}`}>
                             {compact ? kpiCurrency(d.sellOut) : brlFull(d.sellOut)}
                           </td>
                           {!compact && <>
                             <td className="n-right so-dt-fat" style={{ color: d.fat > 0 ? 'var(--blue)' : 'var(--muted)' }}>{brlFull(d.fat)}</td>
-                            <td className="n-right so-dt-afat" style={{ color: d.afat > 0 ? '#f59e0b' : 'var(--muted)' }}>{brlFull(d.afat)}</td>
+                            <td className="n-right so-dt-afat" style={{ color: d.afat > 0 ? 'var(--red)' : 'var(--muted)' }}>{brlFull(d.afat)}</td>
                             <td className={`n-right so-dt-pos${d.posFat > 0 ? ' pos-active' : ''}`}>{d.posFat}</td>
                             <td className={`n-right so-dt-pos${d.posTotal > 0 ? ' pos-total' : ''}`}>{d.posTotal}</td>
                           </>}
@@ -452,6 +511,41 @@ export function SellOutTab({ movementBase, productBase }: {
                 </div>
               </div>
             </div>
+
+            {/* ── Detalhe do dia selecionado ─────────────────── */}
+            {selectedDay && selectedDayMovements.length > 0 && (
+              <div className="so-day-detail">
+                <div className="so-day-detail-head">
+                  <span className="so-chart-tag">DETALHAMENTO · {fmtDay(selectedDay)}</span>
+                  <span className="so-day-detail-count">{selectedDayMovements.length} movimentações</span>
+                  <button type="button" className="so-day-detail-close" onClick={() => setSelectedDay(null)}>✕ fechar</button>
+                </div>
+                <div className="so-day-detail-wrap">
+                  <table className="so-day-detail-table">
+                    <thead>
+                      <tr>
+                        <th>TIPO</th>
+                        <th>CLIENTE</th>
+                        <th>PRODUTO</th>
+                        <th className="n-right">QTD</th>
+                        <th className="n-right">VALOR</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedDayMovements.map((m, i) => (
+                        <tr key={i} className={`so-dm-row so-dm-${m.movementType}`}>
+                          <td><span className={`so-mov-badge so-mov-${m.movementType}`}>{MOV_LABEL[m.movementType] ?? m.movementType}</span></td>
+                          <td className="so-dm-client">{m.customerName ?? m.customerCode ?? '—'}</td>
+                          <td className="so-dm-product">{m.description ?? (m.productCode ? productByCode.get(m.productCode)?.description : undefined) ?? m.productCode ?? '—'}</td>
+                          <td className="n-right so-dm-qty">{m.quantity != null ? fmtNum(m.quantity) : '—'}</td>
+                          <td className="n-right so-dm-value">{m.value != null ? brlFull(m.value) : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
