@@ -337,28 +337,27 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
       if ((tag?.launch || tag?.pex) && p.description) taggedDescWds.set(p.id, { p, wds: wds(p.description) })
     }
 
-    return arrivalInvoices
-      .filter(inv => inv.previewDate)
-      .map(inv => {
-        const taggedItems = inv.items.flatMap(item => {
-          let p = item.productCode ? (byMfr.get(item.productCode) ?? byInternal.get(item.productCode)) : undefined
-          if (!p && item.description) {
-            const iWds = wds(item.description)
-            for (const entry of taggedDescWds.values()) {
-              let overlap = 0
-              for (const w of iWds) if (entry.wds.has(w) && ++overlap >= 2) break
-              if (overlap >= 2) { p = entry.p; break }
-            }
+    const withPreview = arrivalInvoices.filter(inv => inv.previewDate)
+    const mapped = withPreview.map(inv => {
+      const taggedItems = inv.items.flatMap(item => {
+        let p = item.productCode ? (byMfr.get(item.productCode) ?? byInternal.get(item.productCode)) : undefined
+        if (!p && item.description) {
+          const iWds = wds(item.description)
+          for (const entry of taggedDescWds.values()) {
+            let overlap = 0
+            for (const w of iWds) if (entry.wds.has(w) && ++overlap >= 2) break
+            if (overlap >= 2) { p = entry.p; break }
           }
-          if (!p) return []
-          const tag = tags[p.id]
-          if (!tag?.launch && !tag?.pex) return []
-          return [{ qty: item.quantity ?? 0, product: p, isLaunch: !!tag.launch, isPex: !!tag.pex }]
-        })
-        return { ...inv, taggedItems }
+        }
+        if (!p) return []
+        const tag = tags[p.id]
+        if (!tag?.launch && !tag?.pex) return []
+        return [{ qty: item.quantity ?? 0, product: p, isLaunch: !!tag.launch, isPex: !!tag.pex }]
       })
-      .filter(inv => inv.taggedItems.length > 0)
-      .sort((a, b) => (a.previewDate ?? '').localeCompare(b.previewDate ?? ''))
+      return { ...inv, taggedItems }
+    })
+    const nfsWithTags = mapped.filter(inv => inv.taggedItems.length > 0).sort((a, b) => (a.previewDate ?? '').localeCompare(b.previewDate ?? ''))
+    return { nfsWithTags, totalWithPreview: withPreview.length, hasTaggedProducts: taggedDescWds.size > 0 }
   }, [arrivalInvoices, productBase, tags])
 
   const availableChannels = useMemo(() => {
@@ -654,10 +653,10 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                   </div>
                 ))}
               </div>
-              {nfsComPrevisao.length > 0 && (
+              {nfsComPrevisao.totalWithPreview > 0 && (
                 <div className="arrivals-important">
                   <div className="arrivals-important-title">Itens marcados com previsão</div>
-                  {nfsComPrevisao.map(inv => (
+                  {nfsComPrevisao.nfsWithTags.length > 0 ? nfsComPrevisao.nfsWithTags.map(inv => (
                     <div key={inv.invoice} className="arrivals-nf-block">
                       <div className="arrivals-nf-head">
                         <span className="arrivals-nf-number">{inv.displayInvoice}</span>
@@ -677,7 +676,13 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                         ))}
                       </div>
                     </div>
-                  ))}
+                  )) : (
+                    <p className="arrivals-important-hint">
+                      {nfsComPrevisao.hasTaggedProducts
+                        ? `Nenhum produto marcado identificado nas ${nfsComPrevisao.totalWithPreview} NF${nfsComPrevisao.totalWithPreview !== 1 ? 's' : ''} com previsão. Verifique se o campo Cód. fabricante está preenchido nos produtos marcados.`
+                        : 'Nenhum produto marcado como PEX ou lançamento. Marque produtos na aba Lançamentos para acompanhar aqui.'}
+                    </p>
+                  )}
                 </div>
               )}
             </div>
