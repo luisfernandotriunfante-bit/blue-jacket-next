@@ -498,3 +498,46 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
   .so-lb-row { grid-template-columns: 26px 12px 1fr auto; gap: 8px; }
   .so-lb-bar-wrap, .so-lb-pct, .so-lb-pos, .so-lb-afat { display: none; }
 }
+
+/* ── Aba Gerencial ────────────────────────────────────────── */
+.gr-view-bar { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+.gr-view-btn { padding: 12px 24px; border: 0; background: transparent; color: var(--muted); font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; font-family: 'Space Grotesk', sans-serif; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; }
+.gr-view-btn.on { color: var(--red); border-bottom-color: var(--red); }
+.gr-view-btn:hover:not(.on) { color: var(--text); }
+
+.gr-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.gr-table thead th { font-size: 9px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface); z-index: 1; white-space: nowrap; }
+.gr-table .n-right { text-align: right; font-family: 'Space Grotesk', sans-serif; }
+.gr-row td { padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.gr-row:last-child td { border-bottom: none; }
+.gr-row:hover td { background: rgba(255,255,255,.02); }
+.gr-rank { font-size: 11px; font-weight: 800; color: var(--muted); font-family: 'Space Grotesk', sans-serif; white-space: nowrap; }
+.gr-seller-name { font-weight: 700; color: var(--text); }
+.gr-seller-code { font-size: 10px; color: var(--muted); margin-top: 1px; }
+.gr-ating { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 800; font-family: 'Space Grotesk', sans-serif; }
+.gr-ating-ok { background: rgba(59,130,246,.12); color: var(--blue); border: 1px solid rgba(59,130,246,.3); }
+.gr-ating-mid { background: rgba(245,158,11,.12); color: #f59e0b; border: 1px solid rgba(245,158,11,.3); }
+.gr-ating-low { background: rgba(239,68,68,.10); color: var(--red); border: 1px solid rgba(239,68,68,.3); }
+
+.gr-table-sm td, .gr-table-sm th { padding: 6px 8px; }
+
+.gr-team-card { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.gr-team-head { display: flex; align-items: center; gap: 16px; padding: 14px 18px; cursor: pointer; user-select: none; }
+.gr-team-head:hover { background: var(--surface-raised); }
+.gr-team-info { flex: 1; min-width: 0; }
+.gr-team-name { font-weight: 800; font-size: 14px; color: var(--text); font-family: 'Space Grotesk', sans-serif; }
+.gr-team-sup { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.gr-team-stats { display: flex; gap: 14px; align-items: center; font-size: 12px; font-weight: 700; color: var(--text); }
+.gr-team-chevron { color: var(--muted); font-size: 12px; flex-shrink: 0; }
+.gr-team-body { padding: 0 18px 14px; border-top: 1px solid var(--border); }
+
+.gr-progress-bar-wrap { height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; min-width: 60px; }
+.gr-progress-bar { height: 100%; border-radius: 3px; transition: width .4s; }
+
+.gr-inactive-list { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 10px 0 0; }
+.gr-inactive-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.gr-inactive-tag { font-size: 10px; color: var(--muted); background: var(--border); padding: 2px 6px; border-radius: 4px; }
+
+/* ── Aba Clientes ─────────────────────────────────────────── */
+.cl-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+@media (max-width: 720px) { .cl-toolbar { flex-direction: column; align-items: stretch; } }

@@ -142,9 +142,10 @@ function areaPath(vals: number[], xFn: (i: number) => number, yFn: (v: number) =
 }
 
 /* ── SellOutTab ─────────────────────────────────────────── */
-export function SellOutTab({ movementBase, productBase }: {
+export function SellOutTab({ movementBase, productBase, monthLabel }: {
   movementBase: CanonicalMovement[]
   productBase: CanonicalProduct[]
+  monthLabel: string
 }) {
   const [windowOffset, setWindowOffset] = useState(0)
   const [compact, setCompact] = useState(false)
@@ -163,12 +164,11 @@ export function SellOutTab({ movementBase, productBase }: {
     }
   }, [])
 
-  const { monthStart, monthEnd, monthLabel } = useMemo(() => {
+  const { monthStart, monthEnd } = useMemo(() => {
     const now = new Date()
     return {
       monthStart: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`,
       monthEnd: now.toISOString().slice(0, 10),
-      monthLabel: now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase(),
     }
   }, [])
 
@@ -270,10 +270,9 @@ export function SellOutTab({ movementBase, productBase }: {
 
   if (!movementBase.length) {
     return (
-      <>
-        <header className="topbar stock-topbar" aria-label="Sell out" />
-        <section className="content"><div className="so-empty"><p>Nenhuma movimentação importada ainda.</p><small>Importe na aba <strong>Administração</strong>.</small></div></section>
-      </>
+      <section className="content">
+        <div className="so-empty"><p>Nenhuma movimentação importada ainda.</p><small>Importe na aba <strong>Administração</strong>.</small></div>
+      </section>
     )
   }
 
@@ -295,10 +294,6 @@ export function SellOutTab({ movementBase, productBase }: {
 
   return (
     <>
-      <header className="topbar stock-topbar" aria-label="Sell out">
-        <span className="so-month-label">{monthLabel}</span>
-      </header>
-
       <section className="content">
         {/* ── 2 hero donuts ───────────────────────────────── */}
         <div className="so-hero-row">

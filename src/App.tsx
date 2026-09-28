@@ -12,6 +12,8 @@ import { loadPersisted, savePersisted } from './domain/persistence'
 import { detectFile } from './domain/fileDetector'
 import { StockTab } from './StockTab'
 import { SellOutTab } from './SellOutTab'
+import { GerencialTab } from './GerencialTab'
+import { ClientesTab } from './ClientesTab'
 
 const motors: Array<{ id: Exclude<SourceArea, 'diario'>; name: string }> = [
   { id: 'produtos', name: 'Produtos' },
@@ -49,7 +51,10 @@ const dedupeList = (files: UploadedFile[] | undefined) => (files ?? []).filter((
 export function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
   const [section, setSection] = useState<'sellout' | 'estoque' | 'administracao'>('sellout')
+  const [selloutTab, setSelloutTab] = useState<'dashboard' | 'gerencial' | 'clientes'>('dashboard')
   const [tab, setTab] = useState<'uploads' | 'auditoria' | 'config'>('uploads')
+
+  const monthLabel = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase()
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [rawFiles, setRawFiles] = useState<Record<string, File>>({})
   const [activeNotice, setActiveNotice] = useState<AuditItem | null>(null)
@@ -338,9 +343,17 @@ export function App() {
       </button>
     </nav>
     <main className="main">
-      {section === 'sellout' ? (
-        <SellOutTab movementBase={movementBase} productBase={productBase} />
-      ) : section === 'estoque' ? <>
+      {section === 'sellout' ? (<>
+        <header className="topbar stock-topbar" aria-label="Sell out">
+          <button type="button" className={`stock-nav-btn${selloutTab === 'dashboard' ? ' on' : ''}`} onClick={() => setSelloutTab('dashboard')}>Dashboard</button>
+          <button type="button" className={`stock-nav-btn${selloutTab === 'gerencial' ? ' on' : ''}`} onClick={() => setSelloutTab('gerencial')}>Gerencial</button>
+          <button type="button" className={`stock-nav-btn${selloutTab === 'clientes' ? ' on' : ''}`} onClick={() => setSelloutTab('clientes')}>Clientes</button>
+          <span className="so-month-label" style={{ marginLeft: 'auto', paddingRight: 16 }}>{monthLabel}</span>
+        </header>
+        {selloutTab === 'dashboard' && <SellOutTab movementBase={movementBase} productBase={productBase} monthLabel={monthLabel} />}
+        {selloutTab === 'gerencial' && <GerencialTab movementBase={movementBase} monthLabel={monthLabel} />}
+        {selloutTab === 'clientes' && <ClientesTab movementBase={movementBase} clientBase={clientBase} monthLabel={monthLabel} />}
+      </>) : section === 'estoque' ? <>
         <StockTab productBase={productBase} receiptBase={receiptBase} movementBase={movementBase} productIndicators={productIndicators} />
       </> : <>
       <header className="topbar stock-topbar" aria-label="Administração">
@@ -394,6 +407,20 @@ function ConfigTab() {
   })
   const [savedPositivMeta, setSavedPositivMeta] = useState(false)
 
+  const [teamsInput, setTeamsInput] = useState<string>(() => {
+    try { const v = localStorage.getItem('rj-teams'); return v ?? '[]' }
+    catch { return '[]' }
+  })
+  const [teamsError, setTeamsError] = useState('')
+  const [savedTeams, setSavedTeams] = useState(false)
+
+  const [goalsInput, setGoalsInput] = useState<string>(() => {
+    try { const v = localStorage.getItem('rj-seller-goals'); return v ?? '{}' }
+    catch { return '{}' }
+  })
+  const [goalsError, setGoalsError] = useState('')
+  const [savedGoals, setSavedGoals] = useState(false)
+
   function saveMarkup() {
     const val = parseFloat(markupInput.replace(',', '.'))
     if (!isNaN(val) && val >= 0 && val <= 9999) {
@@ -440,6 +467,30 @@ function ConfigTab() {
         setTimeout(() => setSavedPositivMeta(false), 2000)
       } catch { /* quota */ }
     }
+  }
+
+  function saveTeams() {
+    setTeamsError('')
+    try {
+      const parsed = JSON.parse(teamsInput)
+      if (!Array.isArray(parsed)) { setTeamsError('Deve ser um array JSON.'); return }
+      localStorage.setItem('rj-teams', JSON.stringify(parsed))
+      window.dispatchEvent(new Event('rj-teams-changed'))
+      setSavedTeams(true)
+      setTimeout(() => setSavedTeams(false), 2000)
+    } catch { setTeamsError('JSON inválido.') }
+  }
+
+  function saveGoals() {
+    setGoalsError('')
+    try {
+      const parsed = JSON.parse(goalsInput)
+      if (typeof parsed !== 'object' || Array.isArray(parsed)) { setGoalsError('Deve ser um objeto JSON.'); return }
+      localStorage.setItem('rj-seller-goals', JSON.stringify(parsed))
+      window.dispatchEvent(new Event('rj-seller-goals-changed'))
+      setSavedGoals(true)
+      setTimeout(() => setSavedGoals(false), 2000)
+    } catch { setGoalsError('JSON inválido.') }
   }
 
   return (
@@ -542,6 +593,44 @@ function ConfigTab() {
           />
           <button className="process-button" style={{ margin: 0 }} type="button" onClick={savePositivMeta}>
             {savedPositivMeta ? 'Salvo ✓' : 'Salvar'}
+          </button>
+        </div>
+      </div>
+      <div className="config-group">
+        <label className="config-label">Equipes de vendedores</label>
+        <p className="config-help">
+          Array JSON com as equipes. Cada equipe tem <code>name</code>, <code>supervisor</code> e <code>sellers</code> (array de códigos de vendedor).
+          Ex.: <code>{'[{"name":"Equipe A","supervisor":"João","sellers":["001","002"]}]'}</code>
+        </p>
+        <textarea
+          className="config-input"
+          style={{ width: '100%', minHeight: 100, resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }}
+          value={teamsInput}
+          onChange={e => { setTeamsInput(e.target.value); setSavedTeams(false); setTeamsError('') }}
+        />
+        {teamsError && <p style={{ color: 'var(--red)', fontSize: 12, margin: '4px 0 0' }}>{teamsError}</p>}
+        <div className="config-input-row" style={{ marginTop: 8 }}>
+          <button className="process-button" style={{ margin: 0 }} type="button" onClick={saveTeams}>
+            {savedTeams ? 'Salvo ✓' : 'Salvar equipes'}
+          </button>
+        </div>
+      </div>
+      <div className="config-group">
+        <label className="config-label">Metas individuais de vendedores</label>
+        <p className="config-help">
+          Objeto JSON mapeando código de vendedor para meta mensal em R$.
+          Ex.: <code>{'{"001":50000,"002":120000}'}</code>. Usado no ranking gerencial para calcular % de atingimento.
+        </p>
+        <textarea
+          className="config-input"
+          style={{ width: '100%', minHeight: 80, resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }}
+          value={goalsInput}
+          onChange={e => { setGoalsInput(e.target.value); setSavedGoals(false); setGoalsError('') }}
+        />
+        {goalsError && <p style={{ color: 'var(--red)', fontSize: 12, margin: '4px 0 0' }}>{goalsError}</p>}
+        <div className="config-input-row" style={{ marginTop: 8 }}>
+          <button className="process-button" style={{ margin: 0 }} type="button" onClick={saveGoals}>
+            {savedGoals ? 'Salvo ✓' : 'Salvar metas'}
           </button>
         </div>
       </div>
