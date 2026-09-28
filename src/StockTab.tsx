@@ -320,21 +320,46 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
     return buckets
   }, [arrivalInvoices])
 
-  const productByCode = useMemo(() => {
+  const nfsComPrevisao = useMemo(() => {
+    const wds = (s: string | undefined) => {
+      if (!s) return new Set<string>()
+      return new Set(s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().split(/[^a-z0-9]+/).filter(t => t.length >= 4))
+    }
     const byMfr = new Map<string, typeof productBase[0]>()
     const byInternal = new Map<string, typeof productBase[0]>()
     for (const p of productBase) {
       if (p.manufacturerCode) byMfr.set(p.manufacturerCode, p)
       if (p.internalCode) byInternal.set(p.internalCode, p)
     }
-    return { byMfr, byInternal }
-  }, [productBase])
+    const taggedDescWds = new Map<string, { p: typeof productBase[0]; wds: Set<string> }>()
+    for (const p of productBase) {
+      const tag = tags[p.id]
+      if ((tag?.launch || tag?.pex) && p.description) taggedDescWds.set(p.id, { p, wds: wds(p.description) })
+    }
 
-  const nfsComPrevisao = useMemo(() =>
-    arrivalInvoices
+    return arrivalInvoices
       .filter(inv => inv.previewDate)
+      .map(inv => {
+        const taggedItems = inv.items.flatMap(item => {
+          let p = item.productCode ? (byMfr.get(item.productCode) ?? byInternal.get(item.productCode)) : undefined
+          if (!p && item.description) {
+            const iWds = wds(item.description)
+            for (const entry of taggedDescWds.values()) {
+              let overlap = 0
+              for (const w of iWds) if (entry.wds.has(w) && ++overlap >= 2) break
+              if (overlap >= 2) { p = entry.p; break }
+            }
+          }
+          if (!p) return []
+          const tag = tags[p.id]
+          if (!tag?.launch && !tag?.pex) return []
+          return [{ qty: item.quantity ?? 0, product: p, isLaunch: !!tag.launch, isPex: !!tag.pex }]
+        })
+        return { ...inv, taggedItems }
+      })
+      .filter(inv => inv.taggedItems.length > 0)
       .sort((a, b) => (a.previewDate ?? '').localeCompare(b.previewDate ?? ''))
-  , [arrivalInvoices])
+  }, [arrivalInvoices, productBase, tags])
 
   const availableChannels = useMemo(() => {
     const seen = new Set<string>()
@@ -631,32 +656,25 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
               </div>
               {nfsComPrevisao.length > 0 && (
                 <div className="arrivals-important">
-                  <div className="arrivals-important-title">Notas com previsão · {nfsComPrevisao.length}</div>
+                  <div className="arrivals-important-title">Itens marcados com previsão</div>
                   {nfsComPrevisao.map(inv => (
                     <div key={inv.invoice} className="arrivals-nf-block">
                       <div className="arrivals-nf-head">
                         <span className="arrivals-nf-number">{inv.displayInvoice}</span>
                         {inv.supplier && <span className="arrivals-nf-supplier">{inv.supplier}</span>}
                         <span className="arrivals-nf-date">{new Date(inv.previewDate!).toLocaleDateString('pt-BR')}</span>
-                        <span className="arrivals-nf-totalqty">{inv.totalQty.toLocaleString('pt-BR')} un</span>
                       </div>
                       <div className="arrivals-nf-items">
-                        {inv.items.map((item, i) => {
-                          const p = item.productCode ? (productByCode.byMfr.get(item.productCode) ?? productByCode.byInternal.get(item.productCode)) : undefined
-                          const tag = p ? tags[p.id] : undefined
-                          return (
-                            <div key={i} className="arrivals-nf-item">
-                              <span className="arrivals-nf-item-desc">{item.description ?? item.productCode}</span>
-                              {tag && (tag.launch || tag.pex) && (
-                                <span className="arrivals-nf-item-badges">
-                                  {tag.launch && <span className="badge-launch">Lançamento</span>}
-                                  {tag.pex && <span className="badge-pex">PEX</span>}
-                                </span>
-                              )}
-                              <span className="arrivals-nf-item-qty">{(item.quantity ?? 0).toLocaleString('pt-BR')}</span>
-                            </div>
-                          )
-                        })}
+                        {inv.taggedItems.map((ti, i) => (
+                          <div key={i} className="arrivals-nf-item">
+                            <span className="arrivals-nf-item-desc">{ti.product.description ?? ti.product.internalCode}</span>
+                            <span className="arrivals-nf-item-badges">
+                              {ti.isLaunch && <span className="badge-launch">Lançamento</span>}
+                              {ti.isPex && <span className="badge-pex">PEX</span>}
+                            </span>
+                            <span className="arrivals-nf-item-qty">{ti.qty.toLocaleString('pt-BR')}</span>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   ))}
