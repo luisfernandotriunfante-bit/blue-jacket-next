@@ -1,7 +1,11 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import type { CanonicalProduct, ProductIndicators } from './domain/productMotor'
 import type { CanonicalReceipt } from './domain/receiptMotor'
+import { groupReceiptsByInvoice, computeDailyReceiptRate } from './domain/receiptMotor'
 import type { CanonicalMovement } from './domain/movementMotor'
+import { computeAbcMap } from './domain/movementMotor'
+import { resolveCommercialLine, COMMERCIAL_LINES } from './domain/productGrouping'
+import type { CommercialLine } from './domain/productGrouping'
 
 type ProductTag = { launch?: boolean; pex?: boolean }
 type Tags = Record<string, ProductTag>
@@ -9,45 +13,6 @@ type StockFilter = 'all' | 'com_estoque' | 'sem_estoque' | 'em_transito'
 
 const norm = (v: unknown) => String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
 
-const COMMERCIAL_LINES = ['Creme Dental', 'Esc + Enx + Fio', 'Sabonetes', 'Hair', 'Limpeza'] as const
-type CommercialLine = (typeof COMMERCIAL_LINES)[number]
-
-const FAMILY_TO_LINE: Record<string, CommercialLine> = {
-  'CREME DENTAL': 'Creme Dental',
-  'ESCOVA': 'Esc + Enx + Fio',
-  'ENXAGUANTES': 'Esc + Enx + Fio',
-  'FIO DENTAL': 'Esc + Enx + Fio',
-  'SABONETE EM BARRA': 'Sabonetes',
-  'SABONETE LÍQUIDO': 'Sabonetes',
-  'SHAMPOO': 'Hair',
-  'CONDICIONADOR': 'Hair',
-  'LIMPEZA': 'Limpeza',
-}
-
-function classifyCommercialLine(description?: string, category?: string, subcategory?: string): CommercialLine | null {
-  const up = (s?: string) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase()
-  const sub = up(subcategory), cat = up(category), d = up(description)
-  if (sub.includes('TOOTHPASTE')) return 'Creme Dental'
-  if (sub.includes('MANUAL TB') || sub.includes('TOOTHBRUSH') || sub.includes('MOUTHWASH') || sub.includes('INTERDENTAL') || sub.includes('FLOSS')) return 'Esc + Enx + Fio'
-  if (sub.includes('BAR SOAP') || sub.includes('LIQUID SOAP') || sub.includes('HAND SOAP') || sub.includes('BODY WASH')) return 'Sabonetes'
-  if (sub.includes('SHAMPOO') || sub.includes('CONDITIONER') || sub.includes('HAIR')) return 'Hair'
-  if (sub.includes('CLEAN') || sub.includes('LAUNDRY') || sub.includes('FABRIC')) return 'Limpeza'
-  if (/^CD\b/.test(d) || d.includes('CREME DENTAL') || d.includes('DENTIFRICIO')) return 'Creme Dental'
-  if (/^(ED|ENX|ENXAG|FITA DENT|FIO|GD)\b/.test(d) || d.includes('ESCOVA DENTAL') || d.includes('ENXAGUANTE') || d.includes('FIO DENTAL')) return 'Esc + Enx + Fio'
-  if (/^SAB\b/.test(d) || d.includes('SABONETE')) return 'Sabonetes'
-  if (/^(SH|COND|CR PENT|KIT SH)\b/.test(d) || d.includes('SHAMPOO') || d.includes('CONDICIONADOR')) return 'Hair'
-  if (/^(PINHO SOL|LIMP|LAVA ROUPA|AJAX|DESINF|DESENG)\b/.test(d) || d.includes('LIMPADOR') || d.includes('DESINFETANTE')) return 'Limpeza'
-  if (cat.includes('HOME CARE')) return 'Limpeza'
-  return null
-}
-
-function resolveCommercialLine(p: { groupFamily?: string; description?: string; category?: string; subcategory?: string }): CommercialLine | null {
-  if (p.groupFamily) {
-    const fromFamily = FAMILY_TO_LINE[p.groupFamily]
-    if (fromFamily) return fromFamily
-  }
-  return classifyCommercialLine(p.description, p.category, p.subcategory)
-}
 
 const brl = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const kpiCurrency = (n: number) => {
@@ -148,6 +113,8 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
     catch { /* */ }
   }, [notasSeen])
 
+  const receiptGroups = useMemo(() => groupReceiptsByInvoice(receiptBase), [receiptBase])
+
   const kpis = useMemo(() => {
     // Agrega carteira dos receipts em_transito (productCode = código fabricante / material)
     const transitByMfr = new Map<string, { qty: number; value: number }>()
@@ -157,22 +124,18 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
       transitByMfr.set(r.productCode, { qty: cur.qty + (r.quantity ?? 0), value: cur.value + (r.value ?? 0) })
     }
 
-    let comEstoque = 0, semEstoque = 0, emTransito = 0, comPreco = 0, carteiraCusto = 0
+    let comEstoque = 0, semEstoque = 0, emTransito = 0, comPreco = 0
     for (const p of productBase) {
       const avail = p.availableStock ?? 0
       if (avail > 0) {
         comEstoque++
         if (p.sellerPrice !== undefined) comPreco++
       } else semEstoque++
-      // emTransito e carteiraCusto: usa campos do produto (motor) quando disponíveis
+      // emTransito: usa campos do produto (motor) quando disponíveis
       const tQty = (p.inTransitQuantity ?? 0) > 0
         ? (p.inTransitQuantity ?? 0)
         : (p.manufacturerCode ? transitByMfr.get(p.manufacturerCode)?.qty ?? 0 : 0)
-      const tVal = (p.inTransitValue ?? 0) > 0
-        ? (p.inTransitValue ?? 0)
-        : (p.manufacturerCode ? transitByMfr.get(p.manufacturerCode)?.value ?? 0 : 0)
       if (tQty > 0) emTransito++
-      carteiraCusto += tVal
     }
     // KPIs agregados vêm do motor; fallback para bases sem esses campos (pré-migração)
     const custoCusto = (productIndicators?.stockAtCost != null)
@@ -181,13 +144,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
     const custoVenda = (productIndicators?.stockAtSalePrice != null)
       ? productIndicators.stockAtSalePrice
       : productBase.reduce((s, p) => { const a = p.availableStock ?? 0; return a > 0 && p.sellerPrice != null ? s + a * p.sellerPrice : s }, 0)
-    const normNf = (nf: string) => nf.replace(/\*/g, '').replace(/^0+/, '').split('-')[0] ?? ''
-    const receivedNFs = new Set(
-      receiptBase.filter(r => r.status === 'recebida' && r.invoice).map(r => normNf(r.invoice!)).filter(Boolean)
-    )
-    const resolvedCarteira = receiptBase
-      .filter(r => r.status === 'em_transito')
-      .reduce((s, r) => { const nf = r.invoice ? normNf(r.invoice) : null; return s + ((!nf || !receivedNFs.has(nf)) ? (r.value ?? 0) : 0) }, 0)
+    const resolvedCarteira = receiptGroups.openTransitGroups.reduce((s, g) => s + g.totalValue, 0)
     const resolvedEmTransito = (productIndicators?.inTransit != null && productIndicators.inTransit > 0)
       ? productIndicators.inTransit
       : emTransito
@@ -197,21 +154,10 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
     const marginRatio = custoVenda > 0 ? custoCusto / custoVenda : null
     const transitRatio = projetadoCusto > 0 ? resolvedCarteira / projetadoCusto : null
     return { comEstoque, semEstoque, emTransito: resolvedEmTransito, comPreco, total: productBase.length, custoCusto, custoVenda, carteiraCusto: resolvedCarteira, projetadoCusto, projetadoVenda, pricedCoverage, marginRatio, transitRatio }
-  }, [productBase, receiptBase, markup, productIndicators])
+  }, [productBase, receiptBase, receiptGroups, markup, productIndicators])
 
   const coverageStats = useMemo(() => {
-    const now = Date.now()
-    const cutoff12m = now - 365 * 86_400_000
-    // Taxa diária baseada nos últimos 12 meses de entradas recebidas
-    const qty12m = new Map<string, number>()
-    for (const r of receiptBase) {
-      if (r.status !== 'recebida' || !r.productCode || !r.quantity || !r.entryDate) continue
-      const ms = new Date(r.entryDate).getTime()
-      if (!Number.isFinite(ms) || ms < cutoff12m) continue
-      qty12m.set(r.productCode, (qty12m.get(r.productCode) ?? 0) + r.quantity)
-    }
-    const receiptRate = new Map<string, number>()
-    for (const [c, qty] of qty12m) receiptRate.set(c, qty / 365)
+    const receiptRate = computeDailyReceiptRate(receiptBase)
     let critico = 0, adequado = 0, excesso = 0, semHistorico = 0
     const [low, high] = covDays
     for (const p of productBase) {
@@ -229,26 +175,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
     return { critico, adequado, excesso, semHistorico, total, hasHistory: total > semHistorico }
   }, [productBase, receiptBase, covDays])
 
-  const abcMap = useMemo((): Map<string, 'A' | 'B' | 'C'> => {
-    const salesByCode = new Map<string, number>()
-    for (const m of movementBase) {
-      if (m.movementType !== 'venda_faturada' || !m.productCode) continue
-      const qty = m.quantity ?? 0
-      if (qty <= 0) continue
-      salesByCode.set(m.productCode, (salesByCode.get(m.productCode) ?? 0) + qty)
-    }
-    if (salesByCode.size === 0) return new Map()
-    const sorted = [...salesByCode.entries()].sort((a, b) => b[1] - a[1])
-    const grandTotal = sorted.reduce((s, [, v]) => s + v, 0)
-    const result = new Map<string, 'A' | 'B' | 'C'>()
-    let acc = 0
-    for (const [code, qty] of sorted) {
-      acc += qty
-      const pct = acc / grandTotal
-      result.set(code, pct <= 0.8 ? 'A' : pct <= 0.95 ? 'B' : 'C')
-    }
-    return result
-  }, [movementBase])
+  const abcMap = useMemo(() => computeAbcMap(movementBase), [movementBase])
 
   const treemapData = useMemo(() => {
     const lineMap = new Map<CommercialLine, Map<string, { value: number; items: number }>>()
@@ -277,33 +204,9 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
       .filter((g): g is NonNullable<typeof g> => g !== null && g.totalValue > 0)
   }, [productBase])
 
-  const arrivalInvoices = useMemo(() => {
-    const normNf = (nf: string) => nf.replace(/\*/g, '').replace(/^0+/, '').split('-')[0] ?? ''
-    const receivedNFs = new Set(
-      receiptBase.filter(r => r.status === 'recebida' && r.invoice).map(r => normNf(r.invoice!)).filter(Boolean)
-    )
-    const transit = receiptBase
-      .filter(r => r.status === 'em_transito')
-      .sort((a, b) => (a.entryDate ?? '').localeCompare(b.entryDate ?? ''))
-    const groups = new Map<string, CanonicalReceipt[]>()
-    for (const r of transit) {
-      const nfNorm = r.invoice ? normNf(r.invoice) : null
-      if (nfNorm && receivedNFs.has(nfNorm)) continue
-      const key = r.invoice ?? `_${r.entryDate ?? ''}_${r.productCode ?? ''}`
-      if (!groups.has(key)) groups.set(key, [])
-      groups.get(key)!.push(r)
-    }
-    return Array.from(groups.entries()).map(([invoice, items]) => ({
-      invoice,
-      displayInvoice: items[0]?.invoice ?? 'Sem nota',
-      items,
-      date: items[0]?.entryDate,
-      previewDate: notaPrev[invoice] ?? items[0]?.entryDate,
-      supplier: items[0]?.supplierName,
-      totalQty: items.reduce((s, r) => s + (r.quantity ?? 0), 0),
-      totalValue: items.reduce((s, r) => s + (r.value ?? 0), 0),
-    }))
-  }, [receiptBase, notaPrev])
+  const arrivalInvoices = useMemo(() =>
+    receiptGroups.openTransitGroups.map(g => ({ ...g, previewDate: notaPrev[g.invoice] ?? g.date }))
+  , [receiptGroups, notaPrev])
 
   const arrivalBuckets = useMemo(() => {
     const today = new Date(); today.setHours(0, 0, 0, 0)
@@ -444,26 +347,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
     return { launch, pex, total: launch + pex }
   }, [productBase, tags])
 
-  const receivedInvoices = useMemo(() => {
-    const groups = new Map<string, CanonicalReceipt[]>()
-    for (const r of receiptBase) {
-      if (r.status !== 'recebida') continue
-      const key = r.invoice ?? `_${r.entryDate ?? ''}_${r.productCode ?? ''}`
-      if (!groups.has(key)) groups.set(key, [])
-      groups.get(key)!.push(r)
-    }
-    return Array.from(groups.entries())
-      .map(([invoice, items]) => ({
-        invoice,
-        displayInvoice: items[0]?.invoice ?? 'Sem nota',
-        items,
-        date: items[0]?.entryDate,
-        supplier: items[0]?.supplierName,
-        totalQty: items.reduce((s, r) => s + (r.quantity ?? 0), 0),
-        totalValue: items.reduce((s, r) => s + (r.value ?? 0), 0),
-      }))
-      .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
-  }, [receiptBase])
+  const receivedInvoices = useMemo(() => receiptGroups.receivedGroups, [receiptGroups])
 
   const notasBadge = useMemo(() => {
     if (notasSeen === 0) return receivedInvoices.length > 0 ? receivedInvoices.length : 0

@@ -4,6 +4,46 @@ export type ProductGroup = { code: string; name: string; family: string }
 const normalize = (value: unknown) => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
 const haystack = (product: CanonicalProduct) => normalize([product.description, product.brand, product.category, product.subcategory, product.productLine].filter(Boolean).join(' '))
 
+export const COMMERCIAL_LINES = ['Creme Dental', 'Esc + Enx + Fio', 'Sabonetes', 'Hair', 'Limpeza'] as const
+export type CommercialLine = (typeof COMMERCIAL_LINES)[number]
+
+const FAMILY_TO_LINE: Record<string, CommercialLine> = {
+  'CREME DENTAL': 'Creme Dental',
+  'ESCOVA': 'Esc + Enx + Fio',
+  'ENXAGUANTES': 'Esc + Enx + Fio',
+  'FIO DENTAL': 'Esc + Enx + Fio',
+  'SABONETE EM BARRA': 'Sabonetes',
+  'SABONETE L\u00cdQUIDO': 'Sabonetes',
+  'SHAMPOO': 'Hair',
+  'CONDICIONADOR': 'Hair',
+  'LIMPEZA': 'Limpeza',
+}
+
+export function classifyCommercialLine(description?: string, category?: string, subcategory?: string): CommercialLine | null {
+  const up = (s?: string) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
+  const sub = up(subcategory), cat = up(category), d = up(description)
+  if (sub.includes('TOOTHPASTE')) return 'Creme Dental'
+  if (sub.includes('MANUAL TB') || sub.includes('TOOTHBRUSH') || sub.includes('MOUTHWASH') || sub.includes('INTERDENTAL') || sub.includes('FLOSS')) return 'Esc + Enx + Fio'
+  if (sub.includes('BAR SOAP') || sub.includes('LIQUID SOAP') || sub.includes('HAND SOAP') || sub.includes('BODY WASH')) return 'Sabonetes'
+  if (sub.includes('SHAMPOO') || sub.includes('CONDITIONER') || sub.includes('HAIR')) return 'Hair'
+  if (sub.includes('CLEAN') || sub.includes('LAUNDRY') || sub.includes('FABRIC')) return 'Limpeza'
+  if (/^CD\b/.test(d) || d.includes('CREME DENTAL') || d.includes('DENTIFRICIO')) return 'Creme Dental'
+  if (/^(ED|ENX|ENXAG|FITA DENT|FIO|GD)\b/.test(d) || d.includes('ESCOVA DENTAL') || d.includes('ENXAGUANTE') || d.includes('FIO DENTAL')) return 'Esc + Enx + Fio'
+  if (/^SAB\b/.test(d) || d.includes('SABONETE')) return 'Sabonetes'
+  if (/^(SH|COND|CR PENT|KIT SH)\b/.test(d) || d.includes('SHAMPOO') || d.includes('CONDICIONADOR')) return 'Hair'
+  if (/^(PINHO SOL|LIMP|LAVA ROUPA|AJAX|DESINF|DESENG)\b/.test(d) || d.includes('LIMPADOR') || d.includes('DESINFETANTE')) return 'Limpeza'
+  if (cat.includes('HOME CARE')) return 'Limpeza'
+  return null
+}
+
+export function resolveCommercialLine(p: { groupFamily?: string; description?: string; category?: string; subcategory?: string }): CommercialLine | null {
+  if (p.groupFamily) {
+    const fromFamily = FAMILY_TO_LINE[p.groupFamily]
+    if (fromFamily) return fromFamily
+  }
+  return classifyCommercialLine(p.description, p.category, p.subcategory)
+}
+
 const rules: Array<{ group: ProductGroup; matches: (text: string) => boolean }> = [
   { group: { code: '22', name: 'COLGATE - FIO DENTAL', family: 'FIO DENTAL' }, matches: text => /FIO DENTAL|DENTAL FLOSS/.test(text) },
   { group: { code: '3', name: 'COLGATE - ENXAGUANTES', family: 'ENXAGUANTES' }, matches: text => /ENXAG|MOUTHWASH|\bMW\b/.test(text) },

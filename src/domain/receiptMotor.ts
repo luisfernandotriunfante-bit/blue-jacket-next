@@ -4,6 +4,64 @@ import type { AuditItem } from './types'
 export type CanonicalReceipt = { id: string; status: 'recebida' | 'em_transito'; system: 'legado' | 'atual' | 'industria'; entryDate?: string; issueDate?: string; invoice?: string; supplierDocument?: string; supplierName?: string; operation?: string; productCode?: string; description?: string; quantity?: number; unitPrice?: number; financialCost?: number; value?: number; sources: string[] }
 export type ReceiptIndicators = { received: number; inTransit: number; currentItems: number; legacyNotes: number }
 export type ReceiptMotorResult = { canonicalBase: CanonicalReceipt[]; audit: AuditItem[]; indicators: ReceiptIndicators }
+
+export type InvoiceGroup = {
+  invoice: string
+  displayInvoice: string
+  items: CanonicalReceipt[]
+  date?: string
+  supplier?: string
+  totalQty: number
+  totalValue: number
+}
+
+export function normNfKey(nf: string): string {
+  return nf.replace(/\*/g, '').replace(/^0+/, '').split('-')[0] ?? ''
+}
+
+export function groupReceiptsByInvoice(base: CanonicalReceipt[]): {
+  receivedGroups: InvoiceGroup[]
+  openTransitGroups: InvoiceGroup[]
+} {
+  const receivedNFs = new Set<string>()
+  for (const r of base) {
+    if (r.status === 'recebida' && r.invoice) { const k = normNfKey(r.invoice); if (k) receivedNFs.add(k) }
+  }
+  const recMap = new Map<string, CanonicalReceipt[]>()
+  for (const r of base.filter(r => r.status === 'recebida')) {
+    const key = r.invoice ?? `_${r.entryDate ?? ''}_${r.productCode ?? ''}`
+    if (!recMap.has(key)) recMap.set(key, [])
+    recMap.get(key)!.push(r)
+  }
+  const receivedGroups: InvoiceGroup[] = Array.from(recMap.entries())
+    .map(([invoice, items]) => ({ invoice, displayInvoice: items[0]?.invoice ?? 'Sem nota', items, date: items[0]?.entryDate, supplier: items[0]?.supplierName, totalQty: items.reduce((s, r) => s + (r.quantity ?? 0), 0), totalValue: items.reduce((s, r) => s + (r.value ?? 0), 0) }))
+    .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
+  const transMap = new Map<string, CanonicalReceipt[]>()
+  for (const r of base.filter(r => r.status === 'em_transito').sort((a, b) => (a.entryDate ?? '').localeCompare(b.entryDate ?? ''))) {
+    const nfNorm = r.invoice ? normNfKey(r.invoice) : null
+    if (nfNorm && receivedNFs.has(nfNorm)) continue
+    const key = r.invoice ?? `_${r.entryDate ?? ''}_${r.productCode ?? ''}`
+    if (!transMap.has(key)) transMap.set(key, [])
+    transMap.get(key)!.push(r)
+  }
+  const openTransitGroups: InvoiceGroup[] = Array.from(transMap.entries())
+    .map(([invoice, items]) => ({ invoice, displayInvoice: items[0]?.invoice ?? 'Sem nota', items, date: items[0]?.entryDate, supplier: items[0]?.supplierName, totalQty: items.reduce((s, r) => s + (r.quantity ?? 0), 0), totalValue: items.reduce((s, r) => s + (r.value ?? 0), 0) }))
+  return { receivedGroups, openTransitGroups }
+}
+
+export function computeDailyReceiptRate(base: CanonicalReceipt[]): Map<string, number> {
+  const cutoff12m = Date.now() - 365 * 86_400_000
+  const qty12m = new Map<string, number>()
+  for (const r of base) {
+    if (r.status !== 'recebida' || !r.productCode || !r.quantity || !r.entryDate) continue
+    const ms = new Date(r.entryDate).getTime()
+    if (!Number.isFinite(ms) || ms < cutoff12m) continue
+    qty12m.set(r.productCode, (qty12m.get(r.productCode) ?? 0) + r.quantity)
+  }
+  const result = new Map<string, number>()
+  for (const [c, qty] of qty12m) result.set(c, qty / 365)
+  return result
+}
 type Row = unknown[]
 const norm=(v:unknown)=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'')
 const text=(v:unknown)=>{const x=String(v??'').trim();return x||undefined}

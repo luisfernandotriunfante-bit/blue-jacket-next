@@ -30,6 +30,27 @@ export type CanonicalMovement = {
 
 export type MovementIndicators = { sales: number; toBill: number; returns: number; bonuses: number; cuts: number; pendingRetyping: number; receiptItems: number }
 export type MovementMotorResult = { canonicalBase: CanonicalMovement[]; audit: AuditItem[]; indicators: MovementIndicators }
+
+export function computeAbcMap(movements: CanonicalMovement[]): Map<string, 'A' | 'B' | 'C'> {
+  const salesByCode = new Map<string, number>()
+  for (const m of movements) {
+    if (m.movementType !== 'venda_faturada' || !m.productCode) continue
+    const qty = m.quantity ?? 0
+    if (qty <= 0) continue
+    salesByCode.set(m.productCode, (salesByCode.get(m.productCode) ?? 0) + qty)
+  }
+  if (salesByCode.size === 0) return new Map()
+  const sorted = [...salesByCode.entries()].sort((a, b) => b[1] - a[1])
+  const grandTotal = sorted.reduce((s, [, v]) => s + v, 0)
+  const result = new Map<string, 'A' | 'B' | 'C'>()
+  let acc = 0
+  for (const [code, qty] of sorted) {
+    acc += qty
+    const pct = acc / grandTotal
+    result.set(code, pct <= 0.8 ? 'A' : pct <= 0.95 ? 'B' : 'C')
+  }
+  return result
+}
 type Row = unknown[]
 const norm = (value: unknown) => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
 const text = (value: unknown) => { const result = String(value ?? '').trim(); return result || undefined }
