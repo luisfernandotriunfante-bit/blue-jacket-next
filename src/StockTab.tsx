@@ -278,11 +278,17 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
   }, [productBase])
 
   const arrivalInvoices = useMemo(() => {
+    const normNf = (nf: string) => nf.replace(/\*/g, '').replace(/^0+/, '').split('-')[0] ?? ''
+    const receivedNFs = new Set(
+      receiptBase.filter(r => r.status === 'recebida' && r.invoice).map(r => normNf(r.invoice!)).filter(Boolean)
+    )
     const transit = receiptBase
       .filter(r => r.status === 'em_transito')
       .sort((a, b) => (a.entryDate ?? '').localeCompare(b.entryDate ?? ''))
     const groups = new Map<string, CanonicalReceipt[]>()
     for (const r of transit) {
+      const nfNorm = r.invoice ? normNf(r.invoice) : null
+      if (nfNorm && receivedNFs.has(nfNorm)) continue
       const key = r.invoice ?? `_${r.entryDate ?? ''}_${r.productCode ?? ''}`
       if (!groups.has(key)) groups.set(key, [])
       groups.get(key)!.push(r)
