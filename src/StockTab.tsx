@@ -321,18 +321,36 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
   }, [arrivalInvoices])
 
   const importantArrivals = useMemo(() => {
+    const wds = (s: string | undefined) => {
+      if (!s) return new Set<string>()
+      return new Set(s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().split(/[^a-z0-9]+/).filter(t => t.length >= 4))
+    }
     // productCode em itens em_transito da Colgate é o código SAP (manufacturerCode)
-    const inTransit = new Map<string, number>()
+    // Guarda também a descrição para fallback de matching
+    const inTransit = new Map<string, { qty: number; description?: string }>()
     for (const r of receiptBase) {
       if (r.status !== 'em_transito' || !r.productCode || !r.quantity) continue
-      inTransit.set(r.productCode, (inTransit.get(r.productCode) ?? 0) + r.quantity)
+      const cur = inTransit.get(r.productCode)
+      inTransit.set(r.productCode, { qty: (cur?.qty ?? 0) + r.quantity, description: cur?.description ?? r.description })
     }
     const result: Array<{ id: string; description?: string; code?: string; qty: number; isLaunch: boolean; isPex: boolean; avail: number; abc?: 'A' | 'B' | 'C' }> = []
     for (const p of productBase) {
       const tag = tags[p.id]
       if (!tag?.launch && !tag?.pex) continue
-      const qty = (p.manufacturerCode ? inTransit.get(p.manufacturerCode) : undefined)
-               ?? (p.internalCode ? inTransit.get(p.internalCode) : undefined)
+      // 1. Match por código SAP (manufacturerCode) ou código interno
+      let qty = (p.manufacturerCode ? inTransit.get(p.manufacturerCode)?.qty : undefined)
+             ?? (p.internalCode ? inTransit.get(p.internalCode)?.qty : undefined)
+      // 2. Fallback: sobreposição de palavras entre descrições (≥2 tokens de 4+ chars)
+      if (!qty && p.description) {
+        const prodWds = wds(p.description)
+        for (const entry of inTransit.values()) {
+          if (!entry.description) continue
+          const tWds = wds(entry.description)
+          let overlap = 0
+          for (const w of tWds) if (prodWds.has(w) && ++overlap >= 2) break
+          if (overlap >= 2) { qty = entry.qty; break }
+        }
+      }
       if (!qty) continue
       result.push({ id: p.id, description: p.description, code: p.internalCode, qty, isLaunch: !!tag.launch, isPex: !!tag.pex, avail: p.availableStock ?? 0, abc: p.internalCode ? abcMap.get(p.internalCode) : undefined })
     }
@@ -632,10 +650,10 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                   </div>
                 ))}
               </div>
-              {importantArrivals.length > 0 && (
+              {(importantArrivals.length > 0 || (lncCounts.total > 0 && arrivalInvoices.length > 0)) && (
                 <div className="arrivals-important">
                   <div className="arrivals-important-title">Itens marcados chegando</div>
-                  {importantArrivals.map(item => (
+                  {importantArrivals.length > 0 ? importantArrivals.map(item => (
                     <div key={item.id} className="arrivals-important-row">
                       <span className="arrivals-important-desc">{item.description ?? item.code}</span>
                       <span className="arrivals-important-badges">
@@ -648,7 +666,11 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                         {item.avail <= 0 && <span className="arrivals-important-sem"> · sem estoque</span>}
                       </span>
                     </div>
-                  ))}
+                  )) : (
+                    <p className="arrivals-important-hint">
+                      Nenhum item marcado encontrado na carteira. Verifique se o campo <strong>Cód. fabricante</strong> está preenchido nos produtos marcados, ou se as descrições são compatíveis com as da carteira SAP.
+                    </p>
+                  )}
                 </div>
               )}
             </div>
