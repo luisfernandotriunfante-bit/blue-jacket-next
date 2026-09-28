@@ -181,26 +181,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
     const custoVenda = (productIndicators?.stockAtSalePrice != null)
       ? productIndicators.stockAtSalePrice
       : productBase.reduce((s, p) => { const a = p.availableStock ?? 0; return a > 0 && p.sellerPrice != null ? s + a * p.sellerPrice : s }, 0)
-    // Carteira vem do motor de recebimentos (receiptBase), não do motor de produtos.
-    // Só usa productIndicators quando o motor de produtos efetivamente processou uma
-    // carteira própria (inTransit > 0); caso contrário o loop acima já usa receiptBase.
-    // NFs já recebidas no Milênio (qualquer sistema: atual ou legado)
-    // Normaliza: '002951330-1' → '2951330', '*2951330' → '2951330'
-    const normNf = (nf: string) => nf.replace(/\*/g, '').replace(/^0+/, '').split('-')[0] ?? ''
-    const receivedNFs = new Set(
-      receiptBase
-        .filter(r => r.status === 'recebida' && r.invoice)
-        .map(r => normNf(r.invoice!))
-        .filter(Boolean)
-    )
-    // Carteira pendente = soma dos itens SAP cujo NF ainda não entrou no Milênio
-    // (usa valor SAP por item, não valor Milênio — evita distorção de custos fiscais adicionais)
-    const resolvedCarteira = receiptBase
-      .filter(r => r.status === 'em_transito')
-      .reduce((s, r) => {
-        const nf = r.invoice ? normNf(r.invoice) : null
-        return s + ((!nf || !receivedNFs.has(nf)) ? (r.value ?? 0) : 0)
-      }, 0)
+    const resolvedCarteira = productIndicators?.inTransitTotalValue ?? 0
     const resolvedEmTransito = (productIndicators?.inTransit != null && productIndicators.inTransit > 0)
       ? productIndicators.inTransit
       : emTransito
@@ -210,7 +191,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
     const marginRatio = custoVenda > 0 ? custoCusto / custoVenda : null
     const transitRatio = projetadoCusto > 0 ? resolvedCarteira / projetadoCusto : null
     return { comEstoque, semEstoque, emTransito: resolvedEmTransito, comPreco, total: productBase.length, custoCusto, custoVenda, carteiraCusto: resolvedCarteira, projetadoCusto, projetadoVenda, pricedCoverage, marginRatio, transitRatio }
-  }, [productBase, receiptBase, markup, productIndicators])
+  }, [productBase, markup, productIndicators])
 
   const coverageStats = useMemo(() => {
     const now = Date.now()
