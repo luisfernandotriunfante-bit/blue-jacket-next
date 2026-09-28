@@ -382,6 +382,18 @@ function ConfigTab() {
   const [[covLow, covHigh], setCovInputs] = useState<[string, string]>(initCovDays)
   const [savedCov, setSavedCov] = useState(false)
 
+  const [selloutMetaInput, setSelloutMetaInput] = useState<string>(() => {
+    try { const v = localStorage.getItem('rj-sellout-meta'); return v ?? '' }
+    catch { return '' }
+  })
+  const [savedSelloutMeta, setSavedSelloutMeta] = useState(false)
+
+  const [positivMetaInput, setPositivMetaInput] = useState<string>(() => {
+    try { const v = localStorage.getItem('rj-positiv-meta'); return v ?? '' }
+    catch { return '' }
+  })
+  const [savedPositivMeta, setSavedPositivMeta] = useState(false)
+
   function saveMarkup() {
     const val = parseFloat(markupInput.replace(',', '.'))
     if (!isNaN(val) && val >= 0 && val <= 9999) {
@@ -402,6 +414,30 @@ function ConfigTab() {
         window.dispatchEvent(new Event('rj-covdays-changed'))
         setSavedCov(true)
         setTimeout(() => setSavedCov(false), 2000)
+      } catch { /* quota */ }
+    }
+  }
+
+  function saveSelloutMeta() {
+    const val = parseFloat(String(selloutMetaInput).replace(/\./g, '').replace(',', '.'))
+    if (!isNaN(val) && val > 0) {
+      try {
+        localStorage.setItem('rj-sellout-meta', String(val))
+        window.dispatchEvent(new Event('rj-sellout-meta-changed'))
+        setSavedSelloutMeta(true)
+        setTimeout(() => setSavedSelloutMeta(false), 2000)
+      } catch { /* quota */ }
+    }
+  }
+
+  function savePositivMeta() {
+    const val = parseInt(positivMetaInput)
+    if (!isNaN(val) && val > 0) {
+      try {
+        localStorage.setItem('rj-positiv-meta', String(val))
+        window.dispatchEvent(new Event('rj-positiv-meta-changed'))
+        setSavedPositivMeta(true)
+        setTimeout(() => setSavedPositivMeta(false), 2000)
       } catch { /* quota */ }
     }
   }
@@ -463,6 +499,49 @@ function ConfigTab() {
           <span className="config-unit">d</span>
           <button className="process-button" style={{ margin: 0 }} type="button" onClick={saveCovDays}>
             {savedCov ? 'Salvo ✓' : 'Salvar'}
+          </button>
+        </div>
+      </div>
+      <div className="config-group">
+        <label className="config-label" htmlFor="cfg-sellout-meta">Meta de sell out — T&C (R$)</label>
+        <p className="config-help">
+          Valor mensal de referência para faturamento (ex.: 1200000). Exibido como meta no KPI <strong>Faturado</strong> do painel Sell out.
+        </p>
+        <div className="config-input-row">
+          <span className="config-unit">R$</span>
+          <input
+            id="cfg-sellout-meta"
+            className="config-input"
+            type="text"
+            inputMode="decimal"
+            placeholder="Ex.: 1200000"
+            value={selloutMetaInput}
+            onChange={e => { setSelloutMetaInput(e.target.value); setSavedSelloutMeta(false) }}
+            onKeyDown={e => e.key === 'Enter' && saveSelloutMeta()}
+          />
+          <button className="process-button" style={{ margin: 0 }} type="button" onClick={saveSelloutMeta}>
+            {savedSelloutMeta ? 'Salvo ✓' : 'Salvar'}
+          </button>
+        </div>
+      </div>
+      <div className="config-group">
+        <label className="config-label" htmlFor="cfg-positiv-meta">Meta de positivações</label>
+        <p className="config-help">
+          Número de clientes positivos (com pedido) esperado no mês. Exibido como meta no KPI <strong>Positivações</strong> do painel Sell out.
+        </p>
+        <div className="config-input-row">
+          <input
+            id="cfg-positiv-meta"
+            className="config-input"
+            type="text"
+            inputMode="numeric"
+            placeholder="Ex.: 200"
+            value={positivMetaInput}
+            onChange={e => { setPositivMetaInput(e.target.value); setSavedPositivMeta(false) }}
+            onKeyDown={e => e.key === 'Enter' && savePositivMeta()}
+          />
+          <button className="process-button" style={{ margin: 0 }} type="button" onClick={savePositivMeta}>
+            {savedPositivMeta ? 'Salvo ✓' : 'Salvar'}
           </button>
         </div>
       </div>
