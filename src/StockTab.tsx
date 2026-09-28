@@ -181,7 +181,13 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
     const custoVenda = (productIndicators?.stockAtSalePrice != null)
       ? productIndicators.stockAtSalePrice
       : productBase.reduce((s, p) => { const a = p.availableStock ?? 0; return a > 0 && p.sellerPrice != null ? s + a * p.sellerPrice : s }, 0)
-    const resolvedCarteira = productIndicators?.inTransitTotalValue ?? 0
+    const normNf = (nf: string) => nf.replace(/\*/g, '').replace(/^0+/, '').split('-')[0] ?? ''
+    const receivedNFs = new Set(
+      receiptBase.filter(r => r.status === 'recebida' && r.invoice).map(r => normNf(r.invoice!)).filter(Boolean)
+    )
+    const resolvedCarteira = receiptBase
+      .filter(r => r.status === 'em_transito')
+      .reduce((s, r) => { const nf = r.invoice ? normNf(r.invoice) : null; return s + ((!nf || !receivedNFs.has(nf)) ? (r.value ?? 0) : 0) }, 0)
     const resolvedEmTransito = (productIndicators?.inTransit != null && productIndicators.inTransit > 0)
       ? productIndicators.inTransit
       : emTransito
@@ -191,7 +197,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
     const marginRatio = custoVenda > 0 ? custoCusto / custoVenda : null
     const transitRatio = projetadoCusto > 0 ? resolvedCarteira / projetadoCusto : null
     return { comEstoque, semEstoque, emTransito: resolvedEmTransito, comPreco, total: productBase.length, custoCusto, custoVenda, carteiraCusto: resolvedCarteira, projetadoCusto, projetadoVenda, pricedCoverage, marginRatio, transitRatio }
-  }, [productBase, markup, productIndicators])
+  }, [productBase, receiptBase, markup, productIndicators])
 
   const coverageStats = useMemo(() => {
     const now = Date.now()
