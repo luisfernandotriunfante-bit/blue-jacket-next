@@ -334,6 +334,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
   }, [arrivalInvoices])
 
   const importantArrivals = useMemo(() => {
+    // productCode em itens em_transito da Colgate é o código SAP (manufacturerCode)
     const inTransit = new Map<string, number>()
     for (const r of receiptBase) {
       if (r.status !== 'em_transito' || !r.productCode || !r.quantity) continue
@@ -343,7 +344,8 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
     for (const p of productBase) {
       const tag = tags[p.id]
       if (!tag?.launch && !tag?.pex) continue
-      const qty = p.internalCode ? inTransit.get(p.internalCode) : undefined
+      const qty = (p.manufacturerCode ? inTransit.get(p.manufacturerCode) : undefined)
+               ?? (p.internalCode ? inTransit.get(p.internalCode) : undefined)
       if (!qty) continue
       result.push({ id: p.id, description: p.description, code: p.internalCode, qty, isLaunch: !!tag.launch, isPex: !!tag.pex, avail: p.availableStock ?? 0, abc: p.internalCode ? abcMap.get(p.internalCode) : undefined })
     }
