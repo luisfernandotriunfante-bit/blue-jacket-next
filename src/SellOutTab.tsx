@@ -32,82 +32,92 @@ function readNum(key: string): number | null {
   catch { return null }
 }
 
-/* ── MetaDonut ── read-only; meta é definida em Configurações */
-function MetaDonut({ label, value, meta, pct, color, isCount }: {
-  label: string; value: string; meta: number | null; pct: number | null
-  color: string; isCount?: boolean
+/* ── TwoSegmentDonut ─────────────────────────────────────
+   Donut com dois segmentos (A = azul, B = vermelho) sobre
+   uma trilha que representa a meta. Se não há meta, usa
+   A+B como 100% e mostra a proporção entre os segmentos.
+─────────────────────────────────────────────────────────── */
+function TwoSegmentDonut({ label, segA, segALabel, segAVal, segB, segBLabel, segBVal, meta, metaLabel }: {
+  label: string
+  segA: number; segALabel: string; segAVal: string
+  segB: number; segBLabel: string; segBVal: string
+  meta: number | null; metaLabel: string
 }) {
-  const r = 42, cx = 54, cy = 54, circ = 2 * Math.PI * r
-  const clamped = pct !== null ? Math.min(120, Math.max(0, pct)) : null
-  const filled = clamped !== null ? Math.min((clamped / 100) * circ, circ - 3) : 0
+  const denominator = meta ?? (segA + segB) || 1
+  const r = 54, cx = 66, cy = 66, circ = 2 * Math.PI * r
+  const clampA = Math.min(segA / denominator, 1)
+  const clampAB = Math.min((segA + segB) / denominator, 1)
+  const gap = 4
+  const arcA = Math.max(0, clampA * circ - gap)
+  const arcB = Math.max(0, (clampAB - clampA) * circ - gap)
+  const hasData = segA + segB > 0
+  const pctA = Math.round(clampA * 100)
+  const pctB = Math.round((clampAB - clampA) * 100)
 
   return (
-    <div className="so-hero-card">
+    <div className="so-hero-card so-hero-card-lg">
       <div className="so-hero-label">{label}</div>
-      <div className="so-hero-svg-wrap">
-        <svg viewBox="0 0 108 108">
-          <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--border)" strokeWidth={11} />
-          {clamped !== null && filled > 0 && (
+      <div className="so-hero-svg-wrap-lg">
+        <svg viewBox="0 0 132 132">
+          {/* trilha (meta) */}
+          <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--border)" strokeWidth={13} />
+          {hasData && (
             <g transform={`rotate(-90 ${cx} ${cy})`}>
-              <circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth={11}
-                strokeDasharray={`${filled} ${circ}`} strokeLinecap="round" />
+              {arcA > 0 && (
+                <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--blue)" strokeWidth={13}
+                  strokeDasharray={`${arcA} ${circ}`} strokeLinecap="round" />
+              )}
+              {arcB > 0 && (
+                <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--red)" strokeWidth={13}
+                  strokeDasharray={`${arcB} ${circ}`} strokeDashoffset={-(clampA * circ)}
+                  strokeLinecap="round" />
+              )}
             </g>
           )}
-          {clamped !== null
+          {/* texto central */}
+          {hasData
             ? <>
-                <text x={cx} y={cy - 4} textAnchor="middle" fontSize={15} fontWeight={800} fill={color} fontFamily="Space Grotesk, sans-serif">{Math.round(pct!)}%</text>
-                <text x={cx} y={cy + 10} textAnchor="middle" fontSize={9} fill="var(--muted)" fontFamily="Space Grotesk, sans-serif">da meta</text>
+                <text x={cx} y={cy - 10} textAnchor="middle" fontSize={22} fontWeight={800}
+                  fill="var(--blue)" fontFamily="Space Grotesk, sans-serif">{pctA}%</text>
+                <text x={cx} y={cy + 6} textAnchor="middle" fontSize={10} fill="var(--muted)"
+                  fontFamily="Space Grotesk, sans-serif">faturado</text>
+                {meta !== null && pctB > 0 && (
+                  <text x={cx} y={cy + 20} textAnchor="middle" fontSize={10} fontWeight={700}
+                    fill="var(--red)" fontFamily="Space Grotesk, sans-serif">+{pctB}%</text>
+                )}
               </>
-            : <text x={cx} y={cy + 4} textAnchor="middle" fontSize={9} fill="var(--muted)" fontFamily="Space Grotesk, sans-serif">sem meta</text>
+            : <text x={cx} y={cy + 4} textAnchor="middle" fontSize={10} fill="var(--muted)"
+                fontFamily="Space Grotesk, sans-serif">sem dados</text>
           }
         </svg>
       </div>
-      <div className="so-hero-value" style={{ color }}>{value}</div>
-      {meta !== null
-        ? <div className="so-hero-sub">meta: {isCount ? fmtNum(meta) : kpiCurrency(meta)}</div>
-        : <div className="so-hero-sub so-hero-no-meta">definir em Configurações</div>
-      }
+
+      {/* legenda de valores */}
+      <div className="so-hero-info">
+        <div className="so-hero-info-row">
+          <span className="so-hero-info-dot" style={{ background: 'var(--blue)' }} />
+          <span className="so-hero-info-key">{segALabel}</span>
+          <span className="so-hero-info-val" style={{ color: 'var(--blue)' }}>{segAVal}</span>
+        </div>
+        <div className="so-hero-info-row">
+          <span className="so-hero-info-dot" style={{ background: 'var(--red)' }} />
+          <span className="so-hero-info-key">{segBLabel}</span>
+          <span className="so-hero-info-val" style={{ color: 'var(--red)' }}>{segBVal}</span>
+        </div>
+        <div className="so-hero-info-divider" />
+        {meta !== null
+          ? <div className="so-hero-info-row so-hero-info-meta">
+              <span className="so-hero-info-key">meta</span>
+              <span className="so-hero-info-val">{metaLabel}</span>
+            </div>
+          : <div className="so-hero-no-meta">definir em Configurações</div>
+        }
+      </div>
     </div>
   )
 }
 
-/* ── SplitDonut — azul (faturado) × vermelho (a faturar) ── */
-function SplitDonut({ fat, afat }: { fat: number; afat: number }) {
-  const total = fat + afat
-  if (total <= 0) return (
-    <div className="so-hero-card">
-      <div className="so-hero-label">Faturado vs A faturar</div>
-      <div className="so-hero-svg-wrap">
-        <svg viewBox="0 0 108 108"><circle cx={54} cy={54} r={42} fill="none" stroke="var(--border)" strokeWidth={11} /></svg>
-      </div>
-      <div className="so-hero-value" style={{ color: 'var(--muted)' }}>—</div>
-      <div className="so-hero-sub">sem dados</div>
-    </div>
-  )
-  const r = 42, cx = 54, cy = 54, circ = 2 * Math.PI * r, gap = 4
-  const fp = fat / total, ap = afat / total
-  const fd = Math.max(0, fp * circ - gap), ad = Math.max(0, ap * circ - gap)
-  return (
-    <div className="so-hero-card">
-      <div className="so-hero-label">Faturado vs A faturar</div>
-      <div className="so-hero-svg-wrap">
-        <svg viewBox="0 0 108 108">
-          <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--border)" strokeWidth={11} />
-          <g transform={`rotate(-90 ${cx} ${cy})`}>
-            {fd > 0 && <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--blue)" strokeWidth={11} strokeDasharray={`${fd} ${circ}`} strokeLinecap="round" />}
-            {ad > 0 && <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--red)" strokeWidth={11} strokeDasharray={`${ad} ${circ}`} strokeDashoffset={-fp * circ} strokeLinecap="round" />}
-          </g>
-          <text x={cx} y={cy - 4} textAnchor="middle" fontSize={15} fontWeight={800} fill="var(--blue)" fontFamily="Space Grotesk, sans-serif">{Math.round(fp * 100)}%</text>
-          <text x={cx} y={cy + 10} textAnchor="middle" fontSize={9} fill="var(--muted)" fontFamily="Space Grotesk, sans-serif">faturado</text>
-        </svg>
-      </div>
-      <div className="so-hero-value" style={{ color: 'var(--blue)' }}>{kpiCurrency(fat)}</div>
-      <div className="so-hero-sub" style={{ color: 'var(--red)' }}>+{kpiCurrency(afat)} a faturar</div>
-    </div>
-  )
-}
-
-/* ── KpiCard secundário ──────────────────────────────────── */
+/* ── KpiCard ─────────────────────────────────────────────── */
 function KpiCard({ label, value, accent, sub }: { label: string; value: string; accent?: 'blue' | 'red' | 'white'; sub?: string }) {
   return (
     <div className={`kpi-card${accent ? ` kpi-${accent}` : ''}`}>
@@ -283,9 +293,6 @@ export function SellOutTab({ movementBase, productBase }: {
   const yPos = (v: number) => PAD.t + iHP * (1 - v / maxPos)
   const yBasePos = PAD.t + iHP
 
-  const faturadoPct = selloutMeta ? (kpis.fat / selloutMeta) * 100 : null
-  const positivPct = positivMeta ? (kpis.posTotal / positivMeta) * 100 : null
-
   return (
     <>
       <header className="topbar stock-topbar" aria-label="Sell out">
@@ -293,13 +300,20 @@ export function SellOutTab({ movementBase, productBase }: {
       </header>
 
       <section className="content">
-        {/* ── Hero donuts ─────────────────────────────────── */}
+        {/* ── 2 hero donuts ───────────────────────────────── */}
         <div className="so-hero-row">
-          <MetaDonut label="Faturado" value={kpiCurrency(kpis.fat)} meta={selloutMeta}
-            pct={faturadoPct} color="var(--blue)" />
-          <MetaDonut label="Positivações" value={fmtNum(kpis.posTotal)} meta={positivMeta}
-            pct={positivPct} color="var(--red)" isCount />
-          <SplitDonut fat={kpis.fat} afat={kpis.afat} />
+          <TwoSegmentDonut
+            label="Sell Out — Faturamento"
+            segA={kpis.fat}      segALabel="Faturado"   segAVal={kpiCurrency(kpis.fat)}
+            segB={kpis.afat}     segBLabel="A faturar"  segBVal={kpiCurrency(kpis.afat)}
+            meta={selloutMeta}   metaLabel={selloutMeta ? kpiCurrency(selloutMeta) : '—'}
+          />
+          <TwoSegmentDonut
+            label="Positivações"
+            segA={kpis.posFat}               segALabel="Faturadas"  segAVal={fmtNum(kpis.posFat)}
+            segB={kpis.posTotal - kpis.posFat} segBLabel="A faturar"  segBVal={fmtNum(kpis.posTotal - kpis.posFat)}
+            meta={positivMeta}               metaLabel={positivMeta ? fmtNum(positivMeta) : '—'}
+          />
         </div>
 
         {/* ── KPIs secundários ─────────────────────────────── */}
@@ -313,7 +327,6 @@ export function SellOutTab({ movementBase, productBase }: {
         {/* ── Fechamento diário ────────────────────────────── */}
         {allDays.length > 0 && (
           <div className="notas-section so-detail-section" style={{ maxHeight: 'none', marginBottom: 20 }}>
-            {/* barra de navegação */}
             <div className="so-window-bar">
               <div className="so-window-info">
                 <span className="so-window-tag">JANELA SINCRONIZADA · {WINDOW} DIAS</span>
@@ -332,12 +345,9 @@ export function SellOutTab({ movementBase, productBase }: {
               </div>
             </div>
 
-            {/* grid: gráficos (esq) + planilha (dir) */}
             <div className="so-detail-grid">
-              {/* coluna esquerda: gráficos */}
+              {/* gráficos */}
               <div className="so-charts-col">
-
-                {/* MOVIMENTO FINANCEIRO */}
                 <div className="so-chart-block">
                   <div className="so-chart-head">
                     <div>
@@ -378,7 +388,6 @@ export function SellOutTab({ movementBase, productBase }: {
                       {n > 0 && <path d={linePath(windowDays.map(d => d.sellOut), xFn, yFin)} fill="none" stroke="var(--text)" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />}
                       {n > 0 && <path d={linePath(windowDays.map(d => d.fat), xFn, yFin)} fill="none" stroke="var(--blue)" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />}
                       {n > 0 && <path d={linePath(windowDays.map(d => d.afat), xFn, yFin)} fill="none" stroke="var(--red)" strokeWidth={1.8} strokeDasharray="6 3" strokeLinecap="round" />}
-                      {/* pontos no último dia */}
                       {n > 0 && (() => {
                         const last = windowDays[n - 1]
                         return <>
@@ -394,7 +403,6 @@ export function SellOutTab({ movementBase, productBase }: {
                   </div>
                 </div>
 
-                {/* MOVIMENTO DE POSITIVAÇÃO */}
                 <div className="so-chart-block">
                   <div className="so-chart-head">
                     <div>
@@ -447,7 +455,7 @@ export function SellOutTab({ movementBase, productBase }: {
                 </div>
               </div>
 
-              {/* coluna direita: planilha */}
+              {/* planilha */}
               <div className="so-table-col">
                 <div className="so-table-head">
                   <div>
@@ -494,7 +502,6 @@ export function SellOutTab({ movementBase, productBase }: {
                     </tbody>
                   </table>
                 </div>
-                {/* totais da janela */}
                 <div className="so-win-totals">
                   <div className="so-win-total-item">
                     <div className="so-win-total-label">SELL OUT ACUMULADO</div>
@@ -512,7 +519,7 @@ export function SellOutTab({ movementBase, productBase }: {
               </div>
             </div>
 
-            {/* ── Detalhe do dia selecionado ─────────────────── */}
+            {/* detalhe do dia selecionado */}
             {selectedDay && selectedDayMovements.length > 0 && (
               <div className="so-day-detail">
                 <div className="so-day-detail-head">
@@ -524,11 +531,8 @@ export function SellOutTab({ movementBase, productBase }: {
                   <table className="so-day-detail-table">
                     <thead>
                       <tr>
-                        <th>TIPO</th>
-                        <th>CLIENTE</th>
-                        <th>PRODUTO</th>
-                        <th className="n-right">QTD</th>
-                        <th className="n-right">VALOR</th>
+                        <th>TIPO</th><th>CLIENTE</th><th>PRODUTO</th>
+                        <th className="n-right">QTD</th><th className="n-right">VALOR</th>
                       </tr>
                     </thead>
                     <tbody>
