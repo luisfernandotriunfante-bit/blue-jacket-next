@@ -89,6 +89,9 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 .pf-range button { min-height: 30px; padding: 0 13px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .pf-range button:hover { border-color: var(--text); color: var(--text); }
 .pf-range button.is-active { border-color: var(--red); background: var(--red); color: #fff; }
+.pf-range button.abc-filter-a.is-active { border-color: #f59e0b; background: #f59e0b; color: #000; }
+.pf-range button.abc-filter-b.is-active { border-color: var(--blue); background: var(--blue); color: #fff; }
+.pf-range button.abc-filter-c.is-active { border-color: var(--muted); background: var(--surface-raised); color: var(--text); }
 /* KPIs */
 .stock-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap: 12px; margin-bottom: 24px; }
 .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; display: flex; flex-direction: column; min-height: 120px; overflow: hidden; }

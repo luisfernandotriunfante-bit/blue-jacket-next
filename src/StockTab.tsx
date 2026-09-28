@@ -90,6 +90,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
   const [filterStatus, setFilterStatus] = useState<StockFilter>('all')
   const [filterChannel, setFilterChannel] = useState('')
   const [filterMarcacao, setFilterMarcacao] = useState<'all' | 'mandatory' | 'important'>('all')
+  const [filterAbc, setFilterAbc] = useState<'all' | 'A' | 'B' | 'C'>('all')
   const [selected, setSelected] = useState<CanonicalProduct | null>(null)
   const [tags, setTags] = useState<Tags>(loadTags)
   const [lncSearch, setLncSearch] = useState('')
@@ -384,9 +385,10 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
       if (filterChannel && (p.sortimentChannels?.[filterChannel] ?? 0) <= 0) return false
       if (filterMarcacao === 'mandatory' && !Object.values(p.sortimentChannels ?? {}).some(v => v === 1)) return false
       if (filterMarcacao === 'important' && !Object.values(p.sortimentChannels ?? {}).some(v => v === 2)) return false
+      if (filterAbc !== 'all' && (p.internalCode ? abcMap.get(p.internalCode) : undefined) !== filterAbc) return false
       return true
     })
-  }, [productBase, search, filterStatus, filterChannel, filterMarcacao])
+  }, [productBase, search, filterStatus, filterChannel, filterMarcacao, filterAbc, abcMap])
 
   const filteredLnc = useMemo(() => {
     const q = lncSearch.trim()
@@ -709,6 +711,17 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                   ))}
                 </div>
               </fieldset>
+              {abcMap.size > 0 && (
+                <fieldset className="pf-range">
+                  <legend>Curva ABC</legend>
+                  <div>
+                    <button type="button" className={filterAbc === 'all' ? 'is-active' : ''} onClick={() => setFilterAbc('all')}>Todos</button>
+                    {(['A', 'B', 'C'] as const).map(faixa => (
+                      <button key={faixa} type="button" className={`${filterAbc === faixa ? 'is-active' : ''} abc-filter-${faixa.toLowerCase()}`} onClick={() => setFilterAbc(faixa)}>{faixa}</button>
+                    ))}
+                  </div>
+                </fieldset>
+              )}
             </div>
 
             <div className="stock-count">
