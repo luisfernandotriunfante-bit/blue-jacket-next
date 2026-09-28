@@ -320,42 +320,21 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
     return buckets
   }, [arrivalInvoices])
 
-  const importantArrivals = useMemo(() => {
-    const wds = (s: string | undefined) => {
-      if (!s) return new Set<string>()
-      return new Set(s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().split(/[^a-z0-9]+/).filter(t => t.length >= 4))
-    }
-    // productCode em itens em_transito da Colgate é o código SAP (manufacturerCode)
-    // Guarda também a descrição para fallback de matching
-    const inTransit = new Map<string, { qty: number; description?: string }>()
-    for (const r of receiptBase) {
-      if (r.status !== 'em_transito' || !r.productCode || !r.quantity) continue
-      const cur = inTransit.get(r.productCode)
-      inTransit.set(r.productCode, { qty: (cur?.qty ?? 0) + r.quantity, description: cur?.description ?? r.description })
-    }
-    const result: Array<{ id: string; description?: string; code?: string; qty: number; isLaunch: boolean; isPex: boolean; avail: number; abc?: 'A' | 'B' | 'C' }> = []
+  const productByCode = useMemo(() => {
+    const byMfr = new Map<string, typeof productBase[0]>()
+    const byInternal = new Map<string, typeof productBase[0]>()
     for (const p of productBase) {
-      const tag = tags[p.id]
-      if (!tag?.launch && !tag?.pex) continue
-      // 1. Match por código SAP (manufacturerCode) ou código interno
-      let qty = (p.manufacturerCode ? inTransit.get(p.manufacturerCode)?.qty : undefined)
-             ?? (p.internalCode ? inTransit.get(p.internalCode)?.qty : undefined)
-      // 2. Fallback: sobreposição de palavras entre descrições (≥2 tokens de 4+ chars)
-      if (!qty && p.description) {
-        const prodWds = wds(p.description)
-        for (const entry of inTransit.values()) {
-          if (!entry.description) continue
-          const tWds = wds(entry.description)
-          let overlap = 0
-          for (const w of tWds) if (prodWds.has(w) && ++overlap >= 2) break
-          if (overlap >= 2) { qty = entry.qty; break }
-        }
-      }
-      if (!qty) continue
-      result.push({ id: p.id, description: p.description, code: p.internalCode, qty, isLaunch: !!tag.launch, isPex: !!tag.pex, avail: p.availableStock ?? 0, abc: p.internalCode ? abcMap.get(p.internalCode) : undefined })
+      if (p.manufacturerCode) byMfr.set(p.manufacturerCode, p)
+      if (p.internalCode) byInternal.set(p.internalCode, p)
     }
-    return result.sort((a, b) => (b.isPex ? 1 : 0) - (a.isPex ? 1 : 0) || a.avail - b.avail)
-  }, [receiptBase, productBase, tags, abcMap])
+    return { byMfr, byInternal }
+  }, [productBase])
+
+  const nfsComPrevisao = useMemo(() =>
+    arrivalInvoices
+      .filter(inv => inv.previewDate)
+      .sort((a, b) => (a.previewDate ?? '').localeCompare(b.previewDate ?? ''))
+  , [arrivalInvoices])
 
   const availableChannels = useMemo(() => {
     const seen = new Set<string>()
@@ -650,27 +629,37 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                   </div>
                 ))}
               </div>
-              {(importantArrivals.length > 0 || (lncCounts.total > 0 && arrivalInvoices.length > 0)) && (
+              {nfsComPrevisao.length > 0 && (
                 <div className="arrivals-important">
-                  <div className="arrivals-important-title">Itens marcados chegando</div>
-                  {importantArrivals.length > 0 ? importantArrivals.map(item => (
-                    <div key={item.id} className="arrivals-important-row">
-                      <span className="arrivals-important-desc">{item.description ?? item.code}</span>
-                      <span className="arrivals-important-badges">
-                        {item.isLaunch && <span className="badge-launch">Lançamento</span>}
-                        {item.isPex && <span className="badge-pex">PEX</span>}
-                        {item.abc && <span className={`badge-abc badge-abc-${item.abc.toLowerCase()}`}>{item.abc}</span>}
-                      </span>
-                      <span className="arrivals-important-qty">
-                        {item.qty.toLocaleString('pt-BR')} chegando
-                        {item.avail <= 0 && <span className="arrivals-important-sem"> · sem estoque</span>}
-                      </span>
+                  <div className="arrivals-important-title">Notas com previsão · {nfsComPrevisao.length}</div>
+                  {nfsComPrevisao.map(inv => (
+                    <div key={inv.invoice} className="arrivals-nf-block">
+                      <div className="arrivals-nf-head">
+                        <span className="arrivals-nf-number">{inv.displayInvoice}</span>
+                        {inv.supplier && <span className="arrivals-nf-supplier">{inv.supplier}</span>}
+                        <span className="arrivals-nf-date">{new Date(inv.previewDate!).toLocaleDateString('pt-BR')}</span>
+                        <span className="arrivals-nf-totalqty">{inv.totalQty.toLocaleString('pt-BR')} un</span>
+                      </div>
+                      <div className="arrivals-nf-items">
+                        {inv.items.map((item, i) => {
+                          const p = item.productCode ? (productByCode.byMfr.get(item.productCode) ?? productByCode.byInternal.get(item.productCode)) : undefined
+                          const tag = p ? tags[p.id] : undefined
+                          return (
+                            <div key={i} className="arrivals-nf-item">
+                              <span className="arrivals-nf-item-desc">{item.description ?? item.productCode}</span>
+                              {tag && (tag.launch || tag.pex) && (
+                                <span className="arrivals-nf-item-badges">
+                                  {tag.launch && <span className="badge-launch">Lançamento</span>}
+                                  {tag.pex && <span className="badge-pex">PEX</span>}
+                                </span>
+                              )}
+                              <span className="arrivals-nf-item-qty">{(item.quantity ?? 0).toLocaleString('pt-BR')}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
                     </div>
-                  )) : (
-                    <p className="arrivals-important-hint">
-                      Nenhum item marcado encontrado na carteira. Verifique se o campo <strong>Cód. fabricante</strong> está preenchido nos produtos marcados, ou se as descrições são compatíveis com as da carteira SAP.
-                    </p>
-                  )}
+                  ))}
                 </div>
               )}
             </div>

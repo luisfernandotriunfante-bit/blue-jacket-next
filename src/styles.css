@@ -200,6 +200,18 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 .arrivals-important-qty { font-size: 11px; font-weight: 700; color: var(--muted); font-family: 'Space Grotesk', sans-serif; flex-shrink: 0; text-align: right; white-space: nowrap; }
 .arrivals-important-sem { color: var(--red); }
 .arrivals-important-hint { margin: 2px 0 0; font-size: 11px; color: var(--muted); line-height: 1.5; }
+.arrivals-nf-block { border-bottom: 1px solid var(--border); padding: 8px 0; }
+.arrivals-nf-block:last-child { border-bottom: none; }
+.arrivals-nf-head { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+.arrivals-nf-number { font-size: 11px; font-weight: 800; color: var(--text); font-family: 'Space Grotesk', sans-serif; flex-shrink: 0; }
+.arrivals-nf-supplier { font-size: 10px; color: var(--muted); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.arrivals-nf-date { font-size: 11px; font-weight: 700; color: var(--blue); flex-shrink: 0; }
+.arrivals-nf-totalqty { font-size: 10px; color: var(--muted); flex-shrink: 0; }
+.arrivals-nf-items { display: flex; flex-direction: column; gap: 2px; padding-left: 8px; }
+.arrivals-nf-item { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.arrivals-nf-item-desc { flex: 1; font-size: 11px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.arrivals-nf-item-badges { display: flex; gap: 3px; flex-shrink: 0; }
+.arrivals-nf-item-qty { font-size: 11px; font-weight: 700; color: var(--muted); font-family: 'Space Grotesk', sans-serif; flex-shrink: 0; }
 .stock-count { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
 .stock-layout { display: grid; grid-template-columns: 1fr; gap: 16px; }
 .stock-layout.has-detail { grid-template-columns: minmax(0, 1fr) 360px; align-items: start; }
