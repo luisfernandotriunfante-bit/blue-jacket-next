@@ -628,7 +628,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                 <span className="arrivals-panel-label">Entradas previstas</span>
                 <span className="arrivals-panel-total">
                   {arrivalInvoices.length > 0
-                    ? `${arrivalInvoices.length} NF${arrivalInvoices.length !== 1 ? 's' : ''} · R$ ${brl(arrivalInvoices.reduce((s, i) => s + i.totalValue, 0))}`
+                    ? `${arrivalInvoices.length} NF${arrivalInvoices.length !== 1 ? 's' : ''} · R$ ${brl(kpis.carteiraCusto)}`
                     : 'Sem carteira em aberto'}
                 </span>
               </div>
