@@ -10,6 +10,8 @@ import { processReceiptMotor, type CanonicalReceipt, type ReceiptIndicators } fr
 import { classifyProduct } from './domain/productGrouping'
 import { loadPersisted, savePersisted } from './domain/persistence'
 import { detectFile } from './domain/fileDetector'
+import { StockTab } from './StockTab'
+import { SellOutTab } from './SellOutTab'
 
 const motors: Array<{ id: Exclude<SourceArea, 'diario'>; name: string }> = [
   { id: 'produtos', name: 'Produtos' },
@@ -20,20 +22,20 @@ const motors: Array<{ id: Exclude<SourceArea, 'diario'>; name: string }> = [
 
 const areaName: Record<SourceArea, string> = { diario: 'Diários', produtos: 'Produtos', clientes: 'Clientes', movimentacoes: 'Movimentações', recebimentos: 'Chegada de notas', historico: 'Histórico' }
 const clientSources = [
-  { id: 'internal', label: 'Cadastro interno' },
-  { id: 'portfolio', label: 'Carteira' },
-  { id: 'premises', label: 'Premissas' },
+  { id: 'internal', label: 'Cadastro de clientes (1203)' },
+  { id: 'portfolio', label: 'Carteira de clientes' },
+  { id: 'premises', label: 'Premissas de clientes' },
 ] as const
 const productSources = [
-  { id: 'internal', label: 'Cadastro interno' }, { id: 'industry', label: 'Lista da indústria' }, { id: 'stock', label: 'Estoque atual' }, { id: 'price', label: 'Preço de venda' }, { id: 'sortiment', label: 'Sortimento' },
+  { id: 'internal', label: 'Cadastro de produtos (286)' }, { id: 'industry', label: 'Lista SAP da indústria' }, { id: 'stock', label: 'Estoque atual (1118)' }, { id: 'price', label: 'Preço de venda (8011)' }, { id: 'subbrands', label: 'Sub-marcas (8013)' }, { id: 'sortiment', label: 'Sortimento SAP' },
 ] as const
 const historySources = [
-  { id: 'sales', label: 'Vendas detalhadas do legado' }, { id: 'summary', label: 'Consolidado por cliente' },
+  { id: 'sales', label: 'Vendas detalhadas do legado (.txt)' }, { id: 'catalog', label: 'Catálogo Milênio — de-para (12.322)' },
 ] as const
 const movementSources = [
-  { id: 'sales', label: 'Vendas atuais' }, { id: 'cuts', label: 'Cortes por cliente' },
+  { id: 'sales', label: 'Vendas atuais (8022)' }, { id: 'cuts', label: 'Corte de mercadorias (1454)' },
 ] as const
-const receiptSources = [{ id: 'legacy', label: 'Notas do legado' }, { id: 'current', label: 'Entradas atuais por nota' }, { id: 'portfolio', label: 'Carteira da Colgate' }] as const
+const receiptSources = [{ id: 'legacy', label: 'Relação de notas fiscais (.txt)' }, { id: 'current', label: 'Entrada de mercadoria (218)' }, { id: 'portfolio', label: 'Carteira SAP (Excel)' }] as const
 type ClientIndicators = { totalClients: number; internal: number; portfolio: number; premises: number; complete: number }
 type SavedClientMotor = { base: CanonicalClient[]; audit: AuditItem[]; indicators: ClientIndicators | null; slots: Partial<Record<(typeof clientSources)[number]['id'], UploadedFile>> }
 type SavedProductMotor = { base: CanonicalProduct[]; audit: AuditItem[]; indicators: ProductIndicators | null; slots: Partial<Record<(typeof productSources)[number]['id'], UploadedFile>> }
@@ -46,7 +48,8 @@ const dedupeList = (files: UploadedFile[] | undefined) => (files ?? []).filter((
 
 export function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
-  const [tab, setTab] = useState<'uploads' | 'auditoria'>('uploads')
+  const [section, setSection] = useState<'sellout' | 'estoque' | 'administracao'>('sellout')
+  const [tab, setTab] = useState<'uploads' | 'auditoria' | 'config'>('uploads')
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [rawFiles, setRawFiles] = useState<Record<string, File>>({})
   const [activeNotice, setActiveNotice] = useState<AuditItem | null>(null)
@@ -155,7 +158,7 @@ export function App() {
     setRawFiles(current => { const next = { ...current }; for (const id of idsToRemove) delete next[id]; return { ...next, ...newRaw } })
     if (Object.keys(toProducts).length) setProductSlots(current => ({ ...current, ...toProducts }))
     if (Object.keys(toClients).length) setClientSlots(current => ({ ...current, ...toClients }))
-    if (Object.keys(toHistory).length) setHistorySlots(current => { const next = { ...current }; for (const [k, v] of Object.entries(toHistory) as [typeof historySources[number]['id'], UploadedFile[]][]) next[k] = [...(current[k] ?? []), ...v]; return next })
+    if (Object.keys(toHistory).length) setHistorySlots(current => { const next = { ...current }; for (const [k, v] of Object.entries(toHistory) as [typeof historySources[number]['id'], UploadedFile[]][]) next[k] = k === 'catalog' ? v : [...(current[k] ?? []), ...v]; return next })
     if (Object.keys(toMovements).length) setMovementSlots(current => { const next = { ...current }; for (const [k, v] of Object.entries(toMovements) as [typeof movementSources[number]['id'], UploadedFile[]][]) next[k] = [...(current[k] ?? []), ...v]; return next })
     if (Object.keys(toReceipts).length) setReceiptSlots(current => { const next = { ...current }; for (const [k, v] of Object.entries(toReceipts) as [typeof receiptSources[number]['id'], UploadedFile[]][]) next[k] = [...(current[k] ?? []), ...v]; return next })
   }
@@ -179,22 +182,26 @@ export function App() {
     setFiles(current => [...current.filter(item => item.id !== productSlots[source]?.id), uploaded]); setRawFiles(current => ({ ...current, [uploaded.id]: file })); setProductSlots(current => ({ ...current, [source]: uploaded }))
   }
   function historySourceChange(source: (typeof historySources)[number]['id'], event: ChangeEvent<HTMLInputElement>) {
-    const incoming = Array.from(event.target.files ?? []); event.target.value = ''
+    const all = Array.from(event.target.files ?? []); event.target.value = ''
+    if (!all.length) return
+    const incoming = source === 'catalog' ? all : all.filter(file => !findInSlot(historySlots[source], file))
     if (!incoming.length) return
     const uploaded = incoming.map(file => ({ id: `${file.name}-${file.size}-${crypto.randomUUID()}`, name: file.name, size: file.size, area: 'historico' as const, receivedAt: new Date().toLocaleString('pt-BR'), lastModified: file.lastModified }))
     setFiles(current => [...current, ...uploaded])
     setRawFiles(current => ({ ...current, ...Object.fromEntries(uploaded.map((item, index) => [item.id, incoming[index]])) }))
-    setHistorySlots(current => ({ ...current, [source]: [...(current[source] ?? []), ...uploaded] }))
+    setHistorySlots(current => ({ ...current, [source]: source === 'catalog' ? uploaded : [...(current[source] ?? []), ...uploaded] }))
   }
   function movementSourceChange(source: (typeof movementSources)[number]['id'], event: ChangeEvent<HTMLInputElement>) {
-    const incoming = Array.from(event.target.files ?? []); event.target.value = ''
+    const all = Array.from(event.target.files ?? []); event.target.value = ''
+    if (!all.length) return
+    const incoming = all.filter(file => !findInSlot(movementSlots[source], file))
     if (!incoming.length) return
     const uploaded = incoming.map(file => ({ id: `${file.name}-${file.size}-${crypto.randomUUID()}`, name: file.name, size: file.size, area: 'movimentacoes' as const, receivedAt: new Date().toLocaleString('pt-BR'), lastModified: file.lastModified }))
     setFiles(current => [...current, ...uploaded])
     setRawFiles(current => ({ ...current, ...Object.fromEntries(uploaded.map((item, index) => [item.id, incoming[index]])) }))
     setMovementSlots(current => ({ ...current, [source]: [...(current[source] ?? []), ...uploaded] }))
   }
-  function receiptSourceChange(source: (typeof receiptSources)[number]['id'], event: ChangeEvent<HTMLInputElement>) { const incoming=Array.from(event.target.files??[]);event.target.value='';if(!incoming.length)return;const uploaded=incoming.map(file=>({id:`${file.name}-${file.size}-${crypto.randomUUID()}`,name:file.name,size:file.size,area:'recebimentos' as const,receivedAt:new Date().toLocaleString('pt-BR'),lastModified:file.lastModified}));setFiles(current=>[...current,...uploaded]);setRawFiles(current=>({...current,...Object.fromEntries(uploaded.map((item,index)=>[item.id,incoming[index]]))}));setReceiptSlots(current=>({...current,[source]:[...(current[source]??[]),...uploaded]})) }
+  function receiptSourceChange(source: (typeof receiptSources)[number]['id'], event: ChangeEvent<HTMLInputElement>) { const all=Array.from(event.target.files??[]);event.target.value='';if(!all.length)return;const incoming=all.filter(file=>!findInSlot(receiptSlots[source],file));if(!incoming.length)return;const uploaded=incoming.map(file=>({id:`${file.name}-${file.size}-${crypto.randomUUID()}`,name:file.name,size:file.size,area:'recebimentos' as const,receivedAt:new Date().toLocaleString('pt-BR'),lastModified:file.lastModified}));setFiles(current=>[...current,...uploaded]);setRawFiles(current=>({...current,...Object.fromEntries(uploaded.map((item,index)=>[item.id,incoming[index]]))}));setReceiptSlots(current=>({...current,[source]:[...(current[source]??[]),...uploaded]})) }
   function drop(area: SourceArea, event: DragEvent<HTMLDivElement>) { event.preventDefault(); addFiles(area, event.dataTransfer.files) }
   function removeFile(id: string) { setFiles(current => current.filter(file => file.id !== id)); setRawFiles(current => { const next = { ...current }; delete next[id]; return next }) }
   function removeHistoryFile(id: string) { removeFile(id); setHistorySlots(current => Object.fromEntries(Object.entries(current).map(([source, files]) => [source, files?.filter(file => file.id !== id)]))) }
@@ -218,9 +225,10 @@ export function App() {
     finally { setProductProcessing(false) }
   }
   async function processHistory() {
-    const selected = Object.values(historySlots).flat().map(file => rawFiles[file.id]).filter((file): file is File => Boolean(file)); if (!selected.length) return
+    const salesFiles = (historySlots.sales ?? []).map(f => rawFiles[f.id]).filter((f): f is File => Boolean(f)); if (!salesFiles.length) return
+    const catalogRaw = historySlots.catalog?.[0] ? rawFiles[historySlots.catalog[0].id] : undefined
     setHistoryProcessing(true); setHistoryAudit([])
-    try { const result = await processHistoryMotor(selected); setHistoryBase(result.canonicalBase); setHistoryAudit(result.audit); setHistoryIndicators(result.indicators) }
+    try { const result = await processHistoryMotor(salesFiles, { catalogFile: catalogRaw, productBase }); setHistoryBase(result.canonicalBase); setHistoryAudit(result.audit); setHistoryIndicators(result.indicators) }
     catch { setHistoryAudit([{ id: 'history-read-error', level: 'action', title: 'Não foi possível ler os arquivos', instruction: 'Confira os arquivos e tente novamente.', detail: 'A base histórica não foi alterada.', area: 'historico' }]); setHistoryBase([]); setHistoryIndicators(null) }
     finally { setHistoryProcessing(false) }
   }
@@ -237,7 +245,7 @@ export function App() {
     const toRun: Promise<void>[] = []
     if (Object.values(productSlots).some(f => f && rawFiles[f.id])) toRun.push(processProducts())
     if (Object.values(clientSlots).some(f => f && rawFiles[f.id])) toRun.push(processClients())
-    if (Object.values(historySlots).flat().some(f => rawFiles[f.id])) toRun.push(processHistory())
+    if ((historySlots.sales ?? []).some(f => rawFiles[f.id])) toRun.push(processHistory())
     if (Object.values(movementSlots).flat().some(f => rawFiles[f.id])) toRun.push(processMovements())
     if (Object.values(receiptSlots).flat().some(f => rawFiles[f.id])) toRun.push(processReceipts())
     await Promise.all(toRun)
@@ -247,9 +255,10 @@ export function App() {
   function downloadClientExcel() {
     const rows = clientBase.map(client => ({
       Documento: client.document, Código: client.winthorCode ?? '', Cliente: client.legalName ?? '', Fantasia: client.tradeName ?? '', Cidade: client.city ?? '',
+      Filial: client.branch ?? '', Cobrança: client.billingType ?? '', 'Bloqueio SEFAZ': client.fiscalBlock ?? '',
       'Código RCA': client.rcaCode ?? '', Atividade: client.commercialActivity ?? '', Bairro: client.district ?? '', Endereço: client.address ?? '',
       Latitude: client.latitude ?? '', Longitude: client.longitude ?? '', Frequência: client.visitFrequency ?? '', Visita: client.visitDay ?? '', 'Dias sem comprar': client.daysWithoutPurchase ?? '',
-      Semestre: client.premiseSemester ?? '', Ambiente: client.premiseEnvironment ?? '', Faixa: client.premiseRange ?? '', Estado: client.premiseState ?? '',
+      Semestre: client.premiseSemester ?? '', Canal: client.channelType ?? '', Faixa: client.premiseRange ?? '', Estado: client.premiseState ?? '',
       Cluster: client.premiseCluster ?? '', 'Média 12 meses': client.premiseAverage12Months ?? '', Perfil: client.premiseProfile ?? '', Rede: client.premiseNetwork ?? '',
     }))
     const sheet = XLSX.utils.json_to_sheet(rows)
@@ -258,7 +267,9 @@ export function App() {
   }
   function downloadProductBase() { const url = URL.createObjectURL(new Blob([JSON.stringify(productBase, null, 2)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = 'base-canonica-produtos.json'; link.click(); URL.revokeObjectURL(url) }
   function downloadProductExcel() {
-    const records = productBase.map(product => ({ Agrupamento: product.groupName ?? '', Família: product.groupFamily ?? '', Código: product.internalCode ?? '', 'Código fabricante': product.manufacturerCode ?? '', EAN: product.ean ?? '', Descrição: product.description ?? '', Embalagem: product.package ?? '', Marca: product.brand ?? '', Categoria: product.category ?? '', Subcategoria: product.subcategory ?? '', 'Unidades por caixa': product.unitsPerBox ?? '', Disponível: product.availableStock ?? '', Estoque: product.totalStock ?? '', Reservado: product.reservedStock ?? '', Bloqueado: product.blockedStock ?? '', Avariado: product.damagedStock ?? '', Preço: product.sellerPrice ?? '', 'Preço sem imposto': product.sellerPriceWithoutTax ?? '', 'Quantidade em carteira': product.inTransitQuantity ?? '', 'Valor em carteira': product.inTransitValue ?? '', Status: product.status, 'Status sortimento': product.sortimentStatus ?? '', 'Ciclo de vida': product.lifestageStatus ?? '', Departamento: product.department ?? '', Linha: product.productLine ?? '', Comprador: product.buyer ?? '', Fornecedor: product.supplierName ?? '', 'Custo real': product.realCost ?? '', 'Custo financeiro': product.financialCost ?? '', 'Venda mês': product.monthlySales ?? '', 'Giro diário': product.dailyTurnover ?? '', 'Preço de referência da indústria': product.industryBasePrice ?? '', 'Peso líquido unitário': product.netWeightUnit ?? '' }))
+    const sortimentLabel = (v: number) => v === 1 ? 'Mandatório' : v === 2 ? 'Importante' : v > 0 ? `Nível ${v}` : ''
+    const allChannels = [...new Set(productBase.flatMap(p => Object.keys(p.sortimentChannels ?? {})))]
+    const records = productBase.map(product => ({ Agrupamento: product.groupName ?? '', Família: product.groupFamily ?? '', Código: product.internalCode ?? '', 'Código fabricante': product.manufacturerCode ?? '', EAN: product.ean ?? '', Descrição: product.description ?? '', Embalagem: product.package ?? '', Marca: product.brand ?? '', Categoria: product.category ?? '', Subcategoria: product.subcategory ?? '', 'Unidades por caixa': product.unitsPerBox ?? '', Disponível: product.availableStock ?? '', Estoque: product.totalStock ?? '', Reservado: product.reservedStock ?? '', Bloqueado: product.blockedStock ?? '', Avariado: product.damagedStock ?? '', Preço: product.sellerPrice ?? '', 'Preço sem imposto': product.sellerPriceWithoutTax ?? '', 'Quantidade em carteira': product.inTransitQuantity ?? '', 'Valor em carteira': product.inTransitValue ?? '', Status: product.status, 'Status sortimento': product.sortimentStatus ?? '', 'Ciclo de vida': product.lifestageStatus ?? '', ...Object.fromEntries(allChannels.map(ch => [`Sortimento: ${ch}`, sortimentLabel(product.sortimentChannels?.[ch] ?? 0)])), Departamento: product.department ?? '', Linha: product.productLine ?? '', Comprador: product.buyer ?? '', Fornecedor: product.supplierName ?? '', 'Custo real': product.realCost ?? '', 'Custo financeiro': product.financialCost ?? '', 'Margem bruta (%)': product.margin ?? '', 'Venda mês': product.monthlySales ?? '', 'Giro diário': product.dailyTurnover ?? '', 'Cobertura (dias)': product.stockCoverage ?? '', 'Preço de referência da indústria': product.industryBasePrice ?? '', 'Peso líquido unitário': product.netWeightUnit ?? '' }))
     const essential = new Set(['Agrupamento', 'Família', 'Código', 'Descrição', 'Status'])
     const meaningful = (value: unknown) => typeof value === 'number' ? value !== 0 : String(value ?? '').trim() !== ''
     const columns = Object.keys(records[0] ?? {}).filter(column => essential.has(column) || records.some(record => meaningful(record[column as keyof typeof record])))
@@ -267,7 +278,7 @@ export function App() {
   }
   function downloadHistoryBase() { const url = URL.createObjectURL(new Blob([JSON.stringify(historyBase, null, 2)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = 'base-canonica-historico.json'; link.click(); URL.revokeObjectURL(url) }
   function downloadHistoryExcel() {
-    const rows = historyBase.map(record => ({ Competência: record.competence, 'Fechamento disponível': record.closingDate, Sistema: 'Legado', Cliente: record.customerCode, Produto: record.productCode, Vendedor: record.sellerCode ?? '', Quantidade: record.quantity, Valor: record.salesValue, Desconto: record.discount, 'Valor líquido': record.netValue, 'Linhas de venda': record.salesLines }))
+    const rows = historyBase.map(record => ({ Data: record.date, Competência: record.competence, Nota: record.invoiceNumber ?? '', Sistema: 'Legado', Cliente: record.customerCode, 'Produto (legado)': record.productCode, 'Código Winthor': record.winthorCode ?? '', Vendedor: record.sellerCode ?? '', Quantidade: record.quantity, Valor: record.salesValue, Desconto: record.discount, 'Valor líquido': record.netValue }))
     const sheet = XLSX.utils.json_to_sheet(rows); sheet['!cols'] = Object.keys(rows[0] ?? {}).map(header => ({ wch: Math.max(14, header.length + 4) }))
     const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, sheet, 'Histórico'); XLSX.writeFile(book, 'base-canonica-historico.xlsx')
   }
@@ -287,24 +298,255 @@ export function App() {
   const filesIn = (area: SourceArea) => files.filter(file => file.area === area)
 
   return <div className={`app theme-${theme}`}>
-    <aside className="sidebar"><div className="brand">RED JACKET</div><button className="nav-item active" type="button">Administração</button><div className="sidebar-bottom"><button className="theme-toggle" type="button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? 'Tema claro' : 'Tema escuro'}</button></div></aside>
+    <aside className="sidebar">
+      <div className="brand"><span className="brand-short">RJ</span><span className="brand-full">RED JACKET</span></div>
+      <button className={`nav-item${section === 'sellout' ? ' active' : ''}`} type="button" onClick={() => setSection('sellout')}>
+        <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" /></svg>
+        <span className="nav-label">Sell out</span>
+      </button>
+      <button className={`nav-item${section === 'estoque' ? ' active' : ''}`} type="button" onClick={() => setSection('estoque')}>
+        <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z" /><path fillRule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
+        <span className="nav-label">Estoque</span>
+      </button>
+      <button className={`nav-item${section === 'administracao' ? ' active' : ''}`} type="button" onClick={() => setSection('administracao')}>
+        <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" /></svg>
+        <span className="nav-label">Administração</span>
+      </button>
+      <div className="sidebar-bottom">
+        <button className="theme-toggle" type="button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+          <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" /></svg>
+          <span className="nav-label">{theme === 'dark' ? 'Tema claro' : 'Tema escuro'}</span>
+        </button>
+      </div>
+    </aside>
+    <nav className="bottom-nav" aria-label="Navegação principal">
+      <button className={`bn-item${section === 'sellout' ? ' active' : ''}`} type="button" onClick={() => setSection('sellout')}>
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" /></svg>
+        <span>Sell out</span>
+      </button>
+      <button className={`bn-item${section === 'estoque' ? ' active' : ''}`} type="button" onClick={() => setSection('estoque')}>
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z" /><path fillRule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
+        <span>Estoque</span>
+      </button>
+      <button className={`bn-item${section === 'administracao' ? ' active' : ''}`} type="button" onClick={() => setSection('administracao')}>
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" /></svg>
+        <span>Admin</span>
+      </button>
+      <button className="bn-item bn-theme" type="button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" /></svg>
+        <span>{theme === 'dark' ? 'Claro' : 'Escuro'}</span>
+      </button>
+    </nav>
     <main className="main">
-      <header className="topbar"><h1>ADMINISTRAÇÃO</h1><nav className="tabs" aria-label="Administração"><button className={tab === 'uploads' ? 'selected' : ''} onClick={() => setTab('uploads')} type="button">Uploads</button><button className={tab === 'auditoria' ? 'selected' : ''} onClick={() => setTab('auditoria')} type="button">Auditoria</button></nav></header>
+      {section === 'sellout' ? (
+        <SellOutTab movementBase={movementBase} productBase={productBase} />
+      ) : section === 'estoque' ? <>
+        <StockTab productBase={productBase} receiptBase={receiptBase} movementBase={movementBase} productIndicators={productIndicators} />
+      </> : <>
+      <header className="topbar stock-topbar" aria-label="Administração">
+        <button type="button" className={`stock-nav-btn${tab === 'uploads' ? ' on' : ''}`} onClick={() => { setTab('uploads'); setActiveNotice(null) }}>Uploads</button>
+        <button type="button" className={`stock-nav-btn${tab === 'auditoria' ? ' on' : ''}`} onClick={() => { setTab('auditoria'); setActiveNotice(null) }}>Auditoria</button>
+        <button type="button" className={`stock-nav-btn${tab === 'config' ? ' on' : ''}`} onClick={() => { setTab('config'); setActiveNotice(null) }}>Configurações</button>
+      </header>
       {tab === 'uploads' ? <section className="content">
         <h2>ARQUIVOS DIÁRIOS</h2>
         <div className="quick-upload" role="button" tabIndex={0} onClick={() => dailyInput.current?.click()} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); void distributeFiles(Array.from(event.dataTransfer.files)) }}><strong>Solte todos os arquivos aqui</strong><span>ou escolha os arquivos</span><input ref={dailyInput} aria-label="Adicionar arquivos diários" type="file" multiple onChange={event => { if (event.target.files) void distributeFiles(Array.from(event.target.files)); event.target.value = '' }} /></div>
-        {(Object.values(productSlots).some(f => f && rawFiles[f.id]) || Object.values(clientSlots).some(f => f && rawFiles[f.id]) || Object.values(historySlots).flat().some(f => rawFiles[f.id]) || Object.values(movementSlots).flat().some(f => rawFiles[f.id]) || Object.values(receiptSlots).flat().some(f => rawFiles[f.id])) ? <button className="process-button" type="button" disabled={processingAll || productProcessing || clientProcessing || historyProcessing || movementProcessing || receiptProcessing} onClick={() => void processAll()} style={{marginBottom: '16px'}}>{processingAll ? 'Processando todos os motores…' : 'Processar todos os motores'}</button> : null}
+        {(Object.values(productSlots).some(f => f && rawFiles[f.id]) || Object.values(clientSlots).some(f => f && rawFiles[f.id]) || (historySlots.sales ?? []).some(f => rawFiles[f.id]) || Object.values(movementSlots).flat().some(f => rawFiles[f.id]) || Object.values(receiptSlots).flat().some(f => rawFiles[f.id])) ? <button className="process-button" type="button" disabled={processingAll || productProcessing || clientProcessing || historyProcessing || movementProcessing || receiptProcessing} onClick={() => void processAll()} style={{marginBottom: '16px'}}>{processingAll ? 'Processando todos os motores…' : 'Processar todos os motores'}</button> : null}
         <FileList files={filesIn('diario')} onRemove={removeFile} />
         <h2 className="section-title">MOTORES</h2>
-        <div className="motor-grid">{motors.map(motor => <article className="motor-card" key={motor.id}><h3>{motor.name}</h3>{motor.id === 'produtos' ? <><div className="client-source-list">{productSources.map(source => { const uploaded = productSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded ? <small style={{display:'flex',gap:'6px',alignItems:'center'}}>{uploaded.name} <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeProductSlotFile(source.id, uploaded.id)}>Remover</button></small> : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => productSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={productProcessing || !Object.values(productSlots).some(file => file && rawFiles[file.id])} onClick={processProducts}>{productProcessing ? 'Conferindo arquivos' : 'Criar base de produtos'}</button>{productIndicators ? <div className="indicators"><span>{productIndicators.total.toLocaleString('pt-BR')} produtos</span><span>{productIndicators.inTransit.toLocaleString('pt-BR')} em trânsito</span><button type="button" onClick={downloadProductBase}>Baixar JSON</button><button type="button" onClick={downloadProductExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'clientes' ? <><div className="client-source-list">{clientSources.map(source => { const uploaded = clientSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded ? <small style={{display:'flex',gap:'6px',alignItems:'center'}}>{uploaded.name} <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeClientSlotFile(source.id, uploaded.id)}>Remover</button></small> : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => clientSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={clientProcessing || !Object.values(clientSlots).some(file => file && rawFiles[file.id])} onClick={processClients}>{clientProcessing ? 'Conferindo arquivos' : 'Criar base de clientes'}</button>{clientIndicators ? <div className="indicators"><span>{clientIndicators.totalClients.toLocaleString('pt-BR')} clientes</span><span>{clientIndicators.complete.toLocaleString('pt-BR')} completos</span><button type="button" onClick={downloadClientBase}>Baixar JSON</button><button type="button" onClick={downloadClientExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'historico' ? <><div className="client-source-list">{historySources.map(source => { const uploaded = historySlots[source.id] ?? []; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file => <small key={file.id} style={{display:'flex',gap:'6px',alignItems:'center'}}>{file.name} <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeHistoryFile(file.id)}>Remover</button></small>) : <small>{source.id === 'summary' ? 'Opcional' : 'Ainda não enviado'}</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".txt" multiple onChange={event => historySourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={historyProcessing || !Object.values(historySlots).flat().some(file => rawFiles[file.id])} onClick={processHistory}>{historyProcessing ? 'Conferindo arquivos' : 'Criar base histórica'}</button>{historyIndicators ? <div className="indicators"><span>{historyIndicators.competencies.toLocaleString('pt-BR')} competências</span><span>{historyIndicators.salesLines.toLocaleString('pt-BR')} vendas</span><button type="button" onClick={downloadHistoryBase}>Baixar JSON</button><button type="button" onClick={downloadHistoryExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'movimentacoes' ? <><div className="client-source-list">{movementSources.map(source => { const uploaded = movementSlots[source.id] ?? []; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file => <small key={file.id} style={{display:'flex',gap:'6px',alignItems:'center'}}>{file.name} <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeMovementFile(file.id)}>Remover</button></small>) : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" multiple onChange={event => movementSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={movementProcessing || !Object.values(movementSlots).flat().some(file => rawFiles[file.id])} onClick={processMovements}>{movementProcessing ? 'Conferindo arquivos' : 'Criar base de movimentações'}</button>{movementIndicators ? <div className="indicators"><span>{movementIndicators.sales.toLocaleString('pt-BR')} vendas faturadas</span><span>{movementIndicators.pendingRetyping.toLocaleString('pt-BR')} para redigitar</span><button type="button" onClick={downloadMovementBase}>Baixar JSON</button><button type="button" onClick={downloadMovementExcel}>Baixar Excel</button></div> : null}</> : <><button type="button" className="add-button" onClick={() => motorInputs.current[motor.id]?.click()}>Adicionar arquivos</button><input ref={element => { motorInputs.current[motor.id] = element }} aria-label={`Adicionar arquivos de ${motor.name}`} type="file" multiple onChange={event => fileChange(motor.id, event)} /><FileList files={filesIn(motor.id)} onRemove={removeFile} compact /></>}</article>)}</div>
+        <div className="motor-grid">{motors.map(motor => <article className="motor-card" key={motor.id}><h3>{motor.name}</h3>{motor.id === 'produtos' ? <><div className="client-source-list">{productSources.map(source => { const uploaded = productSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded ? <small style={{display:'flex',gap:'6px',alignItems:'center'}}>{uploaded.name} <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeProductSlotFile(source.id, uploaded.id)}>Remover</button></small> : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => productSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={productProcessing || !Object.values(productSlots).some(file => file && rawFiles[file.id])} onClick={processProducts}>{productProcessing ? 'Conferindo arquivos' : 'Criar base de produtos'}</button>{productIndicators ? <div className="indicators"><span>{productIndicators.total.toLocaleString('pt-BR')} produtos</span><span>{productIndicators.inTransit.toLocaleString('pt-BR')} em trânsito</span><button type="button" onClick={downloadProductBase}>Baixar JSON</button><button type="button" onClick={downloadProductExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'clientes' ? <><div className="client-source-list">{clientSources.map(source => { const uploaded = clientSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded ? <small style={{display:'flex',gap:'6px',alignItems:'center'}}>{uploaded.name} <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeClientSlotFile(source.id, uploaded.id)}>Remover</button></small> : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => clientSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={clientProcessing || !Object.values(clientSlots).some(file => file && rawFiles[file.id])} onClick={processClients}>{clientProcessing ? 'Conferindo arquivos' : 'Criar base de clientes'}</button>{clientIndicators ? <div className="indicators"><span>{clientIndicators.totalClients.toLocaleString('pt-BR')} clientes</span><span>{clientIndicators.complete.toLocaleString('pt-BR')} completos</span><button type="button" onClick={downloadClientBase}>Baixar JSON</button><button type="button" onClick={downloadClientExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'historico' ? <><div className="client-source-list">{historySources.map(source => { const uploaded = historySlots[source.id] ?? []; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file => <small key={file.id} style={{display:'flex',gap:'6px',alignItems:'center'}}>{file.name} <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeHistoryFile(file.id)}>Remover</button></small>) : <small>{source.id === 'catalog' ? 'Opcional' : 'Ainda não enviado'}</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".txt" multiple={source.id !== 'catalog'} onChange={event => historySourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={historyProcessing || !(historySlots.sales ?? []).some(f => rawFiles[f.id])} onClick={processHistory}>{historyProcessing ? 'Conferindo arquivos' : 'Criar base histórica'}</button>{historyIndicators ? <div className="indicators"><span>{historyIndicators.competencies.toLocaleString('pt-BR')} competências</span><span>{historyIndicators.salesLines.toLocaleString('pt-BR')} vendas</span><button type="button" onClick={downloadHistoryBase}>Baixar JSON</button><button type="button" onClick={downloadHistoryExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'movimentacoes' ? <><div className="client-source-list">{movementSources.map(source => { const uploaded = movementSlots[source.id] ?? []; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file => <small key={file.id} style={{display:'flex',gap:'6px',alignItems:'center'}}>{file.name} <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeMovementFile(file.id)}>Remover</button></small>) : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" multiple onChange={event => movementSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={movementProcessing || !Object.values(movementSlots).flat().some(file => rawFiles[file.id])} onClick={processMovements}>{movementProcessing ? 'Conferindo arquivos' : 'Criar base de movimentações'}</button>{movementIndicators ? <div className="indicators"><span>{movementIndicators.sales.toLocaleString('pt-BR')} vendas faturadas</span><span>{movementIndicators.pendingRetyping.toLocaleString('pt-BR')} para redigitar</span><button type="button" onClick={downloadMovementBase}>Baixar JSON</button><button type="button" onClick={downloadMovementExcel}>Baixar Excel</button></div> : null}</> : <><button type="button" className="add-button" onClick={() => motorInputs.current[motor.id]?.click()}>Adicionar arquivos</button><input ref={element => { motorInputs.current[motor.id] = element }} aria-label={`Adicionar arquivos de ${motor.name}`} type="file" multiple onChange={event => fileChange(motor.id, event)} /><FileList files={filesIn(motor.id)} onRemove={removeFile} compact /></>}</article>)}</div>
         <article className="motor-card"><h3>Chegada de notas</h3><div className="client-source-list">{receiptSources.map(source => { const uploaded=receiptSlots[source.id]??[]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file=><small key={file.id} style={{display:'flex',gap:'6px',alignItems:'center'}}>{file.name} <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeReceiptFile(file.id)}>Remover</button></small>) : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input type="file" multiple accept={source.id==='legacy'?'.txt':'.xls,.xlsx'} onChange={event=>receiptSourceChange(source.id,event)} /></label></div>})}</div><button className="process-button" type="button" disabled={receiptProcessing||!Object.values(receiptSlots).flat().some(file=>rawFiles[file.id])} onClick={processReceipts}>{receiptProcessing?'Conferindo arquivos':'Criar base de chegada'}</button>{receiptIndicators?<div className="indicators"><span>{receiptIndicators.received.toLocaleString('pt-BR')} recebimentos</span><span>{receiptIndicators.inTransit.toLocaleString('pt-BR')} em trânsito</span><button type="button" onClick={downloadReceiptBase}>Baixar JSON</button><button type="button" onClick={downloadReceiptExcel}>Baixar Excel</button></div>:null}</article>
-      </section> : <section className="content">
+      </section> : tab === 'auditoria' ? <section className="content">
         <div className="audit-heading"><h2>AUDITORIA</h2><button className="secondary-button" type="button" onClick={downloadAiJson}>Gerar resumo para IA</button></div>
         <div className="notice-list">{audit.map(item => <button className={`notice ${item.level}`} key={item.id} type="button" onClick={() => setActiveNotice(item)}><span>{item.title}</span><small>{item.instruction}</small></button>)}</div>
+      </section> : <section className="content">
+        <ConfigTab />
       </section>}
+      </>}
     </main>
-    {activeNotice ? <div className="modal-backdrop" onMouseDown={() => setActiveNotice(null)}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="notice-title" onMouseDown={event => event.stopPropagation()}><button className="close" aria-label="Fechar" type="button" onClick={() => setActiveNotice(null)}>×</button><h2 id="notice-title">{activeNotice.title}</h2><p>{activeNotice.detail}</p><strong>{activeNotice.instruction}</strong></section></div> : null}
+    {tab === 'auditoria' && activeNotice ? <div className="modal-backdrop" onMouseDown={() => setActiveNotice(null)}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="notice-title" onMouseDown={event => event.stopPropagation()}><button className="close" aria-label="Fechar" type="button" onClick={() => setActiveNotice(null)}>×</button><h2 id="notice-title">{activeNotice.title}</h2><p>{activeNotice.detail}</p><strong>{activeNotice.instruction}</strong></section></div> : null}
   </div>
+}
+
+function ConfigTab() {
+  const [markupInput, setMarkupInput] = useState<string>(() => {
+    try { const v = localStorage.getItem('rj-markup-pct'); return v ? v : '' }
+    catch { return '' }
+  })
+  const [savedMarkup, setSavedMarkup] = useState(false)
+
+  const initCovDays = (): [string, string] => {
+    try { const v = JSON.parse(localStorage.getItem('rj-cov-days') ?? 'null'); return v ? [String(v[0]), String(v[1])] : ['30', '90'] }
+    catch { return ['30', '90'] }
+  }
+  const [[covLow, covHigh], setCovInputs] = useState<[string, string]>(initCovDays)
+  const [savedCov, setSavedCov] = useState(false)
+
+  const [selloutMetaInput, setSelloutMetaInput] = useState<string>(() => {
+    try { const v = localStorage.getItem('rj-sellout-meta'); return v ?? '' }
+    catch { return '' }
+  })
+  const [savedSelloutMeta, setSavedSelloutMeta] = useState(false)
+
+  const [positivMetaInput, setPositivMetaInput] = useState<string>(() => {
+    try { const v = localStorage.getItem('rj-positiv-meta'); return v ?? '' }
+    catch { return '' }
+  })
+  const [savedPositivMeta, setSavedPositivMeta] = useState(false)
+
+  function saveMarkup() {
+    const val = parseFloat(markupInput.replace(',', '.'))
+    if (!isNaN(val) && val >= 0 && val <= 9999) {
+      try {
+        localStorage.setItem('rj-markup-pct', String(val))
+        window.dispatchEvent(new Event('rj-markup-changed'))
+        setSavedMarkup(true)
+        setTimeout(() => setSavedMarkup(false), 2000)
+      } catch { /* quota */ }
+    }
+  }
+
+  function saveCovDays() {
+    const low = parseInt(covLow), high = parseInt(covHigh)
+    if (!isNaN(low) && !isNaN(high) && low >= 1 && high > low && high <= 730) {
+      try {
+        localStorage.setItem('rj-cov-days', JSON.stringify([low, high]))
+        window.dispatchEvent(new Event('rj-covdays-changed'))
+        setSavedCov(true)
+        setTimeout(() => setSavedCov(false), 2000)
+      } catch { /* quota */ }
+    }
+  }
+
+  function saveSelloutMeta() {
+    const val = parseFloat(String(selloutMetaInput).replace(/\./g, '').replace(',', '.'))
+    if (!isNaN(val) && val > 0) {
+      try {
+        localStorage.setItem('rj-sellout-meta', String(val))
+        window.dispatchEvent(new Event('rj-sellout-meta-changed'))
+        setSavedSelloutMeta(true)
+        setTimeout(() => setSavedSelloutMeta(false), 2000)
+      } catch { /* quota */ }
+    }
+  }
+
+  function savePositivMeta() {
+    const val = parseInt(positivMetaInput)
+    if (!isNaN(val) && val > 0) {
+      try {
+        localStorage.setItem('rj-positiv-meta', String(val))
+        window.dispatchEvent(new Event('rj-positiv-meta-changed'))
+        setSavedPositivMeta(true)
+        setTimeout(() => setSavedPositivMeta(false), 2000)
+      } catch { /* quota */ }
+    }
+  }
+
+  return (
+    <div className="config-page">
+      <h2>CONFIGURAÇÕES MANUAIS</h2>
+      <div className="config-group">
+        <label className="config-label" htmlFor="cfg-markup">Markup médio (%)</label>
+        <p className="config-help">
+          Percentual de markup aplicado sobre o custo para calcular o KPI <strong>Projetado à venda</strong>.
+          Representa o acréscimo médio sobre o custo de aquisição (ex.: 35 = 35% sobre o custo total projetado).
+        </p>
+        <div className="config-input-row">
+          <input
+            id="cfg-markup"
+            className="config-input"
+            type="text"
+            inputMode="decimal"
+            placeholder="Ex.: 35"
+            value={markupInput}
+            onChange={e => { setMarkupInput(e.target.value); setSavedMarkup(false) }}
+            onKeyDown={e => e.key === 'Enter' && saveMarkup()}
+          />
+          <span className="config-unit">%</span>
+          <button className="process-button" style={{ margin: 0 }} type="button" onClick={saveMarkup}>
+            {savedMarkup ? 'Salvo ✓' : 'Salvar'}
+          </button>
+        </div>
+      </div>
+      <div className="config-group">
+        <label className="config-label">Cobertura de estoque — limiares de alerta (dias)</label>
+        <p className="config-help">
+          Define os limiares do donut de cobertura no painel Estoque. Um SKU é classificado como <strong>Crítico</strong> quando
+          seus dias de cobertura estimados ficam abaixo do primeiro limiar, e como <strong>Excesso</strong> acima do segundo.
+          O cálculo usa a taxa de reposição histórica das notas de entrada como proxy de consumo diário.
+        </p>
+        <div className="config-input-row">
+          <span className="config-unit" style={{ marginRight: 2 }}>Crítico &lt;</span>
+          <input
+            className="config-input"
+            style={{ width: 64 }}
+            type="number" min={1} max={365}
+            placeholder="30"
+            value={covLow}
+            onChange={e => { setCovInputs([e.target.value, covHigh]); setSavedCov(false) }}
+            onKeyDown={e => e.key === 'Enter' && saveCovDays()}
+          />
+          <span className="config-unit">d · Excesso &gt;</span>
+          <input
+            className="config-input"
+            style={{ width: 64 }}
+            type="number" min={1} max={730}
+            placeholder="90"
+            value={covHigh}
+            onChange={e => { setCovInputs([covLow, e.target.value]); setSavedCov(false) }}
+            onKeyDown={e => e.key === 'Enter' && saveCovDays()}
+          />
+          <span className="config-unit">d</span>
+          <button className="process-button" style={{ margin: 0 }} type="button" onClick={saveCovDays}>
+            {savedCov ? 'Salvo ✓' : 'Salvar'}
+          </button>
+        </div>
+      </div>
+      <div className="config-group">
+        <label className="config-label" htmlFor="cfg-sellout-meta">Meta de sell out — T&C (R$)</label>
+        <p className="config-help">
+          Valor mensal de referência para faturamento (ex.: 1200000). Exibido como meta no KPI <strong>Faturado</strong> do painel Sell out.
+        </p>
+        <div className="config-input-row">
+          <span className="config-unit">R$</span>
+          <input
+            id="cfg-sellout-meta"
+            className="config-input"
+            type="text"
+            inputMode="decimal"
+            placeholder="Ex.: 1200000"
+            value={selloutMetaInput}
+            onChange={e => { setSelloutMetaInput(e.target.value); setSavedSelloutMeta(false) }}
+            onKeyDown={e => e.key === 'Enter' && saveSelloutMeta()}
+          />
+          <button className="process-button" style={{ margin: 0 }} type="button" onClick={saveSelloutMeta}>
+            {savedSelloutMeta ? 'Salvo ✓' : 'Salvar'}
+          </button>
+        </div>
+      </div>
+      <div className="config-group">
+        <label className="config-label" htmlFor="cfg-positiv-meta">Meta de positivações</label>
+        <p className="config-help">
+          Número de clientes positivos (com pedido) esperado no mês. Exibido como meta no KPI <strong>Positivações</strong> do painel Sell out.
+        </p>
+        <div className="config-input-row">
+          <input
+            id="cfg-positiv-meta"
+            className="config-input"
+            type="text"
+            inputMode="numeric"
+            placeholder="Ex.: 200"
+            value={positivMetaInput}
+            onChange={e => { setPositivMetaInput(e.target.value); setSavedPositivMeta(false) }}
+            onKeyDown={e => e.key === 'Enter' && savePositivMeta()}
+          />
+          <button className="process-button" style={{ margin: 0 }} type="button" onClick={savePositivMeta}>
+            {savedPositivMeta ? 'Salvo ✓' : 'Salvar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function FileList({ files, onRemove, compact = false }: { files: UploadedFile[]; onRemove: (id: string) => void; compact?: boolean }) {

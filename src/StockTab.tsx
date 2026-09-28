@@ -1,0 +1,1445 @@
+import { useState, useEffect, useMemo, useRef } from 'react'
+import type { CanonicalProduct, ProductIndicators } from './domain/productMotor'
+import type { CanonicalReceipt } from './domain/receiptMotor'
+import { groupReceiptsByInvoice, computeDailyReceiptRate } from './domain/receiptMotor'
+import type { CanonicalMovement } from './domain/movementMotor'
+import { computeAbcMap } from './domain/movementMotor'
+import { resolveCommercialLine, COMMERCIAL_LINES } from './domain/productGrouping'
+import type { CommercialLine } from './domain/productGrouping'
+
+type ProductTag = { launch?: boolean; pex?: boolean }
+type Tags = Record<string, ProductTag>
+type StockFilter = 'all' | 'com_estoque' | 'sem_estoque' | 'em_transito'
+
+const norm = (v: unknown) => String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
+
+
+const brl = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const kpiCurrency = (n: number) => {
+  if (n >= 1_000_000) return `R$ ${(n / 1_000_000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}M`
+  if (n >= 1_000) return `R$ ${(n / 1_000).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}K`
+  return `R$ ${brl(n)}`
+}
+const fmtDate = (iso?: string) => {
+  if (!iso) return 'Sem data'
+  const p = iso.split('-')
+  return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso
+}
+
+const fmtWeight = (kg: number) => {
+  if (kg <= 0) return null
+  if (kg < 1) return `${Math.round(kg * 1000)}g`
+  const s = kg.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 3 })
+  return `${s}kg`
+}
+
+const normCh = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
+const isBlockedChannel = (ch: string) => {
+  const n = normCh(ch)
+  return n === 'clubs' || n.startsWith('ecommerce') || n === 'sortimentoatacados' || n === 'sortimentodistribuidores'
+}
+
+function loadTags(): Tags {
+  try { return JSON.parse(localStorage.getItem('rj-product-tags') ?? '{}') }
+  catch { return {} }
+}
+
+export function StockTab({ productBase, receiptBase, movementBase, productIndicators }: {
+  productBase: CanonicalProduct[]
+  receiptBase: CanonicalReceipt[]
+  movementBase: CanonicalMovement[]
+  productIndicators: ProductIndicators | null
+}) {
+  const [subTab, setSubTab] = useState<'estoque' | 'produtos' | 'lancamentos' | 'notas'>('estoque')
+  const [search, setSearch] = useState('')
+  const [filterStatus, setFilterStatus] = useState<StockFilter>('all')
+  const [filterChannel, setFilterChannel] = useState('')
+  const [filterMarcacao, setFilterMarcacao] = useState<'all' | 'mandatory' | 'important'>('all')
+  const [filterAbc, setFilterAbc] = useState<'all' | 'A' | 'B' | 'C'>('all')
+  const [selected, setSelected] = useState<CanonicalProduct | null>(null)
+  const [tags, setTags] = useState<Tags>(loadTags)
+  const [lncSearch, setLncSearch] = useState('')
+  const [lncFilter, setLncFilter] = useState<'all' | 'launch' | 'pex'>('all')
+  const [lncStatus, setLncStatus] = useState<StockFilter>('all')
+  const [notaPrev, setNotaPrev] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem('rj-nota-prev') ?? '{}') } catch { return {} }
+  })
+  const [notasSeen, setNotasSeen] = useState<number>(() => {
+    try { return Number(localStorage.getItem('rj-notas-seen') ?? '0') } catch { return 0 }
+  })
+  const [notasSearch, setNotasSearch] = useState('')
+  const [notasDate, setNotasDate] = useState<string>(() => new Date().toISOString().slice(0, 10))
+  const [expandedNotas, setExpandedNotas] = useState<Set<string>>(new Set())
+  const [markup, setMarkup] = useState<number>(() => {
+    try { return Number(localStorage.getItem('rj-markup-pct') ?? '0') || 0 }
+    catch { return 0 }
+  })
+  const [covDays, setCovDays] = useState<[number, number]>(() => {
+    try { return JSON.parse(localStorage.getItem('rj-cov-days') ?? 'null') ?? [30, 90] }
+    catch { return [30, 90] }
+  })
+  const searchRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const handler = () => {
+      try { setMarkup(Number(localStorage.getItem('rj-markup-pct') ?? '0') || 0) }
+      catch { /* */ }
+    }
+    window.addEventListener('rj-markup-changed', handler)
+    return () => window.removeEventListener('rj-markup-changed', handler)
+  }, [])
+
+  useEffect(() => {
+    const handler = () => {
+      try { setCovDays(JSON.parse(localStorage.getItem('rj-cov-days') ?? 'null') ?? [30, 90]) }
+      catch { /* */ }
+    }
+    window.addEventListener('rj-covdays-changed', handler)
+    return () => window.removeEventListener('rj-covdays-changed', handler)
+  }, [])
+
+  useEffect(() => {
+    try { localStorage.setItem('rj-product-tags', JSON.stringify(tags)) }
+    catch { /* quota exceeded */ }
+  }, [tags])
+
+  useEffect(() => {
+    try { localStorage.setItem('rj-nota-prev', JSON.stringify(notaPrev)) }
+    catch { /* quota exceeded */ }
+  }, [notaPrev])
+
+  useEffect(() => {
+    try { localStorage.setItem('rj-notas-seen', String(notasSeen)) }
+    catch { /* */ }
+  }, [notasSeen])
+
+  const receiptGroups = useMemo(() => groupReceiptsByInvoice(receiptBase), [receiptBase])
+
+  const kpis = useMemo(() => {
+    // Agrega carteira dos receipts em_transito (productCode = código fabricante / material)
+    const transitByMfr = new Map<string, { qty: number; value: number }>()
+    for (const r of receiptBase) {
+      if (r.status !== 'em_transito' || !r.productCode) continue
+      const cur = transitByMfr.get(r.productCode) ?? { qty: 0, value: 0 }
+      transitByMfr.set(r.productCode, { qty: cur.qty + (r.quantity ?? 0), value: cur.value + (r.value ?? 0) })
+    }
+
+    let comEstoque = 0, semEstoque = 0, emTransito = 0, comPreco = 0
+    for (const p of productBase) {
+      const avail = p.availableStock ?? 0
+      if (avail > 0) {
+        comEstoque++
+        if (p.sellerPrice !== undefined) comPreco++
+      } else semEstoque++
+      // emTransito: usa campos do produto (motor) quando disponíveis
+      const tQty = (p.inTransitQuantity ?? 0) > 0
+        ? (p.inTransitQuantity ?? 0)
+        : (p.manufacturerCode ? transitByMfr.get(p.manufacturerCode)?.qty ?? 0 : 0)
+      if (tQty > 0) emTransito++
+    }
+    // KPIs agregados vêm do motor; fallback para bases sem esses campos (pré-migração)
+    const custoCusto = (productIndicators?.stockAtCost != null)
+      ? productIndicators.stockAtCost
+      : productBase.reduce((s, p) => { const a = p.availableStock ?? 0; return a > 0 && p.financialCost != null ? s + a * p.financialCost : s }, 0)
+    const custoVenda = (productIndicators?.stockAtSalePrice != null)
+      ? productIndicators.stockAtSalePrice
+      : productBase.reduce((s, p) => { const a = p.availableStock ?? 0; return a > 0 && p.sellerPrice != null ? s + a * p.sellerPrice : s }, 0)
+    const resolvedCarteira = receiptGroups.openTransitGroups.reduce((s, g) => s + g.totalValue, 0)
+    const resolvedEmTransito = (productIndicators?.inTransit != null && productIndicators.inTransit > 0)
+      ? productIndicators.inTransit
+      : emTransito
+    const projetadoCusto = custoCusto + resolvedCarteira
+    const projetadoVenda = markup > 0 ? projetadoCusto * (1 + markup / 100) : null
+    const pricedCoverage = comEstoque > 0 ? comPreco / comEstoque : null
+    const marginRatio = custoVenda > 0 ? custoCusto / custoVenda : null
+    const transitRatio = projetadoCusto > 0 ? resolvedCarteira / projetadoCusto : null
+    return { comEstoque, semEstoque, emTransito: resolvedEmTransito, comPreco, total: productBase.length, custoCusto, custoVenda, carteiraCusto: resolvedCarteira, projetadoCusto, projetadoVenda, pricedCoverage, marginRatio, transitRatio }
+  }, [productBase, receiptBase, receiptGroups, markup, productIndicators])
+
+  const coverageStats = useMemo(() => {
+    const receiptRate = computeDailyReceiptRate(receiptBase)
+    let critico = 0, adequado = 0, excesso = 0, semHistorico = 0
+    const [low, high] = covDays
+    for (const p of productBase) {
+      const avail = p.availableStock ?? 0
+      if (avail <= 0) { critico++; continue }
+      // Prefere taxa 12 meses dos recebimentos; fallback para giro do motor (286)
+      const rate = p.internalCode ? receiptRate.get(p.internalCode) : undefined
+      const dias = rate !== undefined ? avail / rate : p.stockCoverage
+      if (dias === undefined) { semHistorico++; continue }
+      if (dias < low) critico++
+      else if (dias <= high) adequado++
+      else excesso++
+    }
+    const total = critico + adequado + excesso + semHistorico
+    return { critico, adequado, excesso, semHistorico, total, hasHistory: total > semHistorico }
+  }, [productBase, receiptBase, covDays])
+
+  const abcMap = useMemo(() => computeAbcMap(movementBase), [movementBase])
+
+  const treemapData = useMemo(() => {
+    const lineMap = new Map<CommercialLine, Map<string, { value: number; items: number }>>()
+    for (const p of productBase) {
+      const line = resolveCommercialLine(p)
+      if (!line) continue
+      const sub = p.subBrand ?? 'Outros'
+      const avail = p.availableStock ?? 0
+      const val = avail > 0 && p.sellerPrice !== undefined ? avail * p.sellerPrice : 0
+      if (!lineMap.has(line)) lineMap.set(line, new Map())
+      const sm = lineMap.get(line)!
+      const cur = sm.get(sub) ?? { value: 0, items: 0 }
+      sm.set(sub, { value: cur.value + val, items: cur.items + 1 })
+    }
+    return COMMERCIAL_LINES
+      .map(line => {
+        const sm = lineMap.get(line)
+        if (!sm) return null
+        const tiles = Array.from(sm.entries())
+          .map(([label, d]) => ({ key: label, label, ...d }))
+          .filter(t => t.value > 0)
+          .sort((a, b) => b.value - a.value)
+        const totalValue = tiles.reduce((s, t) => s + t.value, 0)
+        return { line, totalValue, subbrands: tiles.length, tiles }
+      })
+      .filter((g): g is NonNullable<typeof g> => g !== null && g.totalValue > 0)
+  }, [productBase])
+
+  const arrivalInvoices = useMemo(() =>
+    receiptGroups.openTransitGroups.map(g => ({ ...g, previewDate: notaPrev[g.invoice] ?? g.date }))
+  , [receiptGroups, notaPrev])
+
+  const arrivalBuckets = useMemo(() => {
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const todayMs = today.getTime()
+    const buckets = [
+      { key: 'atrasadas', label: 'Atrasadas', count: 0 },
+      { key: 'ate7', label: 'Até 7 dias', count: 0 },
+      { key: 'ate15', label: '8 a 15 dias', count: 0 },
+      { key: 'mais16', label: '16+ dias', count: 0 },
+      { key: 'semdata', label: 'Sem previsão', count: 0 },
+    ]
+    for (const inv of arrivalInvoices) {
+      if (!inv.previewDate) { buckets[4].count++; continue }
+      const diff = Math.round((new Date(inv.previewDate).setHours(0,0,0,0) - todayMs) / 86_400_000)
+      if (diff < 0) { buckets[0].count++ }
+      else if (diff <= 7) { buckets[1].count++ }
+      else if (diff <= 15) { buckets[2].count++ }
+      else { buckets[3].count++ }
+    }
+    return buckets
+  }, [arrivalInvoices])
+
+  const nfsComPrevisao = useMemo(() => {
+    const wds = (s: string | undefined) => {
+      if (!s) return new Set<string>()
+      return new Set(s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().split(/[^a-z0-9]+/).filter(t => t.length >= 4))
+    }
+    const byMfr = new Map<string, typeof productBase[0]>()
+    const byInternal = new Map<string, typeof productBase[0]>()
+    for (const p of productBase) {
+      if (p.manufacturerCode) byMfr.set(p.manufacturerCode, p)
+      if (p.internalCode) byInternal.set(p.internalCode, p)
+    }
+    const taggedDescWds = new Map<string, { p: typeof productBase[0]; wds: Set<string> }>()
+    for (const p of productBase) {
+      const tag = tags[p.id]
+      if ((tag?.launch || tag?.pex) && p.description) taggedDescWds.set(p.id, { p, wds: wds(p.description) })
+    }
+
+    const withPreview = arrivalInvoices.filter(inv => inv.previewDate)
+    const mapped = withPreview.map(inv => {
+      const taggedItems = inv.items.flatMap(item => {
+        let p = item.productCode ? (byMfr.get(item.productCode) ?? byInternal.get(item.productCode)) : undefined
+        if (!p && item.description) {
+          const iWds = wds(item.description)
+          for (const entry of taggedDescWds.values()) {
+            let overlap = 0
+            for (const w of iWds) if (entry.wds.has(w) && ++overlap >= 2) break
+            if (overlap >= 2) { p = entry.p; break }
+          }
+        }
+        if (!p) return []
+        const tag = tags[p.id]
+        if (!tag?.launch && !tag?.pex) return []
+        return [{ qty: item.quantity ?? 0, product: p, isLaunch: !!tag.launch, isPex: !!tag.pex }]
+      })
+      return { ...inv, taggedItems }
+    })
+    const nfsWithTags = mapped.filter(inv => inv.taggedItems.length > 0).sort((a, b) => (a.previewDate ?? '').localeCompare(b.previewDate ?? ''))
+    return { nfsWithTags, totalWithPreview: withPreview.length, hasTaggedProducts: taggedDescWds.size > 0 }
+  }, [arrivalInvoices, productBase, tags])
+
+  const availableChannels = useMemo(() => {
+    const seen = new Set<string>()
+    for (const p of productBase)
+      if (p.sortimentChannels)
+        for (const ch of Object.keys(p.sortimentChannels)) seen.add(ch)
+    return Array.from(seen).filter(ch => !isBlockedChannel(ch)).sort()
+  }, [productBase])
+
+  const filtered = useMemo(() => {
+    const q = search.trim()
+    return productBase.filter(p => {
+      if (q) {
+        const allDigits = /^\d+$/.test(q)
+        const mixed = /[A-Za-z]/.test(q) && /\d/.test(q) && !q.includes(' ')
+        if (allDigits) {
+          if (q.length === 13) { if ((p.ean ?? '') !== q) return false }
+          else if (q.length >= 7) { if (!(p.ean ?? '').endsWith(q)) return false }
+          else {
+            const byCode = (p.internalCode ?? '').startsWith(q)
+            const byEan = q.length >= 4 && (p.ean ?? '').endsWith(q)
+            if (!byCode && !byEan) return false
+          }
+        } else if (mixed) {
+          if (!norm(p.manufacturerCode).startsWith(norm(q))) return false
+        } else {
+          const words = q.split(/\s+/).filter(Boolean).map(norm)
+          if (!words.every(w => norm(p.description).includes(w))) return false
+        }
+      }
+      if (filterStatus === 'com_estoque' && (p.availableStock ?? 0) <= 0) return false
+      if (filterStatus === 'sem_estoque' && (p.availableStock ?? 0) > 0) return false
+      if (filterStatus === 'em_transito' && (p.inTransitQuantity ?? 0) <= 0) return false
+      if (filterChannel && (p.sortimentChannels?.[filterChannel] ?? 0) <= 0) return false
+      if (filterMarcacao === 'mandatory' && !Object.values(p.sortimentChannels ?? {}).some(v => v === 1)) return false
+      if (filterMarcacao === 'important' && !Object.values(p.sortimentChannels ?? {}).some(v => v === 2)) return false
+      if (filterAbc !== 'all' && (p.internalCode ? abcMap.get(p.internalCode) : undefined) !== filterAbc) return false
+      return true
+    })
+  }, [productBase, search, filterStatus, filterChannel, filterMarcacao, filterAbc, abcMap])
+
+  const filteredLnc = useMemo(() => {
+    const q = lncSearch.trim()
+    return productBase.filter(p => {
+      const t = tags[p.id]
+      const isLaunch = !!t?.launch
+      const isPex = !!t?.pex
+      if (!isLaunch && !isPex) return false
+      if (lncFilter === 'launch' && !isLaunch) return false
+      if (lncFilter === 'pex' && !isPex) return false
+      if (lncStatus === 'com_estoque' && (p.availableStock ?? 0) <= 0) return false
+      if (lncStatus === 'sem_estoque' && (p.availableStock ?? 0) > 0) return false
+      if (lncStatus === 'em_transito' && (p.inTransitQuantity ?? 0) <= 0) return false
+      if (q) {
+        const allDigits = /^\d+$/.test(q)
+        const mixed = /[A-Za-z]/.test(q) && /\d/.test(q) && !q.includes(' ')
+        if (allDigits) {
+          if (q.length === 13) { if ((p.ean ?? '') !== q) return false }
+          else { if (!(p.internalCode ?? '').startsWith(q) && !(p.ean ?? '').endsWith(q)) return false }
+        } else if (mixed) {
+          if (!norm(p.manufacturerCode).startsWith(norm(q))) return false
+        } else {
+          const words = q.split(/\s+/).filter(Boolean).map(norm)
+          if (!words.every(w => norm(p.description).includes(w))) return false
+        }
+      }
+      return true
+    })
+  }, [productBase, tags, lncSearch, lncFilter, lncStatus])
+
+  const lncCounts = useMemo(() => {
+    let launch = 0, pex = 0
+    for (const p of productBase) {
+      if (tags[p.id]?.launch) launch++
+      if (tags[p.id]?.pex) pex++
+    }
+    return { launch, pex, total: launch + pex }
+  }, [productBase, tags])
+
+  const receivedInvoices = useMemo(() => receiptGroups.receivedGroups, [receiptGroups])
+
+  const notasBadge = useMemo(() => {
+    if (notasSeen === 0) return receivedInvoices.length > 0 ? receivedInvoices.length : 0
+    const seenDate = new Date(notasSeen).toISOString().slice(0, 10)
+    return receivedInvoices.filter(inv => (inv.date ?? '') > seenDate).length
+  }, [receivedInvoices, notasSeen])
+
+  const filteredReceived = useMemo(() => {
+    const q = notasSearch.trim().toLowerCase()
+    if (!q) return receivedInvoices
+    return receivedInvoices.filter(inv =>
+      (inv.displayInvoice ?? '').toLowerCase().includes(q) ||
+      (inv.supplier ?? '').toLowerCase().includes(q) ||
+      inv.items.some(r => (r.description ?? '').toLowerCase().includes(q) || (r.productCode ?? '').includes(q))
+    )
+  }, [receivedInvoices, notasSearch])
+
+  const notasKpis = useMemo(() => {
+    const cartQty = arrivalInvoices.reduce((s, i) => s + i.totalQty, 0)
+    const cartVal = arrivalInvoices.reduce((s, i) => s + i.totalValue, 0)
+    const now = new Date()
+    const curMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const recThisMonth = receivedInvoices.filter(i => (i.date ?? '').startsWith(curMonth))
+    const recVal = recThisMonth.reduce((s, i) => s + i.totalValue, 0)
+    const lastDate = receivedInvoices[0]?.date
+    return { cartNfs: arrivalInvoices.length, cartQty, cartVal, recNfs: recThisMonth.length, recVal, lastDate }
+  }, [arrivalInvoices, receivedInvoices])
+
+  const lastReceipt = useMemo(() => {
+    if (!selected) return null
+    return receiptBase
+      .filter(r => r.productCode === selected.internalCode && r.status === 'recebida')
+      .sort((a, b) => (b.entryDate ?? '').localeCompare(a.entryDate ?? ''))[0] ?? null
+  }, [selected, receiptBase])
+
+  function toggleTag(id: string, key: 'launch' | 'pex') {
+    setTags(cur => {
+      const prev = cur[id] ?? {}
+      return { ...cur, [id]: { ...prev, [key]: !prev[key] } }
+    })
+  }
+
+  function toggleExpanded(key: string) {
+    setExpandedNotas(cur => {
+      const next = new Set(cur)
+      if (next.has(key)) next.delete(key); else next.add(key)
+      return next
+    })
+  }
+
+  function exportReceivedCsv() {
+    const forDay = filteredReceived.filter(inv => (inv.date ?? '') === notasDate)
+    const rows: string[] = ['Data,NF,Fornecedor,Código,Descrição,Qtd,Preço Unit.,Valor']
+    for (const inv of forDay) {
+      for (const r of inv.items) {
+        const esc = (s: string | undefined) => `"${(s ?? '').replace(/"/g, '""')}"`
+        rows.push([inv.date ?? '', esc(inv.displayInvoice), esc(inv.supplier), r.productCode ?? '', esc(r.description), r.quantity ?? 0, r.unitPrice?.toFixed(2) ?? '', r.value?.toFixed(2) ?? ''].join(','))
+      }
+    }
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    const dateLabel = notasDate.split('-').reverse().join('-')
+    a.href = url; a.download = `entradas-${dateLabel}.csv`; a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function visitNotas() {
+    setSubTab('notas')
+    setNotasSeen(Date.now())
+    try { localStorage.setItem('rj-notas-seen', String(Date.now())) } catch { /* */ }
+  }
+
+  const channelLevel = (v: number) => v === 1 ? 'Mandatório' : v === 2 ? 'Importante' : 'Fora'
+  const channelClass = (v: number) => v === 1 ? 'ch-mandatory' : v === 2 ? 'ch-important' : 'ch-none'
+
+  return (
+    <>
+      <header className="topbar stock-topbar">
+        <button
+          type="button"
+          className={`stock-nav-btn${subTab === 'estoque' ? ' on' : ''}`}
+          onClick={() => setSubTab('estoque')}
+        >Estoque</button>
+        <button
+          type="button"
+          className={`stock-nav-btn${subTab === 'produtos' ? ' on' : ''}`}
+          onClick={() => setSubTab('produtos')}
+        >Produtos</button>
+        <button
+          type="button"
+          className={`stock-nav-btn${subTab === 'lancamentos' ? ' on' : ''}`}
+          onClick={() => { setSubTab('lancamentos'); setSelected(null) }}
+        >
+          Lançamentos
+          {lncCounts.total > 0 && <span className="nav-badge">{lncCounts.total}</span>}
+        </button>
+        <button
+          type="button"
+          className={`stock-nav-btn${subTab === 'notas' ? ' on' : ''}`}
+          onClick={visitNotas}
+        >
+          Notas
+          {notasBadge > 0 && <span className="nav-badge">{notasBadge}</span>}
+        </button>
+      </header>
+
+      <section className="content">
+        {subTab === 'estoque' ? (
+          <>
+            <div className="stock-kpis">
+              <KpiCard
+                label="Estoque a custo"
+                value={kpis.custoCusto > 0 ? kpiCurrency(kpis.custoCusto) : '—'}
+                percent={kpis.marginRatio !== null ? kpis.marginRatio * 100 : undefined}
+                pctLabel={kpis.marginRatio !== null ? `${(kpis.marginRatio * 100).toFixed(0)}% do valor a venda` : 'Sem preço de venda'}
+              />
+              <KpiCard
+                label="Estoque à venda"
+                value={kpis.custoVenda > 0 ? kpiCurrency(kpis.custoVenda) : '—'}
+                accent="blue"
+                percent={kpis.pricedCoverage !== null ? kpis.pricedCoverage * 100 : undefined}
+                pctLabel={kpis.pricedCoverage !== null ? `${(kpis.pricedCoverage * 100).toFixed(0)}% dos SKUs com saldo têm preço` : 'Sem SKUs com saldo'}
+              />
+              <KpiCard
+                label="Carteira em trânsito"
+                value={kpis.carteiraCusto > 0 ? kpiCurrency(kpis.carteiraCusto) : '—'}
+                accent="red"
+                percent={kpis.emTransito > 0 && kpis.total > 0 ? (kpis.emTransito / kpis.total) * 100 : undefined}
+                pctLabel={kpis.emTransito > 0 ? `${kpis.emTransito.toLocaleString('pt-BR')} SKUs em trânsito` : 'Sem Carteira em aberto'}
+              />
+              <KpiCard
+                label="Projetado a custo"
+                value={kpis.projetadoCusto > 0 ? kpiCurrency(kpis.projetadoCusto) : '—'}
+                percent={kpis.transitRatio !== null ? kpis.transitRatio * 100 : undefined}
+                pctLabel={kpis.carteiraCusto > 0 ? `${kpiCurrency(kpis.carteiraCusto)} vêm da Carteira` : 'Sem entradas projetadas'}
+              />
+              <KpiCard
+                label="Projetado à venda"
+                value={kpis.projetadoVenda !== null ? kpiCurrency(kpis.projetadoVenda) : '—'}
+                accent={kpis.projetadoVenda !== null ? 'blue' : undefined}
+                percent={markup > 0 ? Math.min(markup, 100) : undefined}
+                pctLabel={markup === 0 ? 'Configure markup em Administração' : `markup ${markup.toLocaleString('pt-BR')}%`}
+              />
+            </div>
+
+            <div className="stock-sku-overview">
+              {/* Donut 1 — status físico: segmentos somam ao total real de SKUs */}
+              <StockDonut
+                segments={[
+                  { value: kpis.comEstoque, color: 'var(--blue)', label: 'Com estoque' },
+                  { value: kpis.semEstoque, color: 'var(--red)', label: 'Sem estoque' },
+                  ...(kpis.emTransito > 0 ? [{ value: kpis.emTransito, color: 'var(--white)', label: 'Em trânsito' }] : []),
+                ]}
+                total={kpis.comEstoque + kpis.semEstoque + kpis.emTransito}
+                centerValue={kpis.total}
+                centerLabel="SKUs"
+              />
+              <div className="cov-divider" />
+              {/* Donut 2 — cobertura de dias (janela 12 meses) */}
+              <StockDonut
+                segments={coverageStats.hasHistory ? [
+                  { value: coverageStats.critico, color: 'var(--red)', label: `Crítico  <${covDays[0]}d` },
+                  { value: coverageStats.adequado, color: 'var(--blue)', label: `Adequado  ${covDays[0]}–${covDays[1]}d` },
+                  { value: coverageStats.excesso, color: 'var(--white)', label: `Excesso  >${covDays[1]}d` },
+                  ...(coverageStats.semHistorico > 0 ? [{ value: coverageStats.semHistorico, color: 'var(--border)', label: 'Sem histórico' }] : []),
+                ] : [
+                  { value: 1, color: 'var(--border)', label: 'Sem histórico de entradas' },
+                ]}
+                total={coverageStats.total || 1}
+                centerLabel="Cobertura"
+              />
+            </div>
+
+            <StockTreemap data={treemapData} />
+
+            <div className="arrivals-panel">
+              <div className="arrivals-panel-head">
+                <span className="arrivals-panel-label">Entradas previstas</span>
+                <span className="arrivals-panel-total">
+                  {arrivalInvoices.length > 0
+                    ? `${arrivalInvoices.length} NF${arrivalInvoices.length !== 1 ? 's' : ''} · R$ ${brl(kpis.carteiraCusto)}`
+                    : 'Sem carteira em aberto'}
+                </span>
+              </div>
+              <div className="arrivals-buckets">
+                {arrivalBuckets.map((b, idx) => (
+                  <div key={b.key} className={`arrivals-bucket${b.key === 'atrasadas' && b.count > 0 ? ' is-late' : ''}`}>
+                    {idx > 0 && <div className="arrivals-bucket-sep" />}
+                    <div className="arrivals-bucket-label">{b.label}</div>
+                    <div className="arrivals-bucket-count">
+                      {b.count > 0
+                        ? <><strong>{b.count}</strong> <span>NF{b.count !== 1 ? 's' : ''}</span></>
+                        : <span className="arrivals-bucket-empty">—</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {nfsComPrevisao.totalWithPreview > 0 && (
+                <div className="arrivals-important">
+                  <div className="arrivals-important-title">Itens marcados com previsão</div>
+                  {nfsComPrevisao.nfsWithTags.length > 0 ? nfsComPrevisao.nfsWithTags.map(inv => (
+                    <div key={inv.invoice} className="arrivals-nf-block">
+                      <div className="arrivals-nf-head">
+                        <span className="arrivals-nf-number">{inv.displayInvoice}</span>
+                        {inv.supplier && <span className="arrivals-nf-supplier">{inv.supplier}</span>}
+                        <span className="arrivals-nf-date">{new Date(inv.previewDate!).toLocaleDateString('pt-BR')}</span>
+                      </div>
+                      <div className="arrivals-nf-items">
+                        {inv.taggedItems.map((ti, i) => (
+                          <div key={i} className="arrivals-nf-item">
+                            <span className="arrivals-nf-item-desc">{ti.product.description ?? ti.product.internalCode}</span>
+                            <span className="arrivals-nf-item-badges">
+                              {ti.isLaunch && <span className="badge-launch">Lançamento</span>}
+                              {ti.isPex && <span className="badge-pex">PEX</span>}
+                            </span>
+                            <span className="arrivals-nf-item-qty">{ti.qty.toLocaleString('pt-BR')}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )) : (
+                    <p className="arrivals-important-hint">
+                      {nfsComPrevisao.hasTaggedProducts
+                        ? `Nenhum produto marcado identificado nas ${nfsComPrevisao.totalWithPreview} NF${nfsComPrevisao.totalWithPreview !== 1 ? 's' : ''} com previsão. Verifique se o campo Cód. fabricante está preenchido nos produtos marcados.`
+                        : 'Nenhum produto marcado como PEX ou lançamento. Marque produtos na aba Lançamentos para acompanhar aqui.'}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </>
+        ) : subTab === 'produtos' ? (
+          <>
+            <div className="stock-toolbar">
+              <div className="pf-bar">
+                <input
+                  ref={searchRef}
+                  className="pf-input"
+                  placeholder="Buscar produto, EAN ou código interno…"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                />
+                <select
+                  className="pf-select"
+                  value={filterStatus}
+                  onChange={e => setFilterStatus(e.target.value as StockFilter)}
+                  aria-label="Filtrar situação"
+                >
+                  <option value="all">Todas as situações</option>
+                  <option value="com_estoque">Com estoque</option>
+                  <option value="sem_estoque">Sem estoque</option>
+                  <option value="em_transito">Em trânsito</option>
+                </select>
+              </div>
+              {availableChannels.length > 0 && (
+                <fieldset className="pf-range">
+                  <legend>Sortimento</legend>
+                  <div>
+                    <button type="button" className={filterChannel === '' ? 'is-active' : ''} onClick={() => setFilterChannel('')}>Todos</button>
+                    {availableChannels.map(ch => (
+                      <button key={ch} type="button" className={filterChannel === ch ? 'is-active' : ''} onClick={() => setFilterChannel(ch)}>{ch}</button>
+                    ))}
+                  </div>
+                </fieldset>
+              )}
+              <fieldset className="pf-range">
+                <legend>Marcação</legend>
+                <div>
+                  {(['all', 'mandatory', 'important'] as const).map(m => (
+                    <button key={m} type="button" className={filterMarcacao === m ? 'is-active' : ''} onClick={() => setFilterMarcacao(m)}>
+                      {m === 'all' ? 'Todos' : m === 'mandatory' ? 'Mandatório' : 'Importante'}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+              {abcMap.size > 0 && (
+                <fieldset className="pf-range">
+                  <legend>Curva ABC</legend>
+                  <div>
+                    <button type="button" className={filterAbc === 'all' ? 'is-active' : ''} onClick={() => setFilterAbc('all')}>Todos</button>
+                    {(['A', 'B', 'C'] as const).map(faixa => (
+                      <button key={faixa} type="button" className={`${filterAbc === faixa ? 'is-active' : ''} abc-filter-${faixa.toLowerCase()}`} onClick={() => setFilterAbc(faixa)}>{faixa}</button>
+                    ))}
+                  </div>
+                </fieldset>
+              )}
+            </div>
+
+            <div className="stock-count">
+              <strong>{filtered.length.toLocaleString('pt-BR')}</strong>{' '}
+              produto{filtered.length !== 1 ? 's' : ''}
+              {productBase.length !== filtered.length && ` de ${productBase.length.toLocaleString('pt-BR')}`}
+            </div>
+
+            <div className={`stock-layout${selected ? ' has-detail' : ''}`}>
+              <div className="stock-list stock-list--estoque">
+                <div className="stock-head">
+                  <span className="sc-desc">Produto</span>
+                  <span className="sc-num">Disponível</span>
+                  <span className="sc-num sc-hide-sm">Preço sem ST</span>
+                  <span className="sc-num">Preço com ST</span>
+                </div>
+                {filtered.length === 0 && (
+                  <p className="empty" style={{ padding: '24px 16px' }}>Nenhum produto encontrado.</p>
+                )}
+                {filtered.map(p => {
+                  const isSel = selected?.id === p.id
+                  const avail = p.availableStock ?? 0
+                  const availCx = p.unitsPerBox ? Math.floor(avail / p.unitsPerBox) : undefined
+                  const semStCx = (p.sellerPriceWithoutTax !== undefined && p.unitsPerBox) ? p.sellerPriceWithoutTax * p.unitsPerBox : undefined
+                  const comStCx = (p.sellerPrice !== undefined && p.unitsPerBox) ? p.sellerPrice * p.unitsPerBox : undefined
+                  return (
+                    <div
+                      key={p.id}
+                      className={`stock-row${isSel ? ' sel' : ''}`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setSelected(isSel ? null : p)}
+                      onKeyDown={e => e.key === 'Enter' && setSelected(isSel ? null : p)}
+                    >
+                      <span className="sc-desc">
+                        <span className="p-name">{p.description ?? '—'}</span>
+                        {(p.package || p.netWeightUnit !== undefined) && (
+                          <span className="p-pkg-line">
+                            {p.package && <span className="p-pack">{p.package}</span>}
+                            {p.netWeightUnit !== undefined && fmtWeight(p.netWeightUnit) && (
+                              <span className="p-weight">{fmtWeight(p.netWeightUnit)}</span>
+                            )}
+                          </span>
+                        )}
+                        <span className="p-meta">
+                          {p.internalCode && <code>{p.internalCode}</code>}
+                          {p.brand && <span>{p.brand}</span>}
+                          {p.groupName && <span className="p-group">{p.groupName}</span>}
+                          {tags[p.id]?.launch && <span className="badge-launch">Lançamento</span>}
+                          {tags[p.id]?.pex && <span className="badge-pex">PEX</span>}
+                          {p.internalCode && abcMap.has(p.internalCode) && <span className={`badge-abc badge-abc-${abcMap.get(p.internalCode)!.toLowerCase()}`}>{abcMap.get(p.internalCode)}</span>}
+                        </span>
+                      </span>
+                      <span className="sc-num">
+                        <span className="dual-val">
+                          <strong className={avail > 0 ? 'c-blue' : 'c-muted'}>{avail.toLocaleString('pt-BR')}</strong>
+                          <small>UN</small>
+                        </span>
+                        {availCx !== undefined && (
+                          <span className="dual-val">
+                            <strong className={availCx > 0 ? 'c-blue' : 'c-muted'}>{availCx.toLocaleString('pt-BR')}</strong>
+                            <small>CX</small>
+                          </span>
+                        )}
+                      </span>
+                      <span className="sc-num sc-hide-sm">
+                        {p.sellerPriceWithoutTax !== undefined ? <>
+                          <span className="dual-val">
+                            <strong>{`R$ ${brl(p.sellerPriceWithoutTax)}`}</strong>
+                            <small>UN</small>
+                          </span>
+                          {semStCx !== undefined && (
+                            <span className="dual-val">
+                              <strong>{`R$ ${brl(semStCx)}`}</strong>
+                              <small>CX</small>
+                            </span>
+                          )}
+                        </> : <strong className="c-muted">—</strong>}
+                      </span>
+                      <span className="sc-num">
+                        {p.sellerPrice !== undefined ? <>
+                          <span className="dual-val">
+                            <strong>{`R$ ${brl(p.sellerPrice)}`}</strong>
+                            <small>UN</small>
+                          </span>
+                          {comStCx !== undefined && (
+                            <span className="dual-val">
+                              <strong>{`R$ ${brl(comStCx)}`}</strong>
+                              <small>CX</small>
+                            </span>
+                          )}
+                        </> : <strong className="c-muted">—</strong>}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {selected && (
+                <aside className="stock-detail">
+                  <div className="sd-header">
+                    <div className="sd-title-area">
+                      <h3 className="sd-name">{selected.description ?? '—'}</h3>
+                      <div className="sd-codes">
+                        {selected.internalCode && <span>Cód. <strong>{selected.internalCode}</strong></span>}
+                        {selected.manufacturerCode && <span>Fab. <strong>{selected.manufacturerCode}</strong></span>}
+                        {selected.ean && <span>EAN <strong>{selected.ean}</strong></span>}
+                      </div>
+                    </div>
+                    <button type="button" className="close" onClick={() => setSelected(null)}>×</button>
+                  </div>
+
+                  <div className="sd-tags">
+                    <button type="button" className={`tag-pill${tags[selected.id]?.launch ? ' tl' : ''}`} onClick={() => toggleTag(selected.id, 'launch')}>
+                      {tags[selected.id]?.launch ? '★ Lançamento' : '☆ Lançamento'}
+                    </button>
+                    <button type="button" className={`tag-pill${tags[selected.id]?.pex ? ' tp' : ''}`} onClick={() => toggleTag(selected.id, 'pex')}>
+                      {tags[selected.id]?.pex ? '★ PEX' : '☆ PEX'}
+                    </button>
+                  </div>
+
+                  <div className="sd-section">
+                    <div className="sd-section-title">Estoque</div>
+                    <div className="sd-grid">
+                      <DI label="Disponível" value={(selected.availableStock ?? 0).toLocaleString('pt-BR')} hi={(selected.availableStock ?? 0) > 0} />
+                      <DI label="Total" value={(selected.totalStock ?? 0).toLocaleString('pt-BR')} />
+                      <DI label="Reservado" value={(selected.reservedStock ?? 0).toLocaleString('pt-BR')} />
+                      <DI label="Bloqueado" value={(selected.blockedStock ?? 0).toLocaleString('pt-BR')} />
+                      {(selected.damagedStock ?? 0) > 0 && <DI label="Avariado" value={(selected.damagedStock ?? 0).toLocaleString('pt-BR')} />}
+                      <DI label="Ind. em estoque" value={(selected.industryQuantity ?? 0).toLocaleString('pt-BR')} />
+                    </div>
+                  </div>
+
+                  {(selected.inTransitQuantity ?? 0) > 0 && (
+                    <div className="sd-section">
+                      <div className="sd-section-title">Carteira (a chegar)</div>
+                      <div className="sd-grid">
+                        <DI label="Quantidade" value={(selected.inTransitQuantity ?? 0).toLocaleString('pt-BR')} hi />
+                        <DI label="Valor" value={selected.inTransitValue !== undefined ? `R$ ${brl(selected.inTransitValue)}` : '—'} />
+                      </div>
+                    </div>
+                  )}
+
+                  {lastReceipt && (
+                    <div className="sd-section">
+                      <div className="sd-section-title">Última entrada</div>
+                      <div className="sd-grid">
+                        <DI label="Data" value={lastReceipt.entryDate ?? '—'} />
+                        <DI label="Nota" value={lastReceipt.invoice ?? '—'} />
+                        <DI label="Quantidade" value={(lastReceipt.quantity ?? 0).toLocaleString('pt-BR')} />
+                        <DI label="Custo unit." value={lastReceipt.unitPrice !== undefined ? `R$ ${brl(lastReceipt.unitPrice)}` : '—'} />
+                        <DI label="Fornecedor" value={lastReceipt.supplierName ?? '—'} />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="sd-section">
+                    <div className="sd-section-title">Preços e custos</div>
+                    <div className="sd-grid">
+                      <DI label="Preço com ST" value={selected.sellerPrice !== undefined ? `R$ ${brl(selected.sellerPrice)}` : '—'} hi={selected.sellerPrice !== undefined} />
+                      <DI label="Preço sem ST" value={selected.sellerPriceWithoutTax !== undefined ? `R$ ${brl(selected.sellerPriceWithoutTax)}` : '—'} />
+                      <DI label="Custo financeiro" value={selected.financialCost !== undefined ? `R$ ${brl(selected.financialCost)}` : '—'} />
+                      <DI label="Custo real" value={selected.realCost !== undefined ? `R$ ${brl(selected.realCost)}` : '—'} />
+                      <DI label="Margem bruta" value={selected.margin !== undefined ? `${selected.margin.toFixed(1)}%` : '—'} hi={selected.margin !== undefined && selected.margin >= 30} />
+                      <DI label="Giro diário" value={selected.dailyTurnover !== undefined ? selected.dailyTurnover.toString() : '—'} />
+                      <DI label="Cobertura" value={selected.stockCoverage !== undefined ? `${selected.stockCoverage} dias` : '—'} />
+                      {selected.industryBasePrice !== undefined && <DI label="Ref. indústria" value={`R$ ${brl(selected.industryBasePrice)}`} />}
+                    </div>
+                  </div>
+
+                  <div className="sd-section">
+                    <div className="sd-section-title">Sortimento</div>
+                    <DI label="Status" value={selected.sortimentStatus ?? '—'} />
+                    <DI label="Ciclo de vida" value={selected.lifestageStatus ?? '—'} />
+                    {selected.sortimentChannels && Object.keys(selected.sortimentChannels).length > 0 && (
+                      <div className="channel-grid" style={{ marginTop: 8 }}>
+                        {Object.entries(selected.sortimentChannels)
+                          .sort((a, b) => b[1] - a[1])
+                          .map(([ch, lv]) => (
+                            <div key={ch} className={`channel-item ${channelClass(lv)}`}>
+                              <span className="ch-name">{ch}</span>
+                              <span className="ch-level">{channelLevel(lv)}</span>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {(selected.category || selected.brand || selected.subBrand || selected.department) && (
+                    <div className="sd-section">
+                      <div className="sd-section-title">Classificação</div>
+                      <div className="sd-grid">
+                        {selected.brand && <DI label="Marca" value={selected.brand} />}
+                        {selected.subBrand && <DI label="Sub-marca" value={selected.subBrand} />}
+                        {selected.category && <DI label="Categoria" value={selected.category} />}
+                        {selected.subcategory && <DI label="Subcategoria" value={selected.subcategory} />}
+                        {selected.department && <DI label="Departamento" value={selected.department} />}
+                        {selected.ncm && <DI label="NCM" value={selected.ncm} />}
+                        {selected.taxClassification && <DI label="Tributação" value={selected.taxClassification} />}
+                        {selected.buyer && <DI label="Comprador" value={selected.buyer} />}
+                      </div>
+                    </div>
+                  )}
+
+                  {selected.unitsPerBox && (
+                    <div className="sd-section">
+                      <div className="sd-section-title">Embalagem</div>
+                      <div className="sd-grid">
+                        <DI label="Un. por caixa" value={selected.unitsPerBox.toString()} />
+                        {selected.boxesPerPallet !== undefined && <DI label="Cx. por palete" value={selected.boxesPerPallet.toString()} />}
+                        {selected.grossWeightUnit !== undefined && <DI label="Peso bruto unit." value={`${selected.grossWeightUnit} kg`} />}
+                        {selected.netWeightUnit !== undefined && <DI label="Peso líq. unit." value={`${selected.netWeightUnit} kg`} />}
+                      </div>
+                    </div>
+                  )}
+                </aside>
+              )}
+            </div>
+          </>
+        ) : subTab === 'lancamentos' ? (
+          <>
+            <div className="stock-toolbar">
+              <div className="pf-bar">
+                <input
+                  className="pf-input"
+                  placeholder="Buscar produto, EAN ou código interno…"
+                  value={lncSearch}
+                  onChange={e => setLncSearch(e.target.value)}
+                />
+                <select
+                  className="pf-select"
+                  value={lncStatus}
+                  onChange={e => setLncStatus(e.target.value as StockFilter)}
+                  aria-label="Filtrar situação"
+                >
+                  <option value="all">Todas as situações</option>
+                  <option value="com_estoque">Com estoque</option>
+                  <option value="sem_estoque">Sem estoque</option>
+                  <option value="em_transito">Em trânsito</option>
+                </select>
+              </div>
+              <fieldset className="pf-range">
+                <legend>Tipo</legend>
+                <div>
+                  <button type="button" className={lncFilter === 'all' ? 'is-active' : ''} onClick={() => setLncFilter('all')}>
+                    Todos {lncCounts.total > 0 && `(${lncCounts.total})`}
+                  </button>
+                  <button type="button" className={lncFilter === 'launch' ? 'is-active' : ''} onClick={() => setLncFilter('launch')}>
+                    Lançamentos {lncCounts.launch > 0 && `(${lncCounts.launch})`}
+                  </button>
+                  <button type="button" className={lncFilter === 'pex' ? 'is-active' : ''} onClick={() => setLncFilter('pex')}>
+                    PEX {lncCounts.pex > 0 && `(${lncCounts.pex})`}
+                  </button>
+                </div>
+              </fieldset>
+            </div>
+
+            <div className="stock-count">
+              <strong>{filteredLnc.length.toLocaleString('pt-BR')}</strong>{' '}
+              produto{filteredLnc.length !== 1 ? 's' : ''}
+              {lncCounts.total !== filteredLnc.length && ` de ${lncCounts.total.toLocaleString('pt-BR')}`}
+            </div>
+
+            {lncCounts.total === 0 && (
+              <p className="empty" style={{ padding: '40px 0', textAlign: 'center' }}>
+                Nenhum produto marcado como Lançamento ou PEX.<br />
+                <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>Acesse a aba Produtos, selecione um item e use as marcações no painel lateral.</span>
+              </p>
+            )}
+
+            {lncCounts.total > 0 && (
+              <div className={`stock-layout${selected ? ' has-detail' : ''}`}>
+                <div className="stock-list stock-list--estoque">
+                  <div className="stock-head">
+                    <span className="sc-desc">Produto</span>
+                    <span className="sc-num">Disponível</span>
+                    <span className="sc-num sc-hide-sm">Preço sem ST</span>
+                    <span className="sc-num">Preço com ST</span>
+                  </div>
+                  {filteredLnc.length === 0 && (
+                    <p className="empty" style={{ padding: '24px 16px' }}>Nenhum produto encontrado.</p>
+                  )}
+                  {filteredLnc.map(p => {
+                    const isSel = selected?.id === p.id
+                    const avail = p.availableStock ?? 0
+                    const availCx = p.unitsPerBox ? Math.floor(avail / p.unitsPerBox) : undefined
+                    const semStCx = (p.sellerPriceWithoutTax !== undefined && p.unitsPerBox) ? p.sellerPriceWithoutTax * p.unitsPerBox : undefined
+                    const comStCx = (p.sellerPrice !== undefined && p.unitsPerBox) ? p.sellerPrice * p.unitsPerBox : undefined
+                    return (
+                      <div
+                        key={p.id}
+                        className={`stock-row${isSel ? ' sel' : ''}`}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setSelected(isSel ? null : p)}
+                        onKeyDown={e => e.key === 'Enter' && setSelected(isSel ? null : p)}
+                      >
+                        <span className="sc-desc">
+                          <span className="p-name">{p.description ?? '—'}</span>
+                          {(p.package || p.netWeightUnit !== undefined) && (
+                            <span className="p-pkg-line">
+                              {p.package && <span className="p-pack">{p.package}</span>}
+                              {p.netWeightUnit !== undefined && fmtWeight(p.netWeightUnit) && (
+                                <span className="p-weight">{fmtWeight(p.netWeightUnit)}</span>
+                              )}
+                            </span>
+                          )}
+                          <span className="p-meta">
+                            {p.internalCode && <code>{p.internalCode}</code>}
+                            {p.brand && <span>{p.brand}</span>}
+                            {p.groupName && <span className="p-group">{p.groupName}</span>}
+                            {tags[p.id]?.launch && <span className="badge-launch">Lançamento</span>}
+                            {tags[p.id]?.pex && <span className="badge-pex">PEX</span>}
+                            {p.internalCode && abcMap.has(p.internalCode) && <span className={`badge-abc badge-abc-${abcMap.get(p.internalCode)!.toLowerCase()}`}>{abcMap.get(p.internalCode)}</span>}
+                          </span>
+                        </span>
+                        <span className="sc-num">
+                          <span className="dual-val">
+                            <strong className={avail > 0 ? 'c-blue' : 'c-muted'}>{avail.toLocaleString('pt-BR')}</strong>
+                            <small>UN</small>
+                          </span>
+                          {availCx !== undefined && (
+                            <span className="dual-val">
+                              <strong className={availCx > 0 ? 'c-blue' : 'c-muted'}>{availCx.toLocaleString('pt-BR')}</strong>
+                              <small>CX</small>
+                            </span>
+                          )}
+                        </span>
+                        <span className="sc-num sc-hide-sm">
+                          {p.sellerPriceWithoutTax !== undefined ? <>
+                            <span className="dual-val">
+                              <strong>{`R$ ${brl(p.sellerPriceWithoutTax)}`}</strong>
+                              <small>UN</small>
+                            </span>
+                            {semStCx !== undefined && (
+                              <span className="dual-val">
+                                <strong>{`R$ ${brl(semStCx)}`}</strong>
+                                <small>CX</small>
+                              </span>
+                            )}
+                          </> : <strong className="c-muted">—</strong>}
+                        </span>
+                        <span className="sc-num">
+                          {p.sellerPrice !== undefined ? <>
+                            <span className="dual-val">
+                              <strong>{`R$ ${brl(p.sellerPrice)}`}</strong>
+                              <small>UN</small>
+                            </span>
+                            {comStCx !== undefined && (
+                              <span className="dual-val">
+                                <strong>{`R$ ${brl(comStCx)}`}</strong>
+                                <small>CX</small>
+                              </span>
+                            )}
+                          </> : <strong className="c-muted">—</strong>}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {selected && (
+                  <aside className="stock-detail">
+                    <div className="sd-header">
+                      <div className="sd-title-area">
+                        <h3 className="sd-name">{selected.description ?? '—'}</h3>
+                        <div className="sd-codes">
+                          {selected.internalCode && <span>Cód. <strong>{selected.internalCode}</strong></span>}
+                          {selected.manufacturerCode && <span>Fab. <strong>{selected.manufacturerCode}</strong></span>}
+                          {selected.ean && <span>EAN <strong>{selected.ean}</strong></span>}
+                        </div>
+                      </div>
+                      <button type="button" className="close" onClick={() => setSelected(null)}>×</button>
+                    </div>
+
+                    <div className="sd-tags">
+                      <button type="button" className={`tag-pill${tags[selected.id]?.launch ? ' tl' : ''}`} onClick={() => toggleTag(selected.id, 'launch')}>
+                        {tags[selected.id]?.launch ? '★ Lançamento' : '☆ Lançamento'}
+                      </button>
+                      <button type="button" className={`tag-pill${tags[selected.id]?.pex ? ' tp' : ''}`} onClick={() => toggleTag(selected.id, 'pex')}>
+                        {tags[selected.id]?.pex ? '★ PEX' : '☆ PEX'}
+                      </button>
+                    </div>
+
+                    <div className="sd-section">
+                      <div className="sd-section-title">Estoque</div>
+                      <div className="sd-grid">
+                        <DI label="Disponível" value={(selected.availableStock ?? 0).toLocaleString('pt-BR')} hi={(selected.availableStock ?? 0) > 0} />
+                        <DI label="Total" value={(selected.totalStock ?? 0).toLocaleString('pt-BR')} />
+                        <DI label="Reservado" value={(selected.reservedStock ?? 0).toLocaleString('pt-BR')} />
+                        <DI label="Bloqueado" value={(selected.blockedStock ?? 0).toLocaleString('pt-BR')} />
+                        {(selected.damagedStock ?? 0) > 0 && <DI label="Avariado" value={(selected.damagedStock ?? 0).toLocaleString('pt-BR')} />}
+                        <DI label="Ind. em estoque" value={(selected.industryQuantity ?? 0).toLocaleString('pt-BR')} />
+                      </div>
+                    </div>
+
+                    {(selected.inTransitQuantity ?? 0) > 0 && (
+                      <div className="sd-section">
+                        <div className="sd-section-title">Carteira (a chegar)</div>
+                        <div className="sd-grid">
+                          <DI label="Quantidade" value={(selected.inTransitQuantity ?? 0).toLocaleString('pt-BR')} hi />
+                          <DI label="Valor" value={selected.inTransitValue !== undefined ? `R$ ${brl(selected.inTransitValue)}` : '—'} />
+                        </div>
+                      </div>
+                    )}
+
+                    {lastReceipt && (
+                      <div className="sd-section">
+                        <div className="sd-section-title">Última entrada</div>
+                        <div className="sd-grid">
+                          <DI label="Data" value={lastReceipt.entryDate ?? '—'} />
+                          <DI label="Nota" value={lastReceipt.invoice ?? '—'} />
+                          <DI label="Quantidade" value={(lastReceipt.quantity ?? 0).toLocaleString('pt-BR')} />
+                          <DI label="Custo unit." value={lastReceipt.unitPrice !== undefined ? `R$ ${brl(lastReceipt.unitPrice)}` : '—'} />
+                          <DI label="Fornecedor" value={lastReceipt.supplierName ?? '—'} />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="sd-section">
+                      <div className="sd-section-title">Preços e custos</div>
+                      <div className="sd-grid">
+                        <DI label="Preço com ST" value={selected.sellerPrice !== undefined ? `R$ ${brl(selected.sellerPrice)}` : '—'} hi={selected.sellerPrice !== undefined} />
+                        <DI label="Preço sem ST" value={selected.sellerPriceWithoutTax !== undefined ? `R$ ${brl(selected.sellerPriceWithoutTax)}` : '—'} />
+                        <DI label="Custo financeiro" value={selected.financialCost !== undefined ? `R$ ${brl(selected.financialCost)}` : '—'} />
+                        <DI label="Custo real" value={selected.realCost !== undefined ? `R$ ${brl(selected.realCost)}` : '—'} />
+                        <DI label="Margem bruta" value={selected.margin !== undefined ? `${selected.margin.toFixed(1)}%` : '—'} hi={selected.margin !== undefined && selected.margin >= 30} />
+                        <DI label="Giro diário" value={selected.dailyTurnover !== undefined ? selected.dailyTurnover.toString() : '—'} />
+                        <DI label="Cobertura" value={selected.stockCoverage !== undefined ? `${selected.stockCoverage} dias` : '—'} />
+                        {selected.industryBasePrice !== undefined && <DI label="Ref. indústria" value={`R$ ${brl(selected.industryBasePrice)}`} />}
+                      </div>
+                    </div>
+
+                    <div className="sd-section">
+                      <div className="sd-section-title">Sortimento</div>
+                      <DI label="Status" value={selected.sortimentStatus ?? '—'} />
+                      <DI label="Ciclo de vida" value={selected.lifestageStatus ?? '—'} />
+                      {selected.sortimentChannels && Object.keys(selected.sortimentChannels).length > 0 && (
+                        <div className="channel-grid" style={{ marginTop: 8 }}>
+                          {Object.entries(selected.sortimentChannels)
+                            .sort((a, b) => b[1] - a[1])
+                            .map(([ch, lv]) => (
+                              <div key={ch} className={`channel-item ${channelClass(lv)}`}>
+                                <span className="ch-name">{ch}</span>
+                                <span className="ch-level">{channelLevel(lv)}</span>
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {(selected.category || selected.brand || selected.subBrand || selected.department) && (
+                      <div className="sd-section">
+                        <div className="sd-section-title">Classificação</div>
+                        <div className="sd-grid">
+                          {selected.brand && <DI label="Marca" value={selected.brand} />}
+                          {selected.subBrand && <DI label="Sub-marca" value={selected.subBrand} />}
+                          {selected.category && <DI label="Categoria" value={selected.category} />}
+                          {selected.subcategory && <DI label="Subcategoria" value={selected.subcategory} />}
+                          {selected.department && <DI label="Departamento" value={selected.department} />}
+                          {selected.ncm && <DI label="NCM" value={selected.ncm} />}
+                          {selected.taxClassification && <DI label="Tributação" value={selected.taxClassification} />}
+                          {selected.buyer && <DI label="Comprador" value={selected.buyer} />}
+                        </div>
+                      </div>
+                    )}
+
+                    {selected.unitsPerBox && (
+                      <div className="sd-section">
+                        <div className="sd-section-title">Embalagem</div>
+                        <div className="sd-grid">
+                          <DI label="Un. por caixa" value={selected.unitsPerBox.toString()} />
+                          {selected.boxesPerPallet !== undefined && <DI label="Cx. por palete" value={selected.boxesPerPallet.toString()} />}
+                          {selected.grossWeightUnit !== undefined && <DI label="Peso bruto unit." value={`${selected.grossWeightUnit} kg`} />}
+                          {selected.netWeightUnit !== undefined && <DI label="Peso líq. unit." value={`${selected.netWeightUnit} kg`} />}
+                        </div>
+                      </div>
+                    )}
+                  </aside>
+                )}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="notas-kpis">
+              <KpiCard
+                label="Carteira"
+                value={notasKpis.cartNfs > 0 ? `${notasKpis.cartNfs} NF${notasKpis.cartNfs !== 1 ? 's' : ''}` : '—'}
+                accent="white"
+                pctLabel={notasKpis.cartVal > 0 ? `R$ ${brl(notasKpis.cartVal)}` : 'Sem carteira em aberto'}
+                percent={notasKpis.cartNfs + notasKpis.recNfs > 0 ? (notasKpis.cartNfs / (notasKpis.cartNfs + notasKpis.recNfs)) * 100 : 0}
+              />
+              <KpiCard
+                label="SKUs em carteira"
+                value={notasKpis.cartQty > 0 ? notasKpis.cartQty.toLocaleString('pt-BR') : '—'}
+                accent={notasKpis.cartQty > 0 ? 'white' : undefined}
+                pctLabel="unidades a chegar"
+              />
+              <KpiCard
+                label="Recebidas este mês"
+                value={notasKpis.recNfs > 0 ? `${notasKpis.recNfs} NF${notasKpis.recNfs !== 1 ? 's' : ''}` : '—'}
+                accent={notasKpis.recNfs > 0 ? 'blue' : undefined}
+                pctLabel={notasKpis.recVal > 0 ? `R$ ${brl(notasKpis.recVal)}` : 'Nenhuma nota recebida'}
+                percent={notasKpis.cartNfs + notasKpis.recNfs > 0 ? (notasKpis.recNfs / (notasKpis.cartNfs + notasKpis.recNfs)) * 100 : 0}
+              />
+              <KpiCard
+                label="Última entrada"
+                value={notasKpis.lastDate ? fmtDate(notasKpis.lastDate) : '—'}
+                pctLabel={notasKpis.lastDate ? 'data da nota mais recente' : 'nenhuma nota recebida'}
+              />
+            </div>
+
+            <div className="notas-section">
+              <div className="notas-section-head">
+                <span className="notas-section-title">Notas Recebidas</span>
+                <input
+                  className="pf-input"
+                  style={{ maxWidth: 240, height: 32, fontSize: 12, padding: '0 10px' }}
+                  placeholder="Buscar NF, fornecedor ou produto…"
+                  value={notasSearch}
+                  onChange={e => setNotasSearch(e.target.value)}
+                />
+                <input
+                  type="date"
+                  value={notasDate}
+                  onChange={e => setNotasDate(e.target.value)}
+                  style={{ height: 32, fontSize: 12, padding: '0 8px', background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6 }}
+                />
+                {filteredReceived.some(inv => inv.date === notasDate) && (
+                  <button type="button" className="secondary-button" style={{ margin: 0, padding: '5px 12px', fontSize: 12 }} onClick={exportReceivedCsv}>
+                    ↓ CSV do dia
+                  </button>
+                )}
+              </div>
+              <div className="notas-section-body">
+                {filteredReceived.length === 0 && (
+                  <p className="empty compact" style={{ padding: '28px 18px' }}>
+                    {receivedInvoices.length === 0 ? 'Nenhuma nota recebida importada ainda.' : 'Nenhuma nota encontrada para a busca.'}
+                  </p>
+                )}
+                {(() => {
+                  const days = new Map<string, typeof filteredReceived>()
+                  for (const inv of filteredReceived) {
+                    const d = inv.date ?? '(sem data)'
+                    if (!days.has(d)) days.set(d, [])
+                    days.get(d)!.push(inv)
+                  }
+                  return Array.from(days.entries()).map(([day, invs]) => (
+                    <div key={day} className="notas-day-group">
+                      <div className="notas-day-head">{day !== '(sem data)' ? fmtDate(day) : 'Sem data'}</div>
+                      {invs.map(inv => (
+                        <div key={inv.invoice}>
+                          <div
+                            className="notas-inv-row"
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => toggleExpanded(inv.invoice)}
+                            onKeyDown={e => e.key === 'Enter' && toggleExpanded(inv.invoice)}
+                          >
+                            <span className={`notas-inv-toggle${expandedNotas.has(inv.invoice) ? ' open' : ''}`}>▶</span>
+                            <span className="notas-inv-num">NF {inv.displayInvoice}</span>
+                            <span className="notas-inv-supplier">{inv.supplier ?? '—'}</span>
+                            <span className="notas-inv-qty">{inv.totalQty.toLocaleString('pt-BR')} UN</span>
+                            <span className="notas-inv-val">R$ {brl(inv.totalValue)}</span>
+                          </div>
+                          {expandedNotas.has(inv.invoice) && (
+                            <div className="notas-inv-items">
+                              <table className="notas-items-table">
+                                <thead>
+                                  <tr>
+                                    <th>Código</th>
+                                    <th>Descrição</th>
+                                    <th className="n-right">Qtd</th>
+                                    <th className="n-right">Preço unit.</th>
+                                    <th className="n-right">Valor</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {inv.items.map((r, i) => (
+                                    <tr key={i}>
+                                      <td><code style={{ fontSize: 11 }}>{r.productCode ?? '—'}</code></td>
+                                      <td>{r.description ?? '—'}</td>
+                                      <td className="n-right">{(r.quantity ?? 0).toLocaleString('pt-BR')}</td>
+                                      <td className="n-right">{r.unitPrice !== undefined ? `R$ ${brl(r.unitPrice)}` : '—'}</td>
+                                      <td className="n-right">{r.value !== undefined ? `R$ ${brl(r.value)}` : '—'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ))
+                })()}
+              </div>
+            </div>
+
+            <div className="notas-section">
+              <div className="notas-section-head">
+                <span className="notas-section-title">Carteira — em trânsito</span>
+                <span className="arrivals-panel-total">
+                  {arrivalInvoices.length > 0
+                    ? `${arrivalInvoices.length} NF${arrivalInvoices.length !== 1 ? 's' : ''} · R$ ${brl(notasKpis.cartVal)}`
+                    : 'Vazia'}
+                </span>
+              </div>
+              <div className="notas-section-body">
+                {arrivalInvoices.length === 0 && (
+                  <p className="empty compact" style={{ padding: '28px 18px' }}>Carteira vazia. Importe um arquivo de carteira no motor de notas.</p>
+                )}
+                {arrivalInvoices.map(inv => (
+                  <div key={inv.invoice} className="notas-cart-row">
+                    <span className="notas-cart-num">NF {inv.displayInvoice}</span>
+                    <span className="notas-cart-supplier">{inv.supplier ?? '—'}</span>
+                    <span className="notas-cart-qty">{inv.totalQty.toLocaleString('pt-BR')} UN</span>
+                    <span className="notas-cart-val">R$ {brl(inv.totalValue)}</span>
+                    <input
+                      type="date"
+                      className="notas-cart-date"
+                      value={notaPrev[inv.invoice] ?? ''}
+                      onChange={e => setNotaPrev(prev => ({ ...prev, [inv.invoice]: e.target.value }))}
+                      title="Previsão de chegada"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+      </section>
+    </>
+  )
+}
+
+const LINE_HUES = [351, 207, 148, 272, 38]
+function tileBg(lineIdx: number, tileIdx: number): string {
+  const hue = LINE_HUES[lineIdx % LINE_HUES.length]!
+  const shift = (tileIdx % 4) * 4
+  return `linear-gradient(145deg, hsl(${hue} ${58 - shift}% ${32 + shift}% / .98), hsl(${hue + 10} ${48 - shift}% ${22 + shift}% / .99))`
+}
+
+function squarifiedLayout(
+  items: Array<{ id: string; value: number }>,
+  x: number, y: number, w: number, h: number
+): Array<{ id: string; x: number; y: number; w: number; h: number }> {
+  if (items.length === 0) return []
+  if (items.length === 1) return [{ id: items[0].id, x, y, w, h }]
+  const total = items.reduce((s, it) => s + it.value, 0)
+  if (total === 0) return []
+  let acc = 0
+  const half = total / 2
+  let split = items.length - 1
+  for (let i = 0; i < items.length - 1; i++) {
+    acc += items[i].value
+    if (acc >= half) { split = i + 1; break }
+  }
+  const first = items.slice(0, split)
+  const rest = items.slice(split)
+  const frac = first.reduce((s, it) => s + it.value, 0) / total
+  if (w >= h) {
+    return [...squarifiedLayout(first, x, y, w * frac, h), ...squarifiedLayout(rest, x + w * frac, y, w * (1 - frac), h)]
+  }
+  return [...squarifiedLayout(first, x, y, w, h * frac), ...squarifiedLayout(rest, x, y + h * frac, w, h * (1 - frac))]
+}
+
+function StockTreemap({ data }: {
+  data: Array<{ line: string; totalValue: number; subbrands: number; tiles: Array<{ key: string; label: string; value: number }> }>
+}) {
+  const totalAll = data.reduce((s, g) => s + g.totalValue, 0)
+  const pct = (n: number, t: number) => t > 0 ? `${((n / t) * 100).toFixed(1)}%` : '—'
+  if (data.length === 0) return (
+    <div className="stock-treemap-empty">Sem estoque valorizado por linha. Configure grupos de produto e sub-brands.</div>
+  )
+  return (
+    <div className="stock-treemap-section">
+      <div className="stock-treemap-header">
+        <span className="stock-treemap-eyebrow">Estoque por linha</span>
+        <span className="stock-treemap-title">Composição por sub-brand</span>
+      </div>
+      <div className="stock-line-list">
+        {data.map((group, lineIdx) => {
+          const rects = squarifiedLayout(group.tiles.map(t => ({ id: t.key, value: t.value })), 0, 0, 100, 100)
+          const rectMap = new Map(rects.map(r => [r.id, r]))
+          return (
+            <section key={group.line} className="stock-line-card" data-hue={lineIdx % 5}>
+              <header className="stock-line-head">
+                <strong>{group.line}</strong>
+                <span>{kpiCurrency(group.totalValue)}</span>
+                <small>{group.subbrands} sub-brand{group.subbrands !== 1 ? 's' : ''} · {pct(group.totalValue, totalAll)} do estoque</small>
+              </header>
+              <div className="stock-line-body">
+                <div className="stock-subbrand-treemap">
+                  {group.tiles.map((tile, tileIdx) => {
+                    const rect = rectMap.get(tile.key)
+                    if (!rect) return null
+                    const label = `${tile.label}: ${kpiCurrency(tile.value)} · ${pct(tile.value, group.totalValue)}`
+                    return (
+                      <div key={tile.key} className="stock-tile" title={label}
+                        style={{ left: `${rect.x}%`, top: `${rect.y}%`, width: `${rect.w}%`, height: `${rect.h}%`, background: tileBg(lineIdx, tileIdx) }}>
+                        <strong>{tile.label}</strong>
+                        <span>{kpiCurrency(tile.value)}</span>
+                        <small>{pct(tile.value, group.totalValue)}</small>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </section>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function KpiCard({ label, value, accent, sub, percent, pctLabel }: {
+  label: string; value: string; accent?: 'blue' | 'red' | 'white'; sub?: string;
+  percent?: number; pctLabel?: string
+}) {
+  const r = 10, cx = 14, cy = 14, size = 28
+  const circ = 2 * Math.PI * r
+  const filled = percent !== undefined ? (Math.min(100, Math.max(0, percent)) / 100) * circ : 0
+  const ringColor = accent === 'blue' ? 'var(--blue)' : accent === 'red' ? 'var(--red)' : accent === 'white' ? 'var(--white)' : 'var(--muted)'
+  const showRing = percent !== undefined
+  const showSub = !!(pctLabel ?? sub)
+  return (
+    <div className={`kpi-card${accent ? ` kpi-${accent}` : ''}`}>
+      <div className="kpi-card-body">
+        <div className="kpi-label">{label}</div>
+        <div className="kpi-val">{value}</div>
+        {(showRing || showSub) && (
+          <div className="kpi-ring-row">
+            {showRing && (
+              <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="kpi-ring-svg" style={{ transform: 'rotate(-90deg)', flexShrink: 0 }}>
+                <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--border)" strokeWidth={2.5} />
+                <circle cx={cx} cy={cy} r={r} fill="none" stroke={ringColor} strokeWidth={2.5}
+                  strokeDasharray={`${filled} ${circ}`} strokeLinecap="round" />
+              </svg>
+            )}
+            {showSub && <span className="kpi-pct">{pctLabel ?? sub}</span>}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function StockDonut({ segments, total, centerLabel, centerValue }: {
+  segments: Array<{ value: number; color: string; label: string }>
+  total: number
+  centerLabel?: string
+  centerValue?: number
+}) {
+  const r = 48, cx = 60, cy = 60
+  const circ = 2 * Math.PI * r
+  const gap = 3
+  let offset = 0
+  const arcs = segments.map(seg => {
+    const dash = Math.max(0, (seg.value / total) * circ - gap)
+    const arc = { ...seg, dash, offset }
+    offset += (seg.value / total) * circ
+    return arc
+  })
+  return (
+    <div className="stock-donut-wrap">
+      <div className="donut-svg-wrap">
+        <svg viewBox="0 0 120 120">
+          <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--border)" strokeWidth="12" />
+          <g transform={`rotate(-90 ${cx} ${cy})`}>
+            {arcs.map((arc, i) => arc.dash > 0 && (
+              <circle key={i} cx={cx} cy={cy} r={r}
+                fill="none" stroke={arc.color} strokeWidth="12"
+                strokeDasharray={`${arc.dash} ${circ}`}
+                strokeDashoffset={-arc.offset}
+                strokeLinecap="round"
+              />
+            ))}
+          </g>
+        </svg>
+        <div className="donut-center">
+          <span className="donut-center-val">{(centerValue ?? total).toLocaleString('pt-BR')}</span>
+          <span className="donut-center-label">{centerLabel ?? 'SKUs'}</span>
+        </div>
+      </div>
+      <div className="donut-legend">
+        {segments.map(s => (
+          <div key={s.label} className="donut-leg-item">
+            <span className="donut-leg-dot" style={{ background: s.color }} />
+            <span className="donut-leg-label">{s.label}</span>
+            <span className="donut-leg-val" style={{ color: s.color }}>{s.value.toLocaleString('pt-BR')}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function DI({ label, value, hi }: { label: string; value: string; hi?: boolean }) {
+  return (
+    <div className="di">
+      <span className="di-label">{label}</span>
+      <strong className={hi ? 'c-blue' : ''}>{value}</strong>
+    </div>
+  )
+}

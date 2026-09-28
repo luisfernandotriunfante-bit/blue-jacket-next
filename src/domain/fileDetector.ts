@@ -6,10 +6,10 @@ const headerAt = (rows: Row[], expected: Record<number, string>) =>
   rows.findIndex(row => Object.entries(expected).every(([index, label]) => norm(row[Number(index)]) === label))
 
 export type FileDetection =
-  | { motor: 'produtos'; slot: 'internal' | 'industry' | 'stock' | 'price' | 'sortiment' }
+  | { motor: 'produtos'; slot: 'internal' | 'industry' | 'stock' | 'price' | 'subbrands' | 'sortiment' }
   | { motor: 'clientes'; slot: 'internal' | 'portfolio' | 'premises' }
   | { motor: 'movimentacoes'; slot: 'sales' | 'cuts' }
-  | { motor: 'historico'; slot: 'sales' | 'summary' }
+  | { motor: 'historico'; slot: 'sales' | 'catalog' }
   | { motor: 'recebimentos'; slot: 'legacy' | 'current' | 'portfolio' }
   | null
 
@@ -19,8 +19,8 @@ export async function detectFile(file: File): Promise<FileDetection> {
       const content = (await file.text()).replace(/\u0000/g, '')
       if (/vendas\s+\d{2}\/[A-Z]{3}\/\d{4}\s+a\s+\d{2}\/[A-Z]{3}\/\d{4}\s+analitico\s+detalhado/i.test(content))
         return { motor: 'historico', slot: 'sales' }
-      if (/compras\s+por\s+cliente/i.test(content))
-        return { motor: 'historico', slot: 'summary' }
+      if (/RELACAO\s+COMPLEMENTAR\s+-\s+CADASTRO\s+DE\s+ITENS/i.test(content) && /MILENIO/i.test(content))
+        return { motor: 'historico', slot: 'catalog' }
       if (/relacao\s+de\s+notas\s+fiscais/i.test(content))
         return { motor: 'recebimentos', slot: 'legacy' }
       return null
@@ -39,6 +39,8 @@ export async function detectFile(file: File): Promise<FileDetection> {
         return { motor: 'produtos', slot: 'stock' }
       if (headerAt(rows, { 2: 'codprod', 3: 'descricao', 6: 'ean', 10: 'preco' }) >= 0)
         return { motor: 'produtos', slot: 'price' }
+      if (headerAt(rows, { 0: 'nomedistribuidor', 3: 'subbrands', 4: 'codigodoprodutoean13' }) >= 0)
+        return { motor: 'produtos', slot: 'subbrands' }
       if (headerAt(rows, { 0: 'materialsap', 16: 'st', 18: 'lifestage' }) >= 0)
         return { motor: 'produtos', slot: 'sortiment' }
       if (rows.some(row => norm(row[2]) === 'datamovimento' && norm(row[3]) === 'codcliente' && norm(row[24]) === 'codprodwinthor'))
