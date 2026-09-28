@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import type { CanonicalProduct, ProductIndicators } from './domain/productMotor'
 import type { CanonicalReceipt } from './domain/receiptMotor'
+import type { CanonicalMovement } from './domain/movementMotor'
 
 type ProductTag = { launch?: boolean; pex?: boolean }
 type Tags = Record<string, ProductTag>
@@ -78,9 +79,10 @@ function loadTags(): Tags {
   catch { return {} }
 }
 
-export function StockTab({ productBase, receiptBase, productIndicators }: {
+export function StockTab({ productBase, receiptBase, movementBase, productIndicators }: {
   productBase: CanonicalProduct[]
   receiptBase: CanonicalReceipt[]
+  movementBase: CanonicalMovement[]
   productIndicators: ProductIndicators | null
 }) {
   const [subTab, setSubTab] = useState<'estoque' | 'produtos' | 'lancamentos' | 'notas'>('estoque')
@@ -238,6 +240,25 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
     const total = critico + adequado + excesso + semHistorico
     return { critico, adequado, excesso, semHistorico, total, hasHistory: total > semHistorico }
   }, [productBase, receiptBase, covDays])
+
+  const abcMap = useMemo((): Map<string, 'A' | 'B' | 'C'> => {
+    const salesByCode = new Map<string, number>()
+    for (const m of movementBase) {
+      if (m.movementType !== 'venda_faturada' || !m.productCode || !m.value) continue
+      salesByCode.set(m.productCode, (salesByCode.get(m.productCode) ?? 0) + m.value)
+    }
+    if (salesByCode.size === 0) return new Map()
+    const sorted = [...salesByCode.entries()].sort((a, b) => b[1] - a[1])
+    const grandTotal = sorted.reduce((s, [, v]) => s + v, 0)
+    const result = new Map<string, 'A' | 'B' | 'C'>()
+    let acc = 0
+    for (const [code, val] of sorted) {
+      acc += val
+      const pct = acc / grandTotal
+      result.set(code, pct <= 0.8 ? 'A' : pct <= 0.95 ? 'B' : 'C')
+    }
+    return result
+  }, [movementBase])
 
   const treemapData = useMemo(() => {
     const lineMap = new Map<CommercialLine, Map<string, { value: number; items: number }>>()
@@ -700,6 +721,7 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
                           {p.groupName && <span className="p-group">{p.groupName}</span>}
                           {tags[p.id]?.launch && <span className="badge-launch">Lançamento</span>}
                           {tags[p.id]?.pex && <span className="badge-pex">PEX</span>}
+                          {p.internalCode && abcMap.has(p.internalCode) && <span className={`badge-abc badge-abc-${abcMap.get(p.internalCode)!.toLowerCase()}`}>{abcMap.get(p.internalCode)}</span>}
                         </span>
                       </span>
                       <span className="sc-num">
@@ -962,6 +984,7 @@ export function StockTab({ productBase, receiptBase, productIndicators }: {
                             {p.groupName && <span className="p-group">{p.groupName}</span>}
                             {tags[p.id]?.launch && <span className="badge-launch">Lançamento</span>}
                             {tags[p.id]?.pex && <span className="badge-pex">PEX</span>}
+                            {p.internalCode && abcMap.has(p.internalCode) && <span className={`badge-abc badge-abc-${abcMap.get(p.internalCode)!.toLowerCase()}`}>{abcMap.get(p.internalCode)}</span>}
                           </span>
                         </span>
                         <span className="sc-num">
