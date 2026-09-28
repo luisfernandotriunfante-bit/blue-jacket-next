@@ -145,7 +145,8 @@ export async function processProductMotor(files: File[]): Promise<ProductMotorRe
     product.status = 'active'; if (source.manufacturerCode) byManufacturer.set(source.manufacturerCode, product.id)
   }
   // Preço de venda não cadastra item: só atualiza produto que já existe.
-  for (const [key, source] of prices) { const product = products.get(`WINTHOR:${key}`); if (product) merge(product, source) }
+  // O 8011 é a principal fonte de EAN13; adiciona ao byEan para que o 8013 encontre o produto.
+  for (const [key, source] of prices) { const product = products.get(`WINTHOR:${key}`); if (product) { merge(product, source); if (source.ean && !byEan.has(source.ean)) byEan.set(source.ean, product.id) } }
   // A Carteira é a única exceção: pode criar um produto novo, mas somente
   // quando ele realmente está em trânsito. A lista da indústria o enriquece.
   for (const [key, source] of transit) { const product = ensure(resolve(source, `TRANSITO:${key}`), source); merge(product, source); merge(product, industry.get(key)); if (product.status !== 'active') product.status = 'in_transit' }
