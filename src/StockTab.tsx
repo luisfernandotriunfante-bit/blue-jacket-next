@@ -303,19 +303,19 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
     const today = new Date(); today.setHours(0, 0, 0, 0)
     const todayMs = today.getTime()
     const buckets = [
-      { key: 'atrasadas', label: 'Atrasadas', count: 0, value: 0 },
-      { key: 'ate7', label: 'Até 7 dias', count: 0, value: 0 },
-      { key: 'ate15', label: '8 a 15 dias', count: 0, value: 0 },
-      { key: 'mais16', label: '16+ dias', count: 0, value: 0 },
-      { key: 'semdata', label: 'Sem previsão', count: 0, value: 0 },
+      { key: 'atrasadas', label: 'Atrasadas', count: 0 },
+      { key: 'ate7', label: 'Até 7 dias', count: 0 },
+      { key: 'ate15', label: '8 a 15 dias', count: 0 },
+      { key: 'mais16', label: '16+ dias', count: 0 },
+      { key: 'semdata', label: 'Sem previsão', count: 0 },
     ]
     for (const inv of arrivalInvoices) {
-      if (!inv.previewDate) { buckets[4].count++; buckets[4].value += inv.totalValue; continue }
+      if (!inv.previewDate) { buckets[4].count++; continue }
       const diff = Math.round((new Date(inv.previewDate).setHours(0,0,0,0) - todayMs) / 86_400_000)
-      if (diff < 0) { buckets[0].count++; buckets[0].value += inv.totalValue }
-      else if (diff <= 7) { buckets[1].count++; buckets[1].value += inv.totalValue }
-      else if (diff <= 15) { buckets[2].count++; buckets[2].value += inv.totalValue }
-      else { buckets[3].count++; buckets[3].value += inv.totalValue }
+      if (diff < 0) { buckets[0].count++ }
+      else if (diff <= 7) { buckets[1].count++ }
+      else if (diff <= 15) { buckets[2].count++ }
+      else { buckets[3].count++ }
     }
     return buckets
   }, [arrivalInvoices])
@@ -629,9 +629,6 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                         ? <><strong>{b.count}</strong> <span>NF{b.count !== 1 ? 's' : ''}</span></>
                         : <span className="arrivals-bucket-empty">—</span>}
                     </div>
-                    {b.value > 0 && (
-                      <div className="arrivals-bucket-value">R$ {brl(b.value)}</div>
-                    )}
                   </div>
                 ))}
               </div>
