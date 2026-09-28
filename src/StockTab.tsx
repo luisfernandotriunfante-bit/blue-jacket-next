@@ -244,16 +244,18 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
   const abcMap = useMemo((): Map<string, 'A' | 'B' | 'C'> => {
     const salesByCode = new Map<string, number>()
     for (const m of movementBase) {
-      if (m.movementType !== 'venda_faturada' || !m.productCode || !m.value) continue
-      salesByCode.set(m.productCode, (salesByCode.get(m.productCode) ?? 0) + m.value)
+      if (m.movementType !== 'venda_faturada' || !m.productCode) continue
+      const qty = m.quantity ?? 0
+      if (qty <= 0) continue
+      salesByCode.set(m.productCode, (salesByCode.get(m.productCode) ?? 0) + qty)
     }
     if (salesByCode.size === 0) return new Map()
     const sorted = [...salesByCode.entries()].sort((a, b) => b[1] - a[1])
     const grandTotal = sorted.reduce((s, [, v]) => s + v, 0)
     const result = new Map<string, 'A' | 'B' | 'C'>()
     let acc = 0
-    for (const [code, val] of sorted) {
-      acc += val
+    for (const [code, qty] of sorted) {
+      acc += qty
       const pct = acc / grandTotal
       result.set(code, pct <= 0.8 ? 'A' : pct <= 0.95 ? 'B' : 'C')
     }
@@ -329,6 +331,23 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
     }
     return buckets
   }, [arrivalInvoices])
+
+  const importantArrivals = useMemo(() => {
+    const inTransit = new Map<string, number>()
+    for (const r of receiptBase) {
+      if (r.status !== 'em_transito' || !r.productCode || !r.quantity) continue
+      inTransit.set(r.productCode, (inTransit.get(r.productCode) ?? 0) + r.quantity)
+    }
+    const result: Array<{ id: string; description?: string; code?: string; qty: number; isLaunch: boolean; isPex: boolean; avail: number; abc?: 'A' | 'B' | 'C' }> = []
+    for (const p of productBase) {
+      const tag = tags[p.id]
+      if (!tag?.launch && !tag?.pex) continue
+      const qty = p.internalCode ? inTransit.get(p.internalCode) : undefined
+      if (!qty) continue
+      result.push({ id: p.id, description: p.description, code: p.internalCode, qty, isLaunch: !!tag.launch, isPex: !!tag.pex, avail: p.availableStock ?? 0, abc: p.internalCode ? abcMap.get(p.internalCode) : undefined })
+    }
+    return result.sort((a, b) => (b.isPex ? 1 : 0) - (a.isPex ? 1 : 0) || a.avail - b.avail)
+  }, [receiptBase, productBase, tags, abcMap])
 
   const availableChannels = useMemo(() => {
     const seen = new Set<string>()
@@ -625,6 +644,25 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                   </div>
                 ))}
               </div>
+              {importantArrivals.length > 0 && (
+                <div className="arrivals-important">
+                  <div className="arrivals-important-title">Itens marcados chegando</div>
+                  {importantArrivals.map(item => (
+                    <div key={item.id} className="arrivals-important-row">
+                      <span className="arrivals-important-desc">{item.description ?? item.code}</span>
+                      <span className="arrivals-important-badges">
+                        {item.isLaunch && <span className="badge-launch">Lançamento</span>}
+                        {item.isPex && <span className="badge-pex">PEX</span>}
+                        {item.abc && <span className={`badge-abc badge-abc-${item.abc.toLowerCase()}`}>{item.abc}</span>}
+                      </span>
+                      <span className="arrivals-important-qty">
+                        {item.qty.toLocaleString('pt-BR')} chegando
+                        {item.avail <= 0 && <span className="arrivals-important-sem"> · sem estoque</span>}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </>
         ) : subTab === 'produtos' ? (
