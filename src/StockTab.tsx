@@ -484,9 +484,12 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
   const notasKpis = useMemo(() => {
     const cartQty = arrivalInvoices.reduce((s, i) => s + i.totalQty, 0)
     const cartVal = arrivalInvoices.reduce((s, i) => s + i.totalValue, 0)
-    const recVal = receivedInvoices.reduce((s, i) => s + i.totalValue, 0)
+    const now = new Date()
+    const curMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const recThisMonth = receivedInvoices.filter(i => (i.date ?? '').startsWith(curMonth))
+    const recVal = recThisMonth.reduce((s, i) => s + i.totalValue, 0)
     const lastDate = receivedInvoices[0]?.date
-    return { cartNfs: arrivalInvoices.length, cartQty, cartVal, recNfs: receivedInvoices.length, recVal, lastDate }
+    return { cartNfs: arrivalInvoices.length, cartQty, cartVal, recNfs: recThisMonth.length, recVal, lastDate }
   }, [arrivalInvoices, receivedInvoices])
 
   const lastReceipt = useMemo(() => {
@@ -1248,7 +1251,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                 pctLabel="unidades a chegar"
               />
               <KpiCard
-                label="Notas recebidas"
+                label="Recebidas este mês"
                 value={notasKpis.recNfs > 0 ? `${notasKpis.recNfs} NF${notasKpis.recNfs !== 1 ? 's' : ''}` : '—'}
                 accent={notasKpis.recNfs > 0 ? 'blue' : undefined}
                 pctLabel={notasKpis.recVal > 0 ? `R$ ${brl(notasKpis.recVal)}` : 'Nenhuma nota recebida'}
