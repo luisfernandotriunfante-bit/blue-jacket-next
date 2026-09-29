@@ -12,11 +12,12 @@ const kpiCurrency = (n: number) => {
 const fmtPct = (n: number) => `${n.toFixed(1)}%`
 
 /* ── TwoSegmentDonut (mesmo padrão do SellOut) ───────── */
-function TwoSegmentDonut({ label, segA, segALabel, segAVal, segB, segBLabel, segBVal, meta, metaLabel }: {
+function TwoSegmentDonut({ label, segA, segALabel, segAVal, segB, segBLabel, segBVal, meta, metaLabel, net, netLabel }: {
   label: string
   segA: number; segALabel: string; segAVal: string
   segB: number; segBLabel: string; segBVal: string
   meta: number | null; metaLabel: string
+  net?: number; netLabel?: string
 }) {
   const denominator = (meta ?? (segA + segB)) || 1
   const r = 54, cx = 66, cy = 66, circ = 2 * Math.PI * r
@@ -75,6 +76,13 @@ function TwoSegmentDonut({ label, segA, segALabel, segAVal, segB, segBLabel, seg
           <span className="so-hero-info-key">{segBLabel}</span>
           <span className="so-hero-info-val" style={{ color: 'var(--red)' }}>{segBVal}</span>
         </div>
+        {net !== undefined && (
+          <div className="so-hero-info-row">
+            <span className="so-hero-info-dot" style={{ background: 'transparent', border: '1.5px solid var(--muted)' }} />
+            <span className="so-hero-info-key">líquido</span>
+            <span className="so-hero-info-val" style={{ color: 'var(--text)' }}>{netLabel}</span>
+          </div>
+        )}
         <div className="so-hero-info-divider" />
         {meta !== null
           ? <div className="so-hero-info-row so-hero-info-meta">

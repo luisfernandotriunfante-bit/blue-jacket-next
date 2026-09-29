@@ -37,11 +37,12 @@ function readNum(key: string): number | null {
    uma trilha que representa a meta. Se não há meta, usa
    A+B como 100% e mostra a proporção entre os segmentos.
 ─────────────────────────────────────────────────────────── */
-function TwoSegmentDonut({ label, segA, segALabel, segAVal, segB, segBLabel, segBVal, meta, metaLabel }: {
+function TwoSegmentDonut({ label, segA, segALabel, segAVal, segB, segBLabel, segBVal, meta, metaLabel, net, netLabel }: {
   label: string
   segA: number; segALabel: string; segAVal: string
   segB: number; segBLabel: string; segBVal: string
   meta: number | null; metaLabel: string
+  net?: number; netLabel?: string
 }) {
   const denominator = (meta ?? (segA + segB)) || 1
   const r = 54, cx = 66, cy = 66, circ = 2 * Math.PI * r
@@ -104,6 +105,13 @@ function TwoSegmentDonut({ label, segA, segALabel, segAVal, segB, segBLabel, seg
           <span className="so-hero-info-key">{segBLabel}</span>
           <span className="so-hero-info-val" style={{ color: 'var(--red)' }}>{segBVal}</span>
         </div>
+        {net !== undefined && (
+          <div className="so-hero-info-row">
+            <span className="so-hero-info-dot" style={{ background: 'transparent', border: '1.5px solid var(--muted)' }} />
+            <span className="so-hero-info-key">líquido</span>
+            <span className="so-hero-info-val" style={{ color: 'var(--text)' }}>{netLabel}</span>
+          </div>
+        )}
         <div className="so-hero-info-divider" />
         {meta !== null
           ? <div className="so-hero-info-row so-hero-info-meta">
@@ -302,6 +310,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel }: {
             segA={kpis.fat}      segALabel="Faturado"   segAVal={kpiCurrency(kpis.fat)}
             segB={kpis.afat}     segBLabel="A faturar"  segBVal={kpiCurrency(kpis.afat)}
             meta={selloutMeta}   metaLabel={selloutMeta ? kpiCurrency(selloutMeta) : '—'}
+            net={kpis.fat - kpis.dev} netLabel={kpiCurrency(kpis.fat - kpis.dev)}
           />
           <TwoSegmentDonut
             label="Positivações"
