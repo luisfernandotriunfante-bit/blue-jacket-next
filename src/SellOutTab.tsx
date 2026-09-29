@@ -203,8 +203,8 @@ export function SellOutTab({ movementBase, productBase, monthLabel }: {
           if (m.customerCode) { cFat.add(m.customerCode); cTot.add(m.customerCode) }
           if (m.orderId) ped.add(m.orderId)
           break
+        case 'devolucao': fat += m.value ?? 0; dev += m.value ?? 0; break // valor negativo: subtrai do fat, acumula em dev para exibir separado
         case 'a_faturar': afat += m.value ?? 0; if (m.customerCode) cTot.add(m.customerCode); break
-        case 'devolucao': dev += m.value ?? 0; break
         case 'bonificacao': bon += m.value ?? 0; break
         case 'corte': cortes++; break
       }
@@ -307,7 +307,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel }: {
         <div className="so-hero-row">
           <TwoSegmentDonut
             label="Sell Out — Faturamento"
-            segA={kpis.fat + kpis.dev} segALabel="Faturado"  segAVal={kpiCurrency(kpis.fat + kpis.dev)}
+            segA={kpis.fat}            segALabel="Faturado"  segAVal={kpiCurrency(kpis.fat)}
             segB={kpis.afat}           segBLabel="A faturar" segBVal={kpiCurrency(kpis.afat)}
             meta={selloutMeta}         metaLabel={selloutMeta ? kpiCurrency(selloutMeta) : '—'}
           />

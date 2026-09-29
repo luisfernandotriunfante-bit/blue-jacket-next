@@ -174,10 +174,11 @@ export function GerencialTab({ movementBase, monthLabel }: {
     const map = new Map<string, { fat: number; afat: number; customers: Set<string>; name: string }>()
     for (const m of monthBase) {
       if (!m.sellerCode) continue
-      if (m.movementType !== 'venda_faturada' && m.movementType !== 'a_faturar') continue
+      if (m.movementType !== 'venda_faturada' && m.movementType !== 'a_faturar' && m.movementType !== 'devolucao') continue
       if (!map.has(m.sellerCode)) map.set(m.sellerCode, { fat: 0, afat: 0, customers: new Set(), name: m.seller ?? m.sellerCode })
       const e = map.get(m.sellerCode)!
       if (m.movementType === 'venda_faturada') { e.fat += m.value ?? 0; if (m.customerCode) e.customers.add(m.customerCode) }
+      else if (m.movementType === 'devolucao') { e.fat += m.value ?? 0 } // valor negativo, subtrai
       else e.afat += m.value ?? 0
       if (m.seller) e.name = m.seller
     }
