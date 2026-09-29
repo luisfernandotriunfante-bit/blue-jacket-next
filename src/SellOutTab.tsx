@@ -307,10 +307,9 @@ export function SellOutTab({ movementBase, productBase, monthLabel }: {
         <div className="so-hero-row">
           <TwoSegmentDonut
             label="Sell Out — Faturamento"
-            segA={kpis.fat}      segALabel="Faturado"   segAVal={kpiCurrency(kpis.fat)}
-            segB={kpis.afat}     segBLabel="A faturar"  segBVal={kpiCurrency(kpis.afat)}
-            meta={selloutMeta}   metaLabel={selloutMeta ? kpiCurrency(selloutMeta) : '—'}
-            net={kpis.fat + kpis.dev} netLabel={kpiCurrency(kpis.fat + kpis.dev)}
+            segA={kpis.fat + kpis.dev} segALabel="Faturado"  segAVal={kpiCurrency(kpis.fat + kpis.dev)}
+            segB={kpis.afat}           segBLabel="A faturar" segBVal={kpiCurrency(kpis.afat)}
+            meta={selloutMeta}         metaLabel={selloutMeta ? kpiCurrency(selloutMeta) : '—'}
           />
           <TwoSegmentDonut
             label="Positivações"
