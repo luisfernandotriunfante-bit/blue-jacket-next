@@ -11,39 +11,115 @@ const kpiCurrency = (n: number) => {
 }
 const fmtPct = (n: number) => `${n.toFixed(1)}%`
 
-/* ── achievement badge ───────────────────────────────── */
-function AtingBadge({ pct }: { pct: number | null }) {
-  if (pct === null) return <span style={{ color: 'var(--muted)' }}>—</span>
-  const cls = pct >= 100 ? 'gr-ating-ok' : pct >= 70 ? 'gr-ating-mid' : 'gr-ating-low'
-  return <span className={`gr-ating ${cls}`}>{fmtPct(pct)}</span>
+/* ── TwoSegmentDonut (mesmo padrão do SellOut) ───────── */
+function TwoSegmentDonut({ label, segA, segALabel, segAVal, segB, segBLabel, segBVal, meta, metaLabel }: {
+  label: string
+  segA: number; segALabel: string; segAVal: string
+  segB: number; segBLabel: string; segBVal: string
+  meta: number | null; metaLabel: string
+}) {
+  const denominator = (meta ?? (segA + segB)) || 1
+  const r = 54, cx = 66, cy = 66, circ = 2 * Math.PI * r
+  const clampA = Math.min(segA / denominator, 1)
+  const clampAB = Math.min((segA + segB) / denominator, 1)
+  const gap = 4
+  const arcA = Math.max(0, clampA * circ - gap)
+  const arcB = Math.max(0, (clampAB - clampA) * circ - gap)
+  const hasData = segA + segB > 0
+  const pctA = Math.round(clampA * 100)
+  const pctB = Math.round((clampAB - clampA) * 100)
+
+  return (
+    <div className="so-hero-card so-hero-card-lg">
+      <div className="so-hero-label">{label}</div>
+      <div className="so-hero-svg-wrap-lg">
+        <svg viewBox="0 0 132 132">
+          <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--border)" strokeWidth={13} />
+          {hasData && (
+            <g transform={`rotate(-90 ${cx} ${cy})`}>
+              {arcA > 0 && (
+                <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--blue)" strokeWidth={13}
+                  strokeDasharray={`${arcA} ${circ}`} strokeLinecap="round" />
+              )}
+              {arcB > 0 && (
+                <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--red)" strokeWidth={13}
+                  strokeDasharray={`${arcB} ${circ}`} strokeDashoffset={-(clampA * circ)}
+                  strokeLinecap="round" />
+              )}
+            </g>
+          )}
+          {hasData
+            ? <>
+                <text x={cx} y={cy - 10} textAnchor="middle" fontSize={22} fontWeight={800}
+                  fill="var(--blue)" fontFamily="Space Grotesk, sans-serif">{pctA}%</text>
+                <text x={cx} y={cy + 6} textAnchor="middle" fontSize={10} fill="var(--muted)"
+                  fontFamily="Space Grotesk, sans-serif">faturado</text>
+                {meta !== null && pctB > 0 && (
+                  <text x={cx} y={cy + 20} textAnchor="middle" fontSize={10} fontWeight={700}
+                    fill="var(--red)" fontFamily="Space Grotesk, sans-serif">+{pctB}%</text>
+                )}
+              </>
+            : <text x={cx} y={cy + 4} textAnchor="middle" fontSize={10} fill="var(--muted)"
+                fontFamily="Space Grotesk, sans-serif">sem dados</text>
+          }
+        </svg>
+      </div>
+      <div className="so-hero-info">
+        <div className="so-hero-info-row">
+          <span className="so-hero-info-dot" style={{ background: 'var(--blue)' }} />
+          <span className="so-hero-info-key">{segALabel}</span>
+          <span className="so-hero-info-val" style={{ color: 'var(--blue)' }}>{segAVal}</span>
+        </div>
+        <div className="so-hero-info-row">
+          <span className="so-hero-info-dot" style={{ background: 'var(--red)' }} />
+          <span className="so-hero-info-key">{segBLabel}</span>
+          <span className="so-hero-info-val" style={{ color: 'var(--red)' }}>{segBVal}</span>
+        </div>
+        <div className="so-hero-info-divider" />
+        {meta !== null
+          ? <div className="so-hero-info-row so-hero-info-meta">
+              <span className="so-hero-info-key">meta</span>
+              <span className="so-hero-info-val">{metaLabel}</span>
+            </div>
+          : <div className="so-hero-no-meta">cadastre metas em Vendedores</div>
+        }
+      </div>
+    </div>
+  )
 }
 
 /* ── Pódio ───────────────────────────────────────────── */
-const MEDAL = ['🥇', '🥈', '🥉']
-const PODIUM_ORDER = [1, 0, 2] // 2nd, 1st, 3rd visually
+const MEDAL_EMOJI = ['🥇', '🥈', '🥉']
+const PODIUM_VISUAL_ORDER = [1, 0, 2] // esquerda=2º, centro=1º, direita=3º
 
-function Podium({ sellers }: { sellers: { name: string; achievement: number; fat: number; code: string }[] }) {
+function Podium({ sellers }: { sellers: { name: string; achievement: number; fat: number }[] }) {
   if (!sellers.length) return null
-  const heights = ['60px', '90px', '44px']
   return (
     <div className="gr-podium">
-      {PODIUM_ORDER.map(idx => {
-        const s = sellers[idx]
-        if (!s) return <div key={idx} className="gr-podium-slot" />
-        const rank = idx + 1
+      {PODIUM_VISUAL_ORDER.map(rank => {
+        const s = sellers[rank]
+        if (!s) return <div key={rank} className={`gr-podium-card gr-podium-card-${rank + 1}`} />
+        const isFirst = rank === 0
         return (
-          <div key={idx} className={`gr-podium-slot gr-podium-rank-${rank}`}>
-            <div className="gr-podium-name">{s.name.split(' ')[0]}</div>
-            <div className="gr-podium-pct">{fmtPct(s.achievement)}</div>
-            <div className="gr-podium-fat">{kpiCurrency(s.fat)}</div>
-            <div className="gr-podium-block" style={{ height: heights[idx] }}>
-              <span className="gr-podium-medal">{MEDAL[idx]}</span>
+          <div key={rank} className={`gr-podium-card gr-podium-card-${rank + 1}`}>
+            <div className="gr-podium-medal">{MEDAL_EMOJI[rank]}</div>
+            <div className="gr-podium-name" title={s.name}>{s.name.split(' ').slice(0, 2).join(' ')}</div>
+            <div className="gr-podium-pct" style={{ color: isFirst ? 'var(--blue)' : 'var(--text)' }}>
+              {fmtPct(s.achievement)}
             </div>
+            <div className="gr-podium-fat">{kpiCurrency(s.fat)}</div>
           </div>
         )
       })}
     </div>
   )
+}
+
+/* ── achievement badge ───────────────────────────────── */
+function AtingBadge({ pct }: { pct: number | null }) {
+  if (pct === null) return <span style={{ color: 'var(--muted)' }}>—</span>
+  const cls = pct >= 100 ? 'gr-ating-ok' : pct >= 70 ? 'gr-ating-mid' : 'gr-ating-low'
+  return <span className={`gr-ating ${cls}`}>{fmtPct(pct)}</span>
 }
 
 /* ── seller row data ─────────────────────────────────── */
@@ -122,7 +198,6 @@ export function GerencialTab({ movementBase, monthLabel }: {
     return rows
   }, [rcas, movStats, activeCodesThisMonth])
 
-  // Sort ranking: by achievement % desc (sellers without goal go to bottom, sorted by fat)
   const ranked = useMemo(() =>
     [...allSellers].sort((a, b) => {
       if (a.achievement !== null && b.achievement !== null) return b.achievement - a.achievement
@@ -167,18 +242,16 @@ export function GerencialTab({ movementBase, monthLabel }: {
       })
   }, [allSellers])
 
-  // Filial KPIs
   const filialGoal = rcas.reduce((s, r) => s + (r.goal ?? 0), 0)
   const filialFat = allSellers.reduce((s, r) => s + r.fat, 0)
-  const filialAchievement = filialGoal > 0 ? (filialFat / filialGoal) * 100 : null
+  const filialAfat = allSellers.reduce((s, r) => s + r.afat, 0)
 
-  // Pódio: top 3 by achievement %, active this month, with goal
   const podiumSellers = useMemo(() =>
     [...allSellers]
       .filter(s => s.achievement !== null && s.activeThisMonth)
       .sort((a, b) => (b.achievement ?? 0) - (a.achievement ?? 0))
       .slice(0, 3)
-      .map(s => ({ name: s.name, achievement: s.achievement!, fat: s.fat, code: s.code }))
+      .map(s => ({ name: s.name, achievement: s.achievement!, fat: s.fat }))
   , [allSellers])
 
   const hasRcas = rcas.length > 0
@@ -196,43 +269,18 @@ export function GerencialTab({ movementBase, monthLabel }: {
 
   return (
     <section className="content">
-      {/* KPIs + Pódio */}
-      <div className="gr-top-row">
-        {/* Meta da filial */}
-        <div className="gr-filial-kpi">
-          <div className="gr-filial-label">META DA FILIAL</div>
-          <div className="gr-filial-val">{filialGoal > 0 ? kpiCurrency(filialGoal) : '—'}</div>
-          <div className="gr-filial-row">
-            <div>
-              <div className="gr-filial-sub-label">FATURADO</div>
-              <div className="gr-filial-sub-val" style={{ color: 'var(--blue)' }}>{kpiCurrency(filialFat)}</div>
-            </div>
-            {filialAchievement !== null && (
-              <div>
-                <div className="gr-filial-sub-label">ATINGIMENTO</div>
-                <div className="gr-filial-sub-val" style={{ color: filialAchievement >= 100 ? 'var(--blue)' : filialAchievement >= 70 ? '#f59e0b' : 'var(--red)' }}>
-                  {fmtPct(filialAchievement)}
-                </div>
-              </div>
-            )}
-          </div>
-          {filialGoal > 0 && (
-            <div className="gr-filial-progress-wrap">
-              <div
-                className="gr-filial-progress-bar"
-                style={{
-                  width: `${Math.min(100, filialAchievement ?? 0).toFixed(1)}%`,
-                  background: (filialAchievement ?? 0) >= 100 ? 'var(--blue)' : (filialAchievement ?? 0) >= 70 ? '#f59e0b' : 'var(--red)',
-                }}
-              />
-            </div>
-          )}
-        </div>
+      {/* KPIs: donut filial + pódio */}
+      <div className="so-hero-grid" style={{ marginBottom: 24 }}>
+        <TwoSegmentDonut
+          label="META DA FILIAL"
+          segA={filialFat} segALabel="Faturado" segAVal={kpiCurrency(filialFat)}
+          segB={filialAfat} segBLabel="A faturar" segBVal={kpiCurrency(filialAfat)}
+          meta={filialGoal > 0 ? filialGoal : null} metaLabel={kpiCurrency(filialGoal)}
+        />
 
-        {/* Pódio */}
         {podiumSellers.length > 0 && (
-          <div className="gr-podium-wrap">
-            <div className="gr-filial-label" style={{ marginBottom: 8 }}>PÓDIO · {monthLabel}</div>
+          <div className="so-hero-card" style={{ flex: 1 }}>
+            <div className="so-hero-label">PÓDIO · {monthLabel}</div>
             <Podium sellers={podiumSellers} />
           </div>
         )}
