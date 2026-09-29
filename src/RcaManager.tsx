@@ -6,6 +6,7 @@ export interface RcaRecord {
   name: string
   city: string
   supervisor: string
+  supervisorCode: string
   type: 'clt' | 'pj' | ''
   class: string
   goal: number | null
@@ -33,7 +34,7 @@ function persistRcas(list: RcaRecord[]) {
 }
 
 /* ── empty form ──────────────────────────────────────── */
-const EMPTY: RcaRecord = { code: '', name: '', city: '', supervisor: '', type: '', class: '', goal: null, active: true }
+const EMPTY: RcaRecord = { code: '', name: '', city: '', supervisor: '', supervisorCode: '', type: '', class: '', goal: null, active: true }
 
 /* ── RcaManager ──────────────────────────────────────── */
 export function RcaManager() {
@@ -170,6 +171,14 @@ export function RcaManager() {
                     <option key={s} value={s} />
                   ))}
                 </datalist>
+              </div>
+              <div className="rca-field">
+                <label>Cód. Supervisor</label>
+                <input
+                  value={editing.supervisorCode}
+                  onChange={e => setField('supervisorCode', e.target.value)}
+                  placeholder="Ex.: 10"
+                />
               </div>
               <div className="rca-field">
                 <label>Tipo</label>
