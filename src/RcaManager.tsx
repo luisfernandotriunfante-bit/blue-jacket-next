@@ -182,21 +182,23 @@ export function RcaManager() {
               </div>
               <div className="rca-field">
                 <label>Tipo</label>
-                <select value={editing.type} onChange={e => setField('type', e.target.value as 'clt' | 'pj' | '')}>
-                  <option value="">Selecione</option>
-                  <option value="clt">CLT</option>
-                  <option value="pj">PJ</option>
-                </select>
+                <div className="rca-btn-group">
+                  {(['', 'clt', 'pj'] as const).map(v => (
+                    <button key={v} type="button" className={`rca-opt-btn${editing.type === v ? ' on' : ''}`} onClick={() => setField('type', v)}>
+                      {v === '' ? '—' : v.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="rca-field">
                 <label>Classe</label>
-                <select value={editing.class} onChange={e => setField('class', e.target.value)}>
-                  <option value="">Selecione</option>
-                  <option value="varejo">Varejo</option>
-                  <option value="medias_contas">Médias Contas</option>
-                  <option value="grandes_contas">Grandes Contas</option>
-                  <option value="televendas">Televendas</option>
-                </select>
+                <div className="rca-btn-group">
+                  {([['', '—'], ['varejo', 'Varejo'], ['medias_contas', 'Médias'], ['grandes_contas', 'Grandes'], ['televendas', 'Telev.']] as const).map(([v, label]) => (
+                    <button key={v} type="button" className={`rca-opt-btn${editing.class === v ? ' on' : ''}`} onClick={() => setField('class', v)}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="rca-field rca-field-full">
                 <label>Meta mensal (R$)</label>

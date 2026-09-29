@@ -572,9 +572,12 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 .rca-field { display: flex; flex-direction: column; gap: 5px; }
 .rca-field-full { grid-column: 1 / -1; }
 .rca-field label { font-size: 10px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
-.rca-field input, .rca-field select { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 13px; color: var(--text); font-family: inherit; outline: none; transition: border-color .15s; }
-.theme-dark .rca-field select { color-scheme: dark; }
-.theme-light .rca-field select { color-scheme: light; }
+.rca-field input { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 13px; color: var(--text); font-family: inherit; outline: none; transition: border-color .15s; }
+.rca-btn-group { display: flex; gap: 0; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.rca-opt-btn { flex: 1; padding: 8px 6px; font-size: 12px; font-weight: 700; border: none; border-right: 1px solid var(--border); background: var(--bg); color: var(--muted); cursor: pointer; transition: background .12s, color .12s; font-family: 'Space Grotesk', sans-serif; white-space: nowrap; }
+.rca-opt-btn:last-child { border-right: none; }
+.rca-opt-btn:hover { background: var(--surface-raised); color: var(--text); }
+.rca-opt-btn.on { background: var(--blue); color: #fff; }
 .rca-field input:focus, .rca-field select:focus { border-color: var(--blue); }
 .rca-field input:disabled { opacity: .45; cursor: not-allowed; }
 .rca-modal-actions { display: flex; gap: 10px; }
