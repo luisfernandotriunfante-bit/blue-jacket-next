@@ -11,24 +11,39 @@ const kpiCurrency = (n: number) => {
 }
 const fmtPct = (n: number) => `${n.toFixed(1)}%`
 
-/* ── KpiCard ─────────────────────────────────────────── */
-function KpiCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div className="kpi-card">
-      <div className="kpi-card-body">
-        <div className="kpi-label">{label}</div>
-        <div className="kpi-val">{value}</div>
-        {sub && <div className="kpi-ring-row"><span className="kpi-pct">{sub}</span></div>}
-      </div>
-    </div>
-  )
-}
-
 /* ── achievement badge ───────────────────────────────── */
 function AtingBadge({ pct }: { pct: number | null }) {
   if (pct === null) return <span style={{ color: 'var(--muted)' }}>—</span>
   const cls = pct >= 100 ? 'gr-ating-ok' : pct >= 70 ? 'gr-ating-mid' : 'gr-ating-low'
   return <span className={`gr-ating ${cls}`}>{fmtPct(pct)}</span>
+}
+
+/* ── Pódio ───────────────────────────────────────────── */
+const MEDAL = ['🥇', '🥈', '🥉']
+const PODIUM_ORDER = [1, 0, 2] // 2nd, 1st, 3rd visually
+
+function Podium({ sellers }: { sellers: { name: string; achievement: number; fat: number; code: string }[] }) {
+  if (!sellers.length) return null
+  const heights = ['60px', '90px', '44px']
+  return (
+    <div className="gr-podium">
+      {PODIUM_ORDER.map(idx => {
+        const s = sellers[idx]
+        if (!s) return <div key={idx} className="gr-podium-slot" />
+        const rank = idx + 1
+        return (
+          <div key={idx} className={`gr-podium-slot gr-podium-rank-${rank}`}>
+            <div className="gr-podium-name">{s.name.split(' ')[0]}</div>
+            <div className="gr-podium-pct">{fmtPct(s.achievement)}</div>
+            <div className="gr-podium-fat">{kpiCurrency(s.fat)}</div>
+            <div className="gr-podium-block" style={{ height: heights[idx] }}>
+              <span className="gr-podium-medal">{MEDAL[idx]}</span>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 /* ── seller row data ─────────────────────────────────── */
@@ -71,7 +86,6 @@ export function GerencialTab({ movementBase, monthLabel }: {
     movementBase.filter(m => { const d = m.movementDate ?? ''; return d >= monthStart && d <= monthEnd })
   , [movementBase, monthStart, monthEnd])
 
-  // Per-seller movement stats (from movements)
   const movStats = useMemo(() => {
     const map = new Map<string, { fat: number; afat: number; customers: Set<string>; name: string }>()
     for (const m of monthBase) {
@@ -88,59 +102,36 @@ export function GerencialTab({ movementBase, monthLabel }: {
 
   const activeCodesThisMonth = useMemo(() => new Set(movStats.keys()), [movStats])
 
-  // Build unified seller list: RCA records + unregistered sellers from movements
   const allSellers = useMemo((): SellerRow[] => {
     const rows: SellerRow[] = []
     const seenCodes = new Set<string>()
 
-    // RCA registered sellers
     for (const rca of rcas) {
       seenCodes.add(rca.code)
       const stats = movStats.get(rca.code)
       const fat = stats?.fat ?? 0
       const achievement = rca.goal && rca.goal > 0 ? (fat / rca.goal) * 100 : null
-      rows.push({
-        rca,
-        code: rca.code,
-        name: rca.name,
-        fat,
-        afat: stats?.afat ?? 0,
-        customers: stats?.customers.size ?? 0,
-        goal: rca.goal,
-        achievement,
-        activeThisMonth: activeCodesThisMonth.has(rca.code),
-      })
+      rows.push({ rca, code: rca.code, name: rca.name, fat, afat: stats?.afat ?? 0, customers: stats?.customers.size ?? 0, goal: rca.goal, achievement, activeThisMonth: activeCodesThisMonth.has(rca.code) })
     }
 
-    // Sellers in movements but not in RCA register
     for (const [code, stats] of movStats) {
       if (seenCodes.has(code)) continue
-      rows.push({
-        rca: null,
-        code,
-        name: stats.name,
-        fat: stats.fat,
-        afat: stats.afat,
-        customers: stats.customers.size,
-        goal: null,
-        achievement: null,
-        activeThisMonth: true,
-      })
+      rows.push({ rca: null, code, name: stats.name, fat: stats.fat, afat: stats.afat, customers: stats.customers.size, goal: null, achievement: null, activeThisMonth: true })
     }
 
     return rows
   }, [rcas, movStats, activeCodesThisMonth])
 
-  // Sorted ranking
+  // Sort ranking: by achievement % desc (sellers without goal go to bottom, sorted by fat)
   const ranked = useMemo(() =>
     [...allSellers].sort((a, b) => {
-      const aScore = a.achievement ?? a.fat
-      const bScore = b.achievement ?? b.fat
-      return bScore - aScore
+      if (a.achievement !== null && b.achievement !== null) return b.achievement - a.achievement
+      if (a.achievement !== null) return -1
+      if (b.achievement !== null) return 1
+      return b.fat - a.fat
     })
   , [allSellers])
 
-  // Teams: group active RCA sellers by supervisor
   const teams = useMemo(() => {
     const map = new Map<string, SellerRow[]>()
     for (const row of allSellers) {
@@ -148,24 +139,47 @@ export function GerencialTab({ movementBase, monthLabel }: {
       if (!map.has(sup)) map.set(sup, [])
       map.get(sup)!.push(row)
     }
-    // Sort teams by total fat desc
     return [...map.entries()]
-      .map(([supervisor, members]) => ({
-        supervisor,
-        members: members.sort((a, b) => (b.achievement ?? b.fat) - (a.achievement ?? a.fat)),
-        totalFat: members.reduce((s, m) => s + m.fat, 0),
-        activeCount: members.filter(m => m.activeThisMonth).length,
-        inactiveCount: members.filter(m => !m.activeThisMonth).length,
-      }))
-      .sort((a, b) => b.totalFat - a.totalFat)
+      .map(([supervisor, members]) => {
+        const teamGoal = members.reduce((s, m) => s + (m.goal ?? 0), 0)
+        const totalFat = members.reduce((s, m) => s + m.fat, 0)
+        const teamAchievement = teamGoal > 0 ? (totalFat / teamGoal) * 100 : null
+        return {
+          supervisor,
+          members: [...members].sort((a, b) => {
+            if (a.achievement !== null && b.achievement !== null) return b.achievement - a.achievement
+            if (a.achievement !== null) return -1
+            if (b.achievement !== null) return 1
+            return b.fat - a.fat
+          }),
+          totalFat,
+          teamGoal,
+          teamAchievement,
+          activeCount: members.filter(m => m.activeThisMonth).length,
+          inactiveCount: members.filter(m => !m.activeThisMonth).length,
+        }
+      })
+      .sort((a, b) => {
+        if (a.teamAchievement !== null && b.teamAchievement !== null) return b.teamAchievement - a.teamAchievement
+        if (a.teamAchievement !== null) return -1
+        if (b.teamAchievement !== null) return 1
+        return b.totalFat - a.totalFat
+      })
   }, [allSellers])
 
-  // KPIs
-  const totalActive = allSellers.filter(s => s.activeThisMonth).length
-  const totalInactive = allSellers.filter(s => !s.activeThisMonth).length
-  const withGoal = allSellers.filter(s => s.achievement !== null)
-  const avgAchievement = withGoal.length ? withGoal.reduce((s, r) => s + (r.achievement ?? 0), 0) / withGoal.length : null
-  const top = ranked.find(s => s.activeThisMonth) ?? null
+  // Filial KPIs
+  const filialGoal = rcas.reduce((s, r) => s + (r.goal ?? 0), 0)
+  const filialFat = allSellers.reduce((s, r) => s + r.fat, 0)
+  const filialAchievement = filialGoal > 0 ? (filialFat / filialGoal) * 100 : null
+
+  // Pódio: top 3 by achievement %, active this month, with goal
+  const podiumSellers = useMemo(() =>
+    [...allSellers]
+      .filter(s => s.achievement !== null && s.activeThisMonth)
+      .sort((a, b) => (b.achievement ?? 0) - (a.achievement ?? 0))
+      .slice(0, 3)
+      .map(s => ({ name: s.name, achievement: s.achievement!, fat: s.fat, code: s.code }))
+  , [allSellers])
 
   const hasRcas = rcas.length > 0
 
@@ -182,17 +196,45 @@ export function GerencialTab({ movementBase, monthLabel }: {
 
   return (
     <section className="content">
-      {/* KPIs */}
-      <div className="stock-kpis" style={{ marginBottom: 20 }}>
-        <KpiCard label="Ativos no mês" value={String(totalActive)} />
-        <KpiCard label="Inativos no mês" value={String(totalInactive)} />
-        {avgAchievement !== null && <KpiCard label="Atingimento médio" value={fmtPct(avgAchievement)} />}
-        {top && (
-          <KpiCard
-            label="Melhor vendedor"
-            value={top.name}
-            sub={top.achievement !== null ? fmtPct(top.achievement) : kpiCurrency(top.fat)}
-          />
+      {/* KPIs + Pódio */}
+      <div className="gr-top-row">
+        {/* Meta da filial */}
+        <div className="gr-filial-kpi">
+          <div className="gr-filial-label">META DA FILIAL</div>
+          <div className="gr-filial-val">{filialGoal > 0 ? kpiCurrency(filialGoal) : '—'}</div>
+          <div className="gr-filial-row">
+            <div>
+              <div className="gr-filial-sub-label">FATURADO</div>
+              <div className="gr-filial-sub-val" style={{ color: 'var(--blue)' }}>{kpiCurrency(filialFat)}</div>
+            </div>
+            {filialAchievement !== null && (
+              <div>
+                <div className="gr-filial-sub-label">ATINGIMENTO</div>
+                <div className="gr-filial-sub-val" style={{ color: filialAchievement >= 100 ? 'var(--blue)' : filialAchievement >= 70 ? '#f59e0b' : 'var(--red)' }}>
+                  {fmtPct(filialAchievement)}
+                </div>
+              </div>
+            )}
+          </div>
+          {filialGoal > 0 && (
+            <div className="gr-filial-progress-wrap">
+              <div
+                className="gr-filial-progress-bar"
+                style={{
+                  width: `${Math.min(100, filialAchievement ?? 0).toFixed(1)}%`,
+                  background: (filialAchievement ?? 0) >= 100 ? 'var(--blue)' : (filialAchievement ?? 0) >= 70 ? '#f59e0b' : 'var(--red)',
+                }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Pódio */}
+        {podiumSellers.length > 0 && (
+          <div className="gr-podium-wrap">
+            <div className="gr-filial-label" style={{ marginBottom: 8 }}>PÓDIO · {monthLabel}</div>
+            <Podium sellers={podiumSellers} />
+          </div>
         )}
       </div>
 
@@ -213,7 +255,7 @@ export function GerencialTab({ movementBase, monthLabel }: {
         <div className="notas-section" style={{ marginBottom: 24 }}>
           <div className="notas-section-head">
             <span className="notas-section-title">Ranking · {monthLabel}</span>
-            {!withGoal.length && (
+            {!allSellers.some(s => s.achievement !== null) && (
               <small style={{ color: 'var(--muted)', fontSize: 11 }}>sem metas — ordenado por faturado</small>
             )}
           </div>
@@ -275,18 +317,28 @@ export function GerencialTab({ movementBase, monthLabel }: {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {teams.map(team => {
             const isExpanded = expandedTeam === team.supervisor
-            const teamRanked = [...team.members].sort((a, b) => (b.achievement ?? b.fat) - (a.achievement ?? a.fat))
-
             return (
               <div key={team.supervisor} className="gr-team-card">
                 <div className="gr-team-head" onClick={() => setExpandedTeam(isExpanded ? null : team.supervisor)}>
                   <div className="gr-team-info">
                     <div className="gr-team-name">{team.supervisor}</div>
-                    <div className="gr-team-sup">{team.members.length} vendedor{team.members.length !== 1 ? 'es' : ''}</div>
+                    <div className="gr-team-sup">{team.members.length} vendedor{team.members.length !== 1 ? 'es' : ''} · {team.activeCount} ativo{team.activeCount !== 1 ? 's' : ''}</div>
                   </div>
                   <div className="gr-team-stats">
-                    <span style={{ color: 'var(--muted)', fontSize: 12 }}>{team.activeCount} ativos{team.inactiveCount > 0 ? ` · ${team.inactiveCount} inativos` : ''}</span>
-                    <span style={{ color: 'var(--blue)', fontWeight: 800, fontFamily: 'Space Grotesk, sans-serif' }}>{kpiCurrency(team.totalFat)}</span>
+                    {team.teamGoal > 0 && (
+                      <div className="gr-team-goal-block">
+                        <span className="gr-team-goal-label">META</span>
+                        <span className="gr-team-goal-val">{kpiCurrency(team.teamGoal)}</span>
+                      </div>
+                    )}
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ color: 'var(--blue)', fontWeight: 800, fontFamily: 'Space Grotesk, sans-serif', fontSize: 14 }}>{kpiCurrency(team.totalFat)}</div>
+                      {team.teamAchievement !== null && (
+                        <div style={{ fontSize: 11, color: team.teamAchievement >= 100 ? 'var(--blue)' : team.teamAchievement >= 70 ? '#f59e0b' : 'var(--red)', fontWeight: 700 }}>
+                          {fmtPct(team.teamAchievement)}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <span className="gr-team-chevron">{isExpanded ? '▲' : '▼'}</span>
                 </div>
@@ -307,7 +359,7 @@ export function GerencialTab({ movementBase, monthLabel }: {
                           </tr>
                         </thead>
                         <tbody>
-                          {teamRanked.map((s, i) => (
+                          {team.members.map((s, i) => (
                             <tr key={s.code} className={`gr-row${!s.activeThisMonth ? ' gr-row-inactive' : ''}`}>
                               <td className="gr-rank">#{i + 1}</td>
                               <td>
@@ -347,12 +399,6 @@ export function GerencialTab({ movementBase, monthLabel }: {
               </div>
             )
           })}
-          {!hasRcas && (
-            <div className="so-empty">
-              <p>Nenhum vendedor cadastrado.</p>
-              <small>Cadastre os vendedores em <strong>Administração → Vendedores</strong>.</small>
-            </div>
-          )}
         </div>
       )}
 
