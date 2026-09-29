@@ -538,36 +538,21 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 .gr-inactive-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
 .gr-inactive-tag { font-size: 10px; color: var(--muted); background: var(--border); padding: 2px 6px; border-radius: 4px; }
 
-/* ── Gerencial: topo (filial KPI + pódio) ─────────────────── */
-.gr-top-row { display: grid; grid-template-columns: 280px 1fr; gap: 16px; margin-bottom: 24px; align-items: start; }
-@media (max-width: 700px) { .gr-top-row { grid-template-columns: 1fr; } }
-
-.gr-filial-kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
-.gr-filial-label { font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--red); margin-bottom: 6px; }
-.gr-filial-val { font-size: 28px; font-weight: 800; font-family: 'Space Grotesk', sans-serif; color: var(--text); margin-bottom: 14px; }
-.gr-filial-row { display: flex; gap: 24px; margin-bottom: 14px; }
-.gr-filial-sub-label { font-size: 8px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
-.gr-filial-sub-val { font-size: 16px; font-weight: 800; font-family: 'Space Grotesk', sans-serif; }
-.gr-filial-progress-wrap { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
-.gr-filial-progress-bar { height: 100%; border-radius: 3px; transition: width .5s; }
-
+/* ── Gerencial: team goal block (usado no header do card de equipe) */
 .gr-team-goal-block { display: flex; flex-direction: column; align-items: flex-end; }
 .gr-team-goal-label { font-size: 8px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .gr-team-goal-val { font-size: 12px; font-weight: 700; color: var(--muted); font-family: 'Space Grotesk', sans-serif; }
 
-/* ── Pódio ─────────────────────────────────────────────────── */
-.gr-podium-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
-.gr-podium { display: flex; align-items: flex-end; justify-content: center; gap: 8px; height: 160px; }
-.gr-podium-slot { display: flex; flex-direction: column; align-items: center; flex: 1; }
-.gr-podium-name { font-size: 11px; font-weight: 800; color: var(--text); text-align: center; margin-bottom: 3px; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gr-podium-pct { font-size: 13px; font-weight: 800; font-family: 'Space Grotesk', sans-serif; color: var(--text); }
-.gr-podium-fat { font-size: 10px; color: var(--muted); margin-bottom: 6px; }
-.gr-podium-block { width: 100%; border-radius: 8px 8px 0 0; display: flex; align-items: flex-start; justify-content: center; padding-top: 8px; }
-.gr-podium-rank-1 .gr-podium-block { background: rgba(59,130,246,.18); border: 1px solid rgba(59,130,246,.4); border-bottom: none; }
-.gr-podium-rank-2 .gr-podium-block { background: rgba(255,255,255,.06); border: 1px solid var(--border); border-bottom: none; }
-.gr-podium-rank-3 .gr-podium-block { background: rgba(255,255,255,.04); border: 1px solid var(--border); border-bottom: none; }
-.gr-podium-rank-1 .gr-podium-pct { color: var(--blue); }
-.gr-podium-medal { font-size: 18px; }
+/* ── Pódio cards ───────────────────────────────────────────── */
+.gr-podium { display: flex; align-items: flex-end; justify-content: center; gap: 8px; padding: 8px 4px 4px; width: 100%; }
+.gr-podium-card { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 12px 8px 10px; border-radius: 10px; background: var(--surface-raised); border: 1px solid var(--border); text-align: center; min-width: 0; }
+.gr-podium-card-1 { background: rgba(59,130,246,.10); border-color: rgba(59,130,246,.35); padding-top: 18px; padding-bottom: 14px; }
+.gr-podium-card-2 { opacity: .9; }
+.gr-podium-card-3 { opacity: .8; }
+.gr-podium-medal { font-size: 20px; line-height: 1; }
+.gr-podium-name { font-size: 11px; font-weight: 800; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.gr-podium-pct { font-size: 14px; font-weight: 800; font-family: 'Space Grotesk', sans-serif; }
+.gr-podium-fat { font-size: 10px; color: var(--muted); }
 
 /* ── Aba Clientes ─────────────────────────────────────────── */
 .cl-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
