@@ -541,3 +541,53 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 /* ── Aba Clientes ─────────────────────────────────────────── */
 .cl-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
 @media (max-width: 720px) { .cl-toolbar { flex-direction: column; align-items: stretch; } }
+
+.cl-dias-badge { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 800; letter-spacing: .04em; white-space: nowrap; font-family: 'Space Grotesk', sans-serif; }
+.cl-dias-ok { background: rgba(59,130,246,.10); color: var(--blue); border: 1px solid rgba(59,130,246,.25); }
+.cl-dias-mid { background: rgba(245,158,11,.10); color: #f59e0b; border: 1px solid rgba(245,158,11,.25); }
+.cl-dias-warn { background: rgba(239,68,68,.10); color: var(--red); border: 1px solid rgba(239,68,68,.25); }
+
+.cl-expandable-row { cursor: pointer; }
+.cl-expandable-row:hover td { background: rgba(255,255,255,.02); }
+.cl-row-expanded td { background: rgba(59,130,246,.04) !important; }
+.cl-history-row td { padding: 0; }
+.cl-history-wrap { overflow-x: auto; max-height: 260px; overflow-y: auto; background: var(--bg); border-top: 1px solid var(--border); }
+.cl-history-head { font-size: 10px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); padding: 8px 14px 4px; }
+
+/* ── Gerencial: linha inativa ─────────────────────────────── */
+.gr-row-inactive td { opacity: 0.45; }
+
+/* ── RCA Manager ──────────────────────────────────────────── */
+.rca-manager { padding: 0; }
+.rca-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.rca-show-inactive { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.rca-show-inactive input { accent-color: var(--blue); }
+.rca-count { font-size: 11px; color: var(--muted); margin-bottom: 14px; }
+
+.rca-errors { margin: 0 0 12px; padding: 10px 14px; background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); border-radius: 6px; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.rca-errors li { font-size: 12px; color: var(--red); }
+
+.rca-modal { max-width: 560px; width: 100%; }
+.rca-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; margin-bottom: 20px; }
+.rca-field { display: flex; flex-direction: column; gap: 5px; }
+.rca-field-full { grid-column: 1 / -1; }
+.rca-field label { font-size: 10px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.rca-field input, .rca-field select { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 13px; color: var(--text); font-family: inherit; outline: none; transition: border-color .15s; }
+.rca-field input:focus, .rca-field select:focus { border-color: var(--blue); }
+.rca-field input:disabled { opacity: .45; cursor: not-allowed; }
+.rca-modal-actions { display: flex; gap: 10px; }
+
+.rca-code { font-size: 11px; font-weight: 800; color: var(--muted); font-family: 'Space Grotesk', sans-serif; }
+.rca-badge { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 4px; font-size: 9px; font-weight: 800; letter-spacing: .05em; white-space: nowrap; }
+.rca-badge-active { background: rgba(59,130,246,.10); color: var(--blue); border: 1px solid rgba(59,130,246,.25); }
+.rca-badge-inac { background: rgba(255,255,255,.06); color: var(--muted); border: 1px solid var(--border); }
+.rca-badge-warn { background: rgba(245,158,11,.12); color: #f59e0b; border: 1px solid rgba(245,158,11,.3); }
+.rca-type-clt { background: rgba(59,130,246,.10); color: var(--blue); border: 1px solid rgba(59,130,246,.25); }
+.rca-type-pj { background: rgba(168,85,247,.10); color: #a855f7; border: 1px solid rgba(168,85,247,.25); }
+.rca-inactive-row td { opacity: .45; }
+
+.rca-actions { display: flex; gap: 6px; }
+.rca-btn { padding: 3px 9px; font-size: 11px; font-weight: 700; border-radius: 5px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.rca-btn:hover { color: var(--text); border-color: var(--text); }
+.rca-btn-del { color: var(--red) !important; border-color: rgba(239,68,68,.3) !important; }
+.rca-btn-del:hover { background: rgba(239,68,68,.08) !important; }

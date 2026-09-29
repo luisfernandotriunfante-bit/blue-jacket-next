@@ -9,7 +9,20 @@ const kpiCurrency = (n: number) => {
   if (abs >= 1_000) return `${sign}R$ ${(abs / 1_000).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}K`
   return `${sign}R$ ${abs.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
+const brlFull = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const fmtDay = (d: string) => { const p = d.split('-'); return p.length === 3 ? `${p[2]}/${p[1]}` : d }
+
+const today = new Date().toISOString().slice(0, 10)
+function daysSince(dateStr: string): number {
+  if (!dateStr) return -1
+  const diff = new Date(today).getTime() - new Date(dateStr).getTime()
+  return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)))
+}
+
+const MOV_LABEL: Partial<Record<string, string>> = {
+  venda_faturada: 'Faturado', a_faturar: 'A faturar', devolucao: 'Devolução',
+  bonificacao: 'Bonificação', corte: 'Corte', entrada: 'Entrada',
+}
 
 /* ── KpiCard ─────────────────────────────────────────── */
 function KpiCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -32,6 +45,7 @@ export function ClientesTab({ movementBase, clientBase, monthLabel }: {
 }) {
   const [view, setView] = useState<'positivados' | 'nao-positivados'>('positivados')
   const [search, setSearch] = useState('')
+  const [expandedCustomer, setExpandedCustomer] = useState<string | null>(null)
 
   const { monthStart, monthEnd } = useMemo(() => {
     const now = new Date()
@@ -45,15 +59,38 @@ export function ClientesTab({ movementBase, clientBase, monthLabel }: {
     movementBase.filter(m => { const d = m.movementDate ?? ''; return d >= monthStart && d <= monthEnd })
   , [movementBase, monthStart, monthEnd])
 
-  // Positivados: unique customers with venda_faturada or a_faturar this month
+  // All movements grouped by customer (full history)
+  const movsByCustomer = useMemo(() => {
+    const map = new Map<string, CanonicalMovement[]>()
+    for (const m of movementBase) {
+      if (!m.customerCode) continue
+      if (!map.has(m.customerCode)) map.set(m.customerCode, [])
+      map.get(m.customerCode)!.push(m)
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => (b.movementDate ?? '').localeCompare(a.movementDate ?? ''))
+    }
+    return map
+  }, [movementBase])
+
+  // Last faturada date per customer (full history)
+  const lastFatDate = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const m of movementBase) {
+      if (m.movementType !== 'venda_faturada' || !m.customerCode || !m.movementDate) continue
+      const ex = map.get(m.customerCode)
+      if (!ex || m.movementDate > ex) map.set(m.customerCode, m.movementDate)
+    }
+    return map
+  }, [movementBase])
+
+  // Positivados this month: unique customers with venda_faturada or a_faturar
   const positivados = useMemo(() => {
     const map = new Map<string, { code: string; name: string; fat: number; afat: number; seller: string; lastDate: string }>()
     for (const m of monthBase) {
       if (m.movementType !== 'venda_faturada' && m.movementType !== 'a_faturar') continue
       const code = m.customerCode ?? ''; if (!code) continue
-      if (!map.has(code)) {
-        map.set(code, { code, name: m.customerName ?? code, fat: 0, afat: 0, seller: m.seller ?? m.sellerCode ?? '—', lastDate: m.movementDate ?? '' })
-      }
+      if (!map.has(code)) map.set(code, { code, name: m.customerName ?? code, fat: 0, afat: 0, seller: m.seller ?? m.sellerCode ?? '—', lastDate: m.movementDate ?? '' })
       const e = map.get(code)!
       if (m.movementType === 'venda_faturada') e.fat += m.value ?? 0
       else e.afat += m.value ?? 0
@@ -69,39 +106,25 @@ export function ClientesTab({ movementBase, clientBase, monthLabel }: {
 
   const totalFat = useMemo(() => positivados.reduce((s, p) => s + p.fat, 0), [positivados])
 
-  // All known customers from movements (history) not active this month
+  // Não positivados: in clientBase or history but not active this month
   const naoPositivados = useMemo(() => {
     const allCustomers = new Map<string, { code: string; name: string; city: string; lastSeller: string; lastDate: string }>()
 
-    // From clientBase
     for (const c of clientBase) {
       const code = c.winthorCode ?? ''; if (!code) continue
-      allCustomers.set(code, {
-        code,
-        name: c.tradeName ?? c.legalName ?? code,
-        city: c.city ?? '',
-        lastSeller: c.rcaCode ?? '—',
-        lastDate: '',
-      })
+      allCustomers.set(code, { code, name: c.tradeName ?? c.legalName ?? code, city: c.city ?? '', lastSeller: c.rcaCode ?? '—', lastDate: '' })
     }
 
-    // From movement history (for last-seen info)
     for (const m of movementBase) {
       if (!m.customerCode) continue
-      const existing = allCustomers.get(m.customerCode)
-      if (!existing) {
-        allCustomers.set(m.customerCode, {
-          code: m.customerCode,
-          name: m.customerName ?? m.customerCode,
-          city: '',
-          lastSeller: m.seller ?? m.sellerCode ?? '—',
-          lastDate: m.movementDate ?? '',
-        })
+      const ex = allCustomers.get(m.customerCode)
+      if (!ex) {
+        allCustomers.set(m.customerCode, { code: m.customerCode, name: m.customerName ?? m.customerCode, city: '', lastSeller: m.seller ?? m.sellerCode ?? '—', lastDate: m.movementDate ?? '' })
       } else {
-        if ((m.movementDate ?? '') > existing.lastDate) {
-          existing.lastDate = m.movementDate ?? ''
-          existing.lastSeller = m.seller ?? m.sellerCode ?? existing.lastSeller
-          if (m.customerName) existing.name = m.customerName
+        if ((m.movementDate ?? '') > ex.lastDate) {
+          ex.lastDate = m.movementDate ?? ''
+          ex.lastSeller = m.seller ?? m.sellerCode ?? ex.lastSeller
+          if (m.customerName) ex.name = m.customerName
         }
       }
     }
@@ -121,6 +144,10 @@ export function ClientesTab({ movementBase, clientBase, monthLabel }: {
   const filteredNaoPosit = naoPositivados.filter(p =>
     !q || p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q) || p.city.toLowerCase().includes(q)
   )
+
+  function toggleCustomer(code: string) {
+    setExpandedCustomer(prev => prev === code ? null : code)
+  }
 
   if (!movementBase.length) {
     return (
@@ -149,23 +176,25 @@ export function ClientesTab({ movementBase, clientBase, monthLabel }: {
           className="stock-search"
           placeholder="Buscar cliente, código, vendedor…"
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={e => { setSearch(e.target.value); setExpandedCustomer(null) }}
           style={{ flex: 1 }}
         />
-        <div className="gr-view-bar" style={{ margin: 0 }}>
-          <button type="button" className={`gr-view-btn${view === 'positivados' ? ' on' : ''}`} onClick={() => setView('positivados')}>
+        <div className="gr-view-bar" style={{ margin: 0, borderBottom: 'none', gap: 0 }}>
+          <button type="button" className={`gr-view-btn${view === 'positivados' ? ' on' : ''}`} onClick={() => { setView('positivados'); setExpandedCustomer(null) }}>
             Positivados ({filteredPosit.length})
           </button>
-          <button type="button" className={`gr-view-btn${view === 'nao-positivados' ? ' on' : ''}`} onClick={() => setView('nao-positivados')}>
+          <button type="button" className={`gr-view-btn${view === 'nao-positivados' ? ' on' : ''}`} onClick={() => { setView('nao-positivados'); setExpandedCustomer(null) }}>
             Não positivados ({filteredNaoPosit.length})
           </button>
         </div>
       </div>
 
+      {/* ── Positivados ─────────────────────────────────── */}
       {view === 'positivados' && (
         <div className="notas-section" style={{ marginBottom: 24 }}>
           <div className="notas-section-head">
             <span className="notas-section-title">Positivados · {monthLabel}</span>
+            <small style={{ color: 'var(--muted)', fontSize: 11 }}>clique numa linha para ver histórico</small>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table className="gr-table">
@@ -177,23 +206,82 @@ export function ClientesTab({ movementBase, clientBase, monthLabel }: {
                   <th className="n-right">Faturado</th>
                   <th className="n-right">A faturar</th>
                   <th>Vendedor</th>
+                  <th className="n-right">Dias s/ compra</th>
                   <th>Último mov.</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredPosit.map((p, i) => (
-                  <tr key={p.code} className="gr-row">
-                    <td className="gr-rank">#{i + 1}</td>
-                    <td style={{ color: 'var(--muted)', fontSize: 12 }}>{p.code}</td>
-                    <td className="gr-seller-name">{p.name}</td>
-                    <td className="n-right" style={{ color: 'var(--blue)', fontWeight: 700 }}>{kpiCurrency(p.fat)}</td>
-                    <td className="n-right" style={{ color: p.afat > 0 ? 'var(--red)' : 'var(--muted)', fontSize: 12 }}>{p.afat > 0 ? kpiCurrency(p.afat) : '—'}</td>
-                    <td style={{ fontSize: 12 }}>{p.seller}</td>
-                    <td style={{ color: 'var(--muted)', fontSize: 12 }}>{p.lastDate ? fmtDay(p.lastDate) : '—'}</td>
-                  </tr>
-                ))}
+                {filteredPosit.map((p, i) => {
+                  const isExpanded = expandedCustomer === p.code
+                  const lastFat = lastFatDate.get(p.code) ?? p.lastDate
+                  const dias = lastFat ? daysSince(lastFat) : -1
+                  const history = movsByCustomer.get(p.code) ?? []
+
+                  return <>
+                    <tr
+                      key={p.code}
+                      className={`gr-row cl-expandable-row${isExpanded ? ' cl-row-expanded' : ''}`}
+                      onClick={() => toggleCustomer(p.code)}
+                    >
+                      <td className="gr-rank">#{i + 1}</td>
+                      <td style={{ color: 'var(--muted)', fontSize: 12 }}>{p.code}</td>
+                      <td>
+                        <div className="gr-seller-name">{p.name}</div>
+                      </td>
+                      <td className="n-right" style={{ color: 'var(--blue)', fontWeight: 700 }}>{kpiCurrency(p.fat)}</td>
+                      <td className="n-right" style={{ color: p.afat > 0 ? 'var(--red)' : 'var(--muted)', fontSize: 12 }}>
+                        {p.afat > 0 ? kpiCurrency(p.afat) : '—'}
+                      </td>
+                      <td style={{ fontSize: 12 }}>{p.seller}</td>
+                      <td className="n-right">
+                        {dias >= 0
+                          ? <span className={`cl-dias-badge ${dias <= 7 ? 'cl-dias-ok' : dias <= 30 ? 'cl-dias-mid' : 'cl-dias-warn'}`}>{dias}d</span>
+                          : <span style={{ color: 'var(--muted)' }}>—</span>}
+                      </td>
+                      <td style={{ color: 'var(--muted)', fontSize: 12 }}>{p.lastDate ? fmtDay(p.lastDate) : '—'}</td>
+                    </tr>
+                    {isExpanded && history.length > 0 && (
+                      <tr key={`${p.code}-hist`} className="cl-history-row">
+                        <td colSpan={8} style={{ padding: 0 }}>
+                          <div className="cl-history-wrap">
+                            <div className="cl-history-head">
+                              <span className="so-chart-tag">HISTÓRICO · {p.name}</span>
+                              <span style={{ color: 'var(--muted)', fontSize: 11 }}>{history.length} movimentações</span>
+                            </div>
+                            <div style={{ overflowX: 'auto', maxHeight: 280, overflowY: 'auto' }}>
+                              <table className="so-day-detail-table">
+                                <thead>
+                                  <tr>
+                                    <th>Data</th>
+                                    <th>Tipo</th>
+                                    <th>Produto</th>
+                                    <th>Vendedor</th>
+                                    <th className="n-right">Qtd</th>
+                                    <th className="n-right">Valor</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {history.map((m, mi) => (
+                                    <tr key={mi} className={`so-dm-row so-dm-${m.movementType}`}>
+                                      <td style={{ color: 'var(--muted)', fontSize: 11, whiteSpace: 'nowrap' }}>{m.movementDate ? fmtDay(m.movementDate) : '—'}</td>
+                                      <td><span className={`so-mov-badge so-mov-${m.movementType}`}>{MOV_LABEL[m.movementType] ?? m.movementType}</span></td>
+                                      <td className="so-dm-product">{m.description ?? m.productCode ?? '—'}</td>
+                                      <td style={{ fontSize: 11, color: 'var(--muted)' }}>{m.seller ?? m.sellerCode ?? '—'}</td>
+                                      <td className="n-right so-dm-qty">{m.quantity != null ? m.quantity.toLocaleString('pt-BR') : '—'}</td>
+                                      <td className="n-right so-dm-value">{m.value != null ? brlFull(m.value) : '—'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                })}
                 {!filteredPosit.length && (
-                  <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>Nenhum cliente positivado este mês.</td></tr>
+                  <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>Nenhum cliente positivado este mês.</td></tr>
                 )}
               </tbody>
             </table>
@@ -201,10 +289,12 @@ export function ClientesTab({ movementBase, clientBase, monthLabel }: {
         </div>
       )}
 
+      {/* ── Não positivados ─────────────────────────────── */}
       {view === 'nao-positivados' && (
         <div className="notas-section" style={{ marginBottom: 24 }}>
           <div className="notas-section-head">
             <span className="notas-section-title">Não positivados · {monthLabel}</span>
+            <small style={{ color: 'var(--muted)', fontSize: 11 }}>clique numa linha para ver histórico</small>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table className="gr-table">
@@ -214,21 +304,78 @@ export function ClientesTab({ movementBase, clientBase, monthLabel }: {
                   <th>Cliente</th>
                   <th>Cidade</th>
                   <th>Último vendedor</th>
+                  <th className="n-right">Dias s/ compra</th>
                   <th>Última compra</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredNaoPosit.map(p => (
-                  <tr key={p.code} className="gr-row">
-                    <td style={{ color: 'var(--muted)', fontSize: 12 }}>{p.code}</td>
-                    <td className="gr-seller-name">{p.name}</td>
-                    <td style={{ color: 'var(--muted)', fontSize: 12 }}>{p.city || '—'}</td>
-                    <td style={{ fontSize: 12 }}>{p.lastSeller}</td>
-                    <td style={{ color: 'var(--muted)', fontSize: 12 }}>{p.lastDate ? fmtDay(p.lastDate) : '—'}</td>
-                  </tr>
-                ))}
+                {filteredNaoPosit.map(p => {
+                  const isExpanded = expandedCustomer === p.code
+                  const lastFat = lastFatDate.get(p.code) ?? ''
+                  const dias = lastFat ? daysSince(lastFat) : -1
+                  const history = movsByCustomer.get(p.code) ?? []
+
+                  return <>
+                    <tr
+                      key={p.code}
+                      className={`gr-row cl-expandable-row${isExpanded ? ' cl-row-expanded' : ''}`}
+                      onClick={() => toggleCustomer(p.code)}
+                    >
+                      <td style={{ color: 'var(--muted)', fontSize: 12 }}>{p.code}</td>
+                      <td className="gr-seller-name">{p.name}</td>
+                      <td style={{ color: 'var(--muted)', fontSize: 12 }}>{p.city || '—'}</td>
+                      <td style={{ fontSize: 12 }}>{p.lastSeller}</td>
+                      <td className="n-right">
+                        {dias >= 0
+                          ? <span className={`cl-dias-badge ${dias <= 30 ? 'cl-dias-ok' : dias <= 90 ? 'cl-dias-mid' : 'cl-dias-warn'}`}>{dias}d</span>
+                          : <span style={{ color: 'var(--muted)' }}>nunca</span>}
+                      </td>
+                      <td style={{ color: 'var(--muted)', fontSize: 12 }}>{lastFat ? fmtDay(lastFat) : '—'}</td>
+                    </tr>
+                    {isExpanded && history.length > 0 && (
+                      <tr key={`${p.code}-hist`} className="cl-history-row">
+                        <td colSpan={6} style={{ padding: 0 }}>
+                          <div className="cl-history-wrap">
+                            <div className="cl-history-head">
+                              <span className="so-chart-tag">HISTÓRICO · {p.name}</span>
+                              <span style={{ color: 'var(--muted)', fontSize: 11 }}>{history.length} movimentações</span>
+                            </div>
+                            <div style={{ overflowX: 'auto', maxHeight: 240, overflowY: 'auto' }}>
+                              <table className="so-day-detail-table">
+                                <thead>
+                                  <tr>
+                                    <th>Data</th>
+                                    <th>Tipo</th>
+                                    <th>Produto</th>
+                                    <th>Vendedor</th>
+                                    <th className="n-right">Qtd</th>
+                                    <th className="n-right">Valor</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {history.map((m, mi) => (
+                                    <tr key={mi} className={`so-dm-row so-dm-${m.movementType}`}>
+                                      <td style={{ color: 'var(--muted)', fontSize: 11, whiteSpace: 'nowrap' }}>{m.movementDate ? fmtDay(m.movementDate) : '—'}</td>
+                                      <td><span className={`so-mov-badge so-mov-${m.movementType}`}>{MOV_LABEL[m.movementType] ?? m.movementType}</span></td>
+                                      <td className="so-dm-product">{m.description ?? m.productCode ?? '—'}</td>
+                                      <td style={{ fontSize: 11, color: 'var(--muted)' }}>{m.seller ?? m.sellerCode ?? '—'}</td>
+                                      <td className="n-right so-dm-qty">{m.quantity != null ? m.quantity.toLocaleString('pt-BR') : '—'}</td>
+                                      <td className="n-right so-dm-value">{m.value != null ? brlFull(m.value) : '—'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                })}
                 {!filteredNaoPosit.length && (
-                  <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>{search ? 'Nenhum resultado.' : 'Todos os clientes estão positivados!'}</td></tr>
+                  <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>
+                    {search ? 'Nenhum resultado.' : 'Todos os clientes estão positivados!'}
+                  </td></tr>
                 )}
               </tbody>
             </table>
