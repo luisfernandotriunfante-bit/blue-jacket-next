@@ -310,7 +310,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel }: {
             segA={kpis.fat}      segALabel="Faturado"   segAVal={kpiCurrency(kpis.fat)}
             segB={kpis.afat}     segBLabel="A faturar"  segBVal={kpiCurrency(kpis.afat)}
             meta={selloutMeta}   metaLabel={selloutMeta ? kpiCurrency(selloutMeta) : '—'}
-            net={kpis.fat - kpis.dev} netLabel={kpiCurrency(kpis.fat - kpis.dev)}
+            net={kpis.fat + kpis.dev} netLabel={kpiCurrency(kpis.fat + kpis.dev)}
           />
           <TwoSegmentDonut
             label="Positivações"
@@ -323,7 +323,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel }: {
         {/* ── KPIs secundários ─────────────────────────────── */}
         <div className="stock-kpis" style={{ marginBottom: 16 }}>
           {kpis.ticket != null && <KpiCard label="Ticket médio" value={kpiCurrency(kpis.ticket)} sub={`${fmtNum(kpis.pedidos)} pedidos`} />}
-          <KpiCard label="Devoluções" value={kpiCurrency(kpis.dev)} accent={kpis.dev > 0 ? 'red' : undefined} />
+          <KpiCard label="Devoluções" value={kpiCurrency(Math.abs(kpis.dev))} accent={kpis.dev !== 0 ? 'red' : undefined} />
           {kpis.bon > 0 && <KpiCard label="Bonificações" value={kpiCurrency(kpis.bon)} />}
           <KpiCard label="Cortes" value={fmtNum(kpis.cortes)} accent={kpis.cortes > 0 ? 'white' : undefined} />
         </div>
