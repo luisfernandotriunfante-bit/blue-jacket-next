@@ -14,6 +14,7 @@ import { StockTab } from './StockTab'
 import { SellOutTab } from './SellOutTab'
 import { GerencialTab } from './GerencialTab'
 import { ClientesTab } from './ClientesTab'
+import { RcaManager } from './RcaManager'
 
 const motors: Array<{ id: Exclude<SourceArea, 'diario'>; name: string }> = [
   { id: 'produtos', name: 'Produtos' },
@@ -52,7 +53,7 @@ export function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
   const [section, setSection] = useState<'sellout' | 'estoque' | 'administracao'>('sellout')
   const [selloutTab, setSelloutTab] = useState<'dashboard' | 'gerencial' | 'clientes'>('dashboard')
-  const [tab, setTab] = useState<'uploads' | 'auditoria' | 'config'>('uploads')
+  const [tab, setTab] = useState<'uploads' | 'auditoria' | 'config' | 'rcas'>('uploads')
 
   const monthLabel = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase()
   const [files, setFiles] = useState<UploadedFile[]>([])
@@ -344,11 +345,16 @@ export function App() {
     </nav>
     <main className="main">
       {section === 'sellout' ? (<>
-        <header className="topbar stock-topbar" aria-label="Sell out">
-          <button type="button" className={`stock-nav-btn${selloutTab === 'dashboard' ? ' on' : ''}`} onClick={() => setSelloutTab('dashboard')}>Dashboard</button>
-          <button type="button" className={`stock-nav-btn${selloutTab === 'gerencial' ? ' on' : ''}`} onClick={() => setSelloutTab('gerencial')}>Gerencial</button>
-          <button type="button" className={`stock-nav-btn${selloutTab === 'clientes' ? ' on' : ''}`} onClick={() => setSelloutTab('clientes')}>Clientes</button>
-          <span className="so-month-label" style={{ marginLeft: 'auto', paddingRight: 16 }}>{monthLabel}</span>
+        <header className="topbar" aria-label="Sell out" style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'stretch', borderBottom: '1px solid var(--border)' }}>
+          <div />
+          <div style={{ display: 'flex' }}>
+            <button type="button" className={`stock-nav-btn${selloutTab === 'dashboard' ? ' on' : ''}`} onClick={() => setSelloutTab('dashboard')}>Dashboard</button>
+            <button type="button" className={`stock-nav-btn${selloutTab === 'gerencial' ? ' on' : ''}`} onClick={() => setSelloutTab('gerencial')}>Gerencial</button>
+            <button type="button" className={`stock-nav-btn${selloutTab === 'clientes' ? ' on' : ''}`} onClick={() => setSelloutTab('clientes')}>Clientes</button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 16 }}>
+            <span className="so-month-label">{monthLabel}</span>
+          </div>
         </header>
         {selloutTab === 'dashboard' && <SellOutTab movementBase={movementBase} productBase={productBase} monthLabel={monthLabel} />}
         {selloutTab === 'gerencial' && <GerencialTab movementBase={movementBase} monthLabel={monthLabel} />}
@@ -360,6 +366,7 @@ export function App() {
         <button type="button" className={`stock-nav-btn${tab === 'uploads' ? ' on' : ''}`} onClick={() => { setTab('uploads'); setActiveNotice(null) }}>Uploads</button>
         <button type="button" className={`stock-nav-btn${tab === 'auditoria' ? ' on' : ''}`} onClick={() => { setTab('auditoria'); setActiveNotice(null) }}>Auditoria</button>
         <button type="button" className={`stock-nav-btn${tab === 'config' ? ' on' : ''}`} onClick={() => { setTab('config'); setActiveNotice(null) }}>Configurações</button>
+        <button type="button" className={`stock-nav-btn${tab === 'rcas' ? ' on' : ''}`} onClick={() => { setTab('rcas'); setActiveNotice(null) }}>Vendedores</button>
       </header>
       {tab === 'uploads' ? <section className="content">
         <h2>ARQUIVOS DIÁRIOS</h2>
@@ -372,8 +379,10 @@ export function App() {
       </section> : tab === 'auditoria' ? <section className="content">
         <div className="audit-heading"><h2>AUDITORIA</h2><button className="secondary-button" type="button" onClick={downloadAiJson}>Gerar resumo para IA</button></div>
         <div className="notice-list">{audit.map(item => <button className={`notice ${item.level}`} key={item.id} type="button" onClick={() => setActiveNotice(item)}><span>{item.title}</span><small>{item.instruction}</small></button>)}</div>
-      </section> : <section className="content">
+      </section> : tab === 'config' ? <section className="content">
         <ConfigTab />
+      </section> : <section className="content">
+        <RcaManager />
       </section>}
       </>}
     </main>
@@ -406,20 +415,6 @@ function ConfigTab() {
     catch { return '' }
   })
   const [savedPositivMeta, setSavedPositivMeta] = useState(false)
-
-  const [teamsInput, setTeamsInput] = useState<string>(() => {
-    try { const v = localStorage.getItem('rj-teams'); return v ?? '[]' }
-    catch { return '[]' }
-  })
-  const [teamsError, setTeamsError] = useState('')
-  const [savedTeams, setSavedTeams] = useState(false)
-
-  const [goalsInput, setGoalsInput] = useState<string>(() => {
-    try { const v = localStorage.getItem('rj-seller-goals'); return v ?? '{}' }
-    catch { return '{}' }
-  })
-  const [goalsError, setGoalsError] = useState('')
-  const [savedGoals, setSavedGoals] = useState(false)
 
   function saveMarkup() {
     const val = parseFloat(markupInput.replace(',', '.'))
@@ -467,30 +462,6 @@ function ConfigTab() {
         setTimeout(() => setSavedPositivMeta(false), 2000)
       } catch { /* quota */ }
     }
-  }
-
-  function saveTeams() {
-    setTeamsError('')
-    try {
-      const parsed = JSON.parse(teamsInput)
-      if (!Array.isArray(parsed)) { setTeamsError('Deve ser um array JSON.'); return }
-      localStorage.setItem('rj-teams', JSON.stringify(parsed))
-      window.dispatchEvent(new Event('rj-teams-changed'))
-      setSavedTeams(true)
-      setTimeout(() => setSavedTeams(false), 2000)
-    } catch { setTeamsError('JSON inválido.') }
-  }
-
-  function saveGoals() {
-    setGoalsError('')
-    try {
-      const parsed = JSON.parse(goalsInput)
-      if (typeof parsed !== 'object' || Array.isArray(parsed)) { setGoalsError('Deve ser um objeto JSON.'); return }
-      localStorage.setItem('rj-seller-goals', JSON.stringify(parsed))
-      window.dispatchEvent(new Event('rj-seller-goals-changed'))
-      setSavedGoals(true)
-      setTimeout(() => setSavedGoals(false), 2000)
-    } catch { setGoalsError('JSON inválido.') }
   }
 
   return (
@@ -593,44 +564,6 @@ function ConfigTab() {
           />
           <button className="process-button" style={{ margin: 0 }} type="button" onClick={savePositivMeta}>
             {savedPositivMeta ? 'Salvo ✓' : 'Salvar'}
-          </button>
-        </div>
-      </div>
-      <div className="config-group">
-        <label className="config-label">Equipes de vendedores</label>
-        <p className="config-help">
-          Array JSON com as equipes. Cada equipe tem <code>name</code>, <code>supervisor</code> e <code>sellers</code> (array de códigos de vendedor).
-          Ex.: <code>{'[{"name":"Equipe A","supervisor":"João","sellers":["001","002"]}]'}</code>
-        </p>
-        <textarea
-          className="config-input"
-          style={{ width: '100%', minHeight: 100, resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }}
-          value={teamsInput}
-          onChange={e => { setTeamsInput(e.target.value); setSavedTeams(false); setTeamsError('') }}
-        />
-        {teamsError && <p style={{ color: 'var(--red)', fontSize: 12, margin: '4px 0 0' }}>{teamsError}</p>}
-        <div className="config-input-row" style={{ marginTop: 8 }}>
-          <button className="process-button" style={{ margin: 0 }} type="button" onClick={saveTeams}>
-            {savedTeams ? 'Salvo ✓' : 'Salvar equipes'}
-          </button>
-        </div>
-      </div>
-      <div className="config-group">
-        <label className="config-label">Metas individuais de vendedores</label>
-        <p className="config-help">
-          Objeto JSON mapeando código de vendedor para meta mensal em R$.
-          Ex.: <code>{'{"001":50000,"002":120000}'}</code>. Usado no ranking gerencial para calcular % de atingimento.
-        </p>
-        <textarea
-          className="config-input"
-          style={{ width: '100%', minHeight: 80, resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }}
-          value={goalsInput}
-          onChange={e => { setGoalsInput(e.target.value); setSavedGoals(false); setGoalsError('') }}
-        />
-        {goalsError && <p style={{ color: 'var(--red)', fontSize: 12, margin: '4px 0 0' }}>{goalsError}</p>}
-        <div className="config-input-row" style={{ marginTop: 8 }}>
-          <button className="process-button" style={{ margin: 0 }} type="button" onClick={saveGoals}>
-            {savedGoals ? 'Salvo ✓' : 'Salvar metas'}
           </button>
         </div>
       </div>
