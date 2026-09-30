@@ -15,6 +15,7 @@ import { SellOutTab } from './SellOutTab'
 import { GerencialTab } from './GerencialTab'
 import { ClientesTab } from './ClientesTab'
 import { RcaManager } from './RcaManager'
+import { CampaignManager } from './CampaignManager'
 
 const motors: Array<{ id: Exclude<SourceArea, 'diario'>; name: string }> = [
   { id: 'produtos', name: 'Produtos' },
@@ -53,7 +54,7 @@ export function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
   const [section, setSection] = useState<'sellout' | 'estoque' | 'administracao'>('sellout')
   const [selloutTab, setSelloutTab] = useState<'dashboard' | 'gerencial' | 'clientes'>('dashboard')
-  const [tab, setTab] = useState<'uploads' | 'auditoria' | 'config' | 'rcas'>('uploads')
+  const [tab, setTab] = useState<'uploads' | 'auditoria' | 'config' | 'rcas' | 'campanhas'>('uploads')
 
   const monthLabel = useMemo(() => new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase(), [])
   const [files, setFiles] = useState<UploadedFile[]>([])
@@ -367,6 +368,7 @@ export function App() {
         <button type="button" className={`stock-nav-btn${tab === 'auditoria' ? ' on' : ''}`} onClick={() => { setTab('auditoria'); setActiveNotice(null) }}>Auditoria</button>
         <button type="button" className={`stock-nav-btn${tab === 'config' ? ' on' : ''}`} onClick={() => { setTab('config'); setActiveNotice(null) }}>Configurações</button>
         <button type="button" className={`stock-nav-btn${tab === 'rcas' ? ' on' : ''}`} onClick={() => { setTab('rcas'); setActiveNotice(null) }}>Vendedores</button>
+        <button type="button" className={`stock-nav-btn${tab === 'campanhas' ? ' on' : ''}`} onClick={() => { setTab('campanhas'); setActiveNotice(null) }}>Campanhas</button>
       </header>
       {tab === 'uploads' ? <section className="content">
         <h2>ARQUIVOS DIÁRIOS</h2>
@@ -381,8 +383,10 @@ export function App() {
         <div className="notice-list">{audit.map(item => <button className={`notice ${item.level}`} key={item.id} type="button" onClick={() => setActiveNotice(item)}><span>{item.title}</span><small>{item.instruction}</small></button>)}</div>
       </section> : tab === 'config' ? <section className="content">
         <ConfigTab />
-      </section> : <section className="content">
+      </section> : tab === 'rcas' ? <section className="content">
         <RcaManager />
+      </section> : <section className="content">
+        <CampaignManager />
       </section>}
       </>}
     </main>

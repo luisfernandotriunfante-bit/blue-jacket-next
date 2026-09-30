@@ -612,3 +612,20 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 .rca-btn:hover { color: var(--text); border-color: var(--text); }
 .rca-btn-del { color: var(--red) !important; border-color: rgba(239,68,68,.3) !important; }
 .rca-btn-del:hover { background: rgba(239,68,68,.08) !important; }
+
+/* ── Campaign Manager ─────────────────────────────────────── */
+.camp-modal { max-width: 620px; width: 100%; }
+.camp-textarea { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 13px; color: var(--text); font-family: inherit; outline: none; transition: border-color .15s; resize: vertical; width: 100%; }
+.camp-textarea:focus { border-color: var(--blue); }
+
+.camp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; margin-top: 8px; }
+.camp-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; transition: border-color .15s; }
+.camp-card:hover { border-color: var(--blue); }
+.camp-card-inactive { opacity: .6; }
+.camp-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.camp-card-title { font-size: 14px; font-weight: 800; color: var(--text); flex: 1; min-width: 0; }
+.camp-card-badges { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.camp-brand-tag { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 800; letter-spacing: .05em; background: rgba(237,28,36,.10); color: var(--red); border: 1px solid rgba(237,28,36,.20); white-space: nowrap; }
+.camp-card-dates { font-size: 11px; color: var(--muted); font-family: 'Space Grotesk', sans-serif; }
+.camp-card-mechanic { font-size: 12px; color: var(--text); line-height: 1.5; background: var(--surface-raised); border-radius: 6px; padding: 8px 10px; border-left: 3px solid var(--blue); white-space: pre-wrap; }
+.camp-card-notes { font-size: 11px; color: var(--muted); line-height: 1.5; white-space: pre-wrap; }
