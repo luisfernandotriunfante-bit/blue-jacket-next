@@ -15,7 +15,7 @@ import { SellOutTab } from './SellOutTab'
 import { GerencialTab } from './GerencialTab'
 import { ClientesTab } from './ClientesTab'
 import { RcaManager } from './RcaManager'
-import { CampaignManager } from './CampaignManager'
+import { CampaignTab } from './CampaignTab'
 
 const motors: Array<{ id: Exclude<SourceArea, 'diario'>; name: string }> = [
   { id: 'produtos', name: 'Produtos' },
@@ -52,9 +52,9 @@ const dedupeList = (files: UploadedFile[] | undefined) => (files ?? []).filter((
 
 export function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
-  const [section, setSection] = useState<'sellout' | 'estoque' | 'administracao'>('sellout')
+  const [section, setSection] = useState<'sellout' | 'estoque' | 'campanhas' | 'administracao'>('sellout')
   const [selloutTab, setSelloutTab] = useState<'dashboard' | 'gerencial' | 'clientes'>('dashboard')
-  const [tab, setTab] = useState<'uploads' | 'auditoria' | 'config' | 'rcas' | 'campanhas'>('uploads')
+  const [tab, setTab] = useState<'uploads' | 'auditoria' | 'config' | 'rcas'>('uploads')
 
   const monthLabel = useMemo(() => new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase(), [])
   const [files, setFiles] = useState<UploadedFile[]>([])
@@ -315,6 +315,10 @@ export function App() {
         <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z" /><path fillRule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
         <span className="nav-label">Estoque</span>
       </button>
+      <button className={`nav-item${section === 'campanhas' ? ' active' : ''}`} type="button" onClick={() => setSection('campanhas')}>
+        <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z" /></svg>
+        <span className="nav-label">Campanhas</span>
+      </button>
       <button className={`nav-item${section === 'administracao' ? ' active' : ''}`} type="button" onClick={() => setSection('administracao')}>
         <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" /></svg>
         <span className="nav-label">Administração</span>
@@ -334,6 +338,10 @@ export function App() {
       <button className={`bn-item${section === 'estoque' ? ' active' : ''}`} type="button" onClick={() => setSection('estoque')}>
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z" /><path fillRule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
         <span>Estoque</span>
+      </button>
+      <button className={`bn-item${section === 'campanhas' ? ' active' : ''}`} type="button" onClick={() => setSection('campanhas')}>
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z" /></svg>
+        <span>Camp.</span>
       </button>
       <button className={`bn-item${section === 'administracao' ? ' active' : ''}`} type="button" onClick={() => setSection('administracao')}>
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" /></svg>
@@ -362,13 +370,14 @@ export function App() {
         {selloutTab === 'clientes' && <ClientesTab movementBase={movementBase} clientBase={clientBase} monthLabel={monthLabel} />}
       </>) : section === 'estoque' ? <>
         <StockTab productBase={productBase} receiptBase={receiptBase} movementBase={movementBase} productIndicators={productIndicators} />
+      </> : section === 'campanhas' ? <>
+        <CampaignTab movementBase={movementBase} productBase={productBase} />
       </> : <>
       <header className="topbar stock-topbar" aria-label="Administração">
         <button type="button" className={`stock-nav-btn${tab === 'uploads' ? ' on' : ''}`} onClick={() => { setTab('uploads'); setActiveNotice(null) }}>Uploads</button>
         <button type="button" className={`stock-nav-btn${tab === 'auditoria' ? ' on' : ''}`} onClick={() => { setTab('auditoria'); setActiveNotice(null) }}>Auditoria</button>
         <button type="button" className={`stock-nav-btn${tab === 'config' ? ' on' : ''}`} onClick={() => { setTab('config'); setActiveNotice(null) }}>Configurações</button>
         <button type="button" className={`stock-nav-btn${tab === 'rcas' ? ' on' : ''}`} onClick={() => { setTab('rcas'); setActiveNotice(null) }}>Vendedores</button>
-        <button type="button" className={`stock-nav-btn${tab === 'campanhas' ? ' on' : ''}`} onClick={() => { setTab('campanhas'); setActiveNotice(null) }}>Campanhas</button>
       </header>
       {tab === 'uploads' ? <section className="content">
         <h2>ARQUIVOS DIÁRIOS</h2>
@@ -383,10 +392,8 @@ export function App() {
         <div className="notice-list">{audit.map(item => <button className={`notice ${item.level}`} key={item.id} type="button" onClick={() => setActiveNotice(item)}><span>{item.title}</span><small>{item.instruction}</small></button>)}</div>
       </section> : tab === 'config' ? <section className="content">
         <ConfigTab />
-      </section> : tab === 'rcas' ? <section className="content">
-        <RcaManager />
       </section> : <section className="content">
-        <CampaignManager />
+        <RcaManager />
       </section>}
       </>}
     </main>

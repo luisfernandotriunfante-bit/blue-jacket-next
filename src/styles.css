@@ -629,3 +629,18 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 .camp-card-dates { font-size: 11px; color: var(--muted); font-family: 'Space Grotesk', sans-serif; }
 .camp-card-mechanic { font-size: 12px; color: var(--text); line-height: 1.5; background: var(--surface-raised); border-radius: 6px; padding: 8px 10px; border-left: 3px solid var(--blue); white-space: pre-wrap; }
 .camp-card-notes { font-size: 11px; color: var(--muted); line-height: 1.5; white-space: pre-wrap; }
+
+/* Campaign Panel */
+.camp-panel-card { cursor: pointer; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; transition: border-color .15s, box-shadow .15s; outline: none; }
+.camp-panel-card:hover { border-color: var(--blue); }
+.camp-panel-card-sel { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(59,130,246,.18); }
+.camp-progress-bar { position: relative; height: 4px; background: var(--border); border-radius: 99px; overflow: visible; margin: 2px 0; }
+.camp-progress-fill { height: 100%; border-radius: 99px; transition: width .4s; }
+.camp-progress-label { position: absolute; right: 0; top: 7px; font-size: 9px; font-weight: 700; color: var(--muted); white-space: nowrap; letter-spacing: .04em; }
+.camp-stats { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 2px; }
+.camp-stat { display: flex; flex-direction: column; gap: 1px; }
+.camp-stat-val { font-size: 15px; font-weight: 800; font-family: 'Space Grotesk', sans-serif; color: var(--text); }
+.camp-stat-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.camp-no-data { font-size: 11px; color: var(--muted); margin: 4px 0 0; font-style: italic; }
+.camp-detail { margin-top: 28px; padding: 20px; background: var(--surface); border: 1px solid var(--blue); border-radius: 12px; }
+.camp-detail-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; flex-wrap: wrap; }
