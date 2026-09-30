@@ -88,11 +88,12 @@ export function ClientesTab({ movementBase, clientBase, monthLabel }: {
   const positivados = useMemo(() => {
     const map = new Map<string, { code: string; name: string; fat: number; afat: number; seller: string; lastDate: string }>()
     for (const m of monthBase) {
-      if (m.movementType !== 'venda_faturada' && m.movementType !== 'a_faturar') continue
+      if (m.movementType !== 'venda_faturada' && m.movementType !== 'a_faturar' && m.movementType !== 'devolucao') continue
       const code = m.customerCode ?? ''; if (!code) continue
       if (!map.has(code)) map.set(code, { code, name: m.customerName ?? code, fat: 0, afat: 0, seller: m.seller ?? m.sellerCode ?? '—', lastDate: m.movementDate ?? '' })
       const e = map.get(code)!
       if (m.movementType === 'venda_faturada') e.fat += m.value ?? 0
+      else if (m.movementType === 'devolucao') e.fat += m.value ?? 0 // valor negativo, subtrai
       else e.afat += m.value ?? 0
       if ((m.movementDate ?? '') > e.lastDate) {
         e.lastDate = m.movementDate ?? ''
