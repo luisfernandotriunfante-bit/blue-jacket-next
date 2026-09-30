@@ -221,6 +221,8 @@ export function SellOutTab({ movementBase, productBase, monthLabel }: {
       if (m.movementType === 'venda_faturada') {
         e.fat += m.value ?? 0
         if (m.customerCode) { e.cFat.add(m.customerCode); e.cTot.add(m.customerCode) }
+      } else if (m.movementType === 'devolucao') {
+        e.fat += m.value ?? 0 // valor negativo, subtrai
       } else if (m.movementType === 'a_faturar') {
         e.afat += m.value ?? 0
         if (m.customerCode) e.cTot.add(m.customerCode)
@@ -250,13 +252,14 @@ export function SellOutTab({ movementBase, productBase, monthLabel }: {
   const lineKpis = useMemo(() => {
     const map = new Map<CommercialLine, { fat: number; afat: number; pos: Set<string> }>()
     for (const m of monthBase) {
-      if (m.movementType !== 'venda_faturada' && m.movementType !== 'a_faturar') continue
+      if (m.movementType !== 'venda_faturada' && m.movementType !== 'a_faturar' && m.movementType !== 'devolucao') continue
       const p = m.productCode ? productByCode.get(m.productCode) : undefined
       const line = p ? resolveCommercialLine(p) : null
       if (!line) continue
       if (!map.has(line)) map.set(line, { fat: 0, afat: 0, pos: new Set() })
       const e = map.get(line)!
       if (m.movementType === 'venda_faturada') { e.fat += m.value ?? 0; if (m.customerCode) e.pos.add(m.customerCode) }
+      else if (m.movementType === 'devolucao') { e.fat += m.value ?? 0 } // valor negativo, subtrai
       else e.afat += m.value ?? 0
     }
     const totalFat = Array.from(map.values()).reduce((s, v) => s + v.fat, 0)

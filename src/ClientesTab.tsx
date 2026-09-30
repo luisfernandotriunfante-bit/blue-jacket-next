@@ -88,9 +88,15 @@ export function ClientesTab({ movementBase, clientBase, monthLabel }: {
   const positivados = useMemo(() => {
     const map = new Map<string, { code: string; name: string; fat: number; afat: number; seller: string; lastDate: string }>()
     for (const m of monthBase) {
-      if (m.movementType !== 'venda_faturada' && m.movementType !== 'a_faturar' && m.movementType !== 'devolucao') continue
       const code = m.customerCode ?? ''; if (!code) continue
-      if (!map.has(code)) map.set(code, { code, name: m.customerName ?? code, fat: 0, afat: 0, seller: m.seller ?? m.sellerCode ?? '—', lastDate: m.movementDate ?? '' })
+      if (m.movementType === 'venda_faturada' || m.movementType === 'a_faturar') {
+        // cria entrada somente quando há venda real
+        if (!map.has(code)) map.set(code, { code, name: m.customerName ?? code, fat: 0, afat: 0, seller: m.seller ?? m.sellerCode ?? '—', lastDate: m.movementDate ?? '' })
+      } else if (m.movementType === 'devolucao') {
+        if (!map.has(code)) continue // devolução sem venda no mês não cria positivado
+      } else {
+        continue
+      }
       const e = map.get(code)!
       if (m.movementType === 'venda_faturada') e.fat += m.value ?? 0
       else if (m.movementType === 'devolucao') e.fat += m.value ?? 0 // valor negativo, subtrai
