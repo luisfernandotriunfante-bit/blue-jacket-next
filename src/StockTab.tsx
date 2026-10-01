@@ -16,9 +16,10 @@ const norm = (v: unknown) => String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g
 
 const brl = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const kpiCurrency = (n: number) => {
-  if (n >= 1_000_000) return `R$ ${(n / 1_000_000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}M`
-  if (n >= 1_000) return `R$ ${(n / 1_000).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}K`
-  return `R$ ${brl(n)}`
+  const abs = Math.abs(n), sign = n < 0 ? '-' : ''
+  if (abs >= 1_000_000) return `${sign}R$ ${(abs / 1_000_000).toFixed(2)}M`
+  if (abs >= 1_000) return `${sign}R$ ${(abs / 1_000).toFixed(2)}K`
+  return `${sign}R$ ${abs.toFixed(2)}`
 }
 const fmtDate = (iso?: string) => {
   if (!iso) return 'Sem data'

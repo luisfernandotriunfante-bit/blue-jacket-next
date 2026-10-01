@@ -5,9 +5,9 @@ import type { CanonicalClient } from './domain/clientMotor'
 /* ── formatters ──────────────────────────────────────── */
 const kpiCurrency = (n: number) => {
   const abs = Math.abs(n), sign = n < 0 ? '-' : ''
-  if (abs >= 1_000_000) return `${sign}R$ ${(abs / 1_000_000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}M`
-  if (abs >= 1_000) return `${sign}R$ ${(abs / 1_000).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}K`
-  return `${sign}R$ ${abs.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  if (abs >= 1_000_000) return `${sign}R$ ${(abs / 1_000_000).toFixed(2)}M`
+  if (abs >= 1_000) return `${sign}R$ ${(abs / 1_000).toFixed(2)}K`
+  return `${sign}R$ ${abs.toFixed(2)}`
 }
 const brlFull = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const fmtDay = (d: string) => { const p = d.split('-'); return p.length === 3 ? `${p[2]}/${p[1]}` : d }

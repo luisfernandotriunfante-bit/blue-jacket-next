@@ -8,9 +8,9 @@ import type { CommercialLine } from './domain/productGrouping'
 const brlFull = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const kpiCurrency = (n: number) => {
   const abs = Math.abs(n), sign = n < 0 ? '-' : ''
-  if (abs >= 1_000_000) return `${sign}R$ ${(abs / 1_000_000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}M`
-  if (abs >= 1_000) return `${sign}R$ ${(abs / 1_000).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}K`
-  return `${sign}R$ ${abs.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  if (abs >= 1_000_000) return `${sign}R$ ${(abs / 1_000_000).toFixed(2)}M`
+  if (abs >= 1_000) return `${sign}R$ ${(abs / 1_000).toFixed(2)}K`
+  return `${sign}R$ ${abs.toFixed(2)}`
 }
 const fmtDay = (d: string) => { const p = d.split('-'); return p.length === 3 ? `${p[2]}/${p[1]}` : d }
 const fmtNum = (n: number) => n.toLocaleString('pt-BR')
@@ -233,7 +233,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
       }
     }
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([date, d]) => ({
-      date, fat: d.fat, afat: d.afat, sellOut: d.fat, posFat: d.cFat.size, posTotal: d.cTot.size,
+      date, fat: d.fat, afat: d.afat, sellOut: d.fat + d.afat, posFat: d.cFat.size, posTotal: d.cTot.size,
     }))
   }, [monthBase])
 
