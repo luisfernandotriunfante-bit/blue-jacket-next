@@ -614,7 +614,13 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 .rca-btn-del:hover { background: rgba(239,68,68,.08) !important; }
 
 /* ── Campaign Manager ─────────────────────────────────────── */
-.camp-modal { max-width: 620px; width: 100%; }
+.camp-modal { max-width: 640px; width: 100%; max-height: calc(100vh - 40px); overflow-y: auto; }
+.camp-chip-group { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.camp-chip { border: 1px solid var(--border); background: transparent; color: var(--muted); border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 600; transition: border-color .15s, color .15s, background .15s; cursor: pointer; }
+.camp-chip:hover { border-color: var(--blue); color: var(--text); }
+.camp-chip.on { border-color: var(--blue); background: color-mix(in srgb, var(--blue) 14%, transparent); color: var(--blue); }
+.camp-chip.clear { border-style: dashed; }
+.camp-section-divider { grid-column: 1 / -1; border: 0; border-top: 1px solid var(--border); margin: 4px 0; }
 .camp-textarea { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 13px; color: var(--text); font-family: inherit; outline: none; transition: border-color .15s; resize: vertical; width: 100%; }
 .camp-textarea:focus { border-color: var(--blue); }
 
