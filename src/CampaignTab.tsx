@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { CampaignManager, readCampaigns } from './CampaignManager'
-import { apurateCampaign, CAMPAIGN_TYPE_LABEL, type CampaignRecord, type ApurationResult, type ApurationDiagnostic, type SellerResult } from './domain/campaignEngine'
+import { apurateCampaign, CAMPAIGN_TYPE_LABEL, type CampaignRecord, type ApurationResult, type ApurationDiagnostic, type ApurationGoal, type SellerResult } from './domain/campaignEngine'
 import type { CanonicalMovement } from './domain/movementMotor'
 import type { CanonicalProduct } from './domain/productMotor'
 import type { CanonicalClient } from './domain/clientMotor'
@@ -148,6 +148,18 @@ function CampaignPanel({ movementBase, productBase, clientBase, rcas, campaignsO
                     <span className="camp-stat-val">{result.sellers.length}</span>
                     <span className="camp-stat-label">Vendedores</span>
                   </div>
+                  {result.totalPdvs === 0 && result.sellers.length > 0 && (() => {
+                    const leader = result.sellers[0]
+                    const pct = Math.round((leader.bestPdvProgress ?? 0) * 100)
+                    return (
+                      <div style={{ width: '100%', marginTop: 4 }}>
+                        <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 3 }}>
+                          Líder: <strong>{leader.sellerName.split(' ')[0]}</strong> · {pct}% do critério
+                        </div>
+                        <ProgressBar pct={pct} goal={result.goal} height={5} />
+                      </div>
+                    )
+                  })()}
                 </div>
               ) : (
                 <p className="camp-no-data">Sem dados para apurar.</p>
@@ -193,59 +205,75 @@ function CampaignPanel({ movementBase, productBase, clientBase, rcas, campaignsO
           {selectedResult.sellers.length === 0 ? (
             <DiagnosticHint d={selectedResult.diagnostic} cfg={selectedCampaign.config} />
           ) : (
-            <div style={{ overflowX: 'auto', marginTop: 16 }}>
-              <table className="gr-table">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Vendedor</th>
-                    <th>Supervisor</th>
-                    <th className="n-right">PDVs qualif.</th>
-                    <th className="n-right">Prêmio vend.</th>
-                    <th className="n-right">Prêmio sup.</th>
-                    <th style={{ width: 32 }} />
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedResult.sellers.map((s, i) => (
-                    <>
-                      <tr
-                        key={s.sellerCode}
-                        className="gr-row"
-                        style={{ cursor: s.details.length > 0 ? 'pointer' : 'default' }}
-                        onClick={() => s.details.length > 0 && setExpandedSeller(expandedSeller === s.sellerCode ? null : s.sellerCode)}
-                      >
-                        <td style={{ color: 'var(--muted)', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 12 }}>
-                          {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
-                        </td>
-                        <td style={{ fontWeight: 600 }}>{s.sellerName}</td>
-                        <td style={{ color: 'var(--muted)', fontSize: 12 }}>{s.supervisorName}</td>
-                        <td className="n-right" style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700 }}>
-                          {s.qualifiedPdvs}
-                        </td>
-                        <td className="n-right" style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, color: 'var(--blue)' }}>
-                          {kpiCurrency(s.prizeVendedor)}
-                        </td>
-                        <td className="n-right" style={{ color: 'var(--muted)', fontSize: 12 }}>
-                          {kpiCurrency(s.prizeSupervisor)}
-                        </td>
-                        <td style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 12 }}>
-                          {s.details.length > 0 && (expandedSeller === s.sellerCode ? '▲' : '▼')}
-                        </td>
-                      </tr>
+            <>
+              {selectedResult.totalPdvs === 0 && (
+                <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 12, marginBottom: 0 }}>
+                  <strong style={{ color: 'var(--red)' }}>Nenhum PDV qualificou ainda.</strong> Veja abaixo quem está mais perto.
+                </p>
+              )}
 
-                      {expandedSeller === s.sellerCode && s.details.length > 0 && (
-                        <tr key={`${s.sellerCode}-detail`}>
-                          <td colSpan={7} style={{ padding: 0, background: 'var(--surface)' }}>
-                            <SellerPdvDetail seller={s} />
+              {/* Podium */}
+              <CampaignPodium sellers={selectedResult.sellers} goal={selectedResult.goal} />
+
+              {/* Ranking table */}
+              <div style={{ overflowX: 'auto', marginTop: 8 }}>
+                <table className="gr-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Vendedor</th>
+                      <th>Supervisor</th>
+                      <th className="n-right">PDVs qualif.</th>
+                      <th>Melhor PDV</th>
+                      <th className="n-right">Prêmio vend.</th>
+                      <th className="n-right">Prêmio sup.</th>
+                      <th style={{ width: 32 }} />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedResult.sellers.map((s, i) => (
+                      <>
+                        <tr
+                          key={s.sellerCode}
+                          className="gr-row"
+                          style={{ cursor: s.details.length > 0 ? 'pointer' : 'default' }}
+                          onClick={() => s.details.length > 0 && setExpandedSeller(expandedSeller === s.sellerCode ? null : s.sellerCode)}
+                        >
+                          <td style={{ color: 'var(--muted)', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 12 }}>
+                            {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
+                          </td>
+                          <td style={{ fontWeight: 600 }}>{s.sellerName}</td>
+                          <td style={{ color: 'var(--muted)', fontSize: 12 }}>{s.supervisorName}</td>
+                          <td className="n-right" style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700 }}>
+                            {s.qualifiedPdvs}
+                          </td>
+                          <td style={{ minWidth: 120 }}>
+                            <ProgressBar pct={Math.min(100, Math.round((s.bestPdvProgress ?? 0) * 100))} goal={selectedResult.goal} />
+                          </td>
+                          <td className="n-right" style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, color: 'var(--blue)' }}>
+                            {kpiCurrency(s.prizeVendedor)}
+                          </td>
+                          <td className="n-right" style={{ color: 'var(--muted)', fontSize: 12 }}>
+                            {kpiCurrency(s.prizeSupervisor)}
+                          </td>
+                          <td style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 12 }}>
+                            {s.details.length > 0 && (expandedSeller === s.sellerCode ? '▲' : '▼')}
                           </td>
                         </tr>
-                      )}
-                    </>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+
+                        {expandedSeller === s.sellerCode && s.details.length > 0 && (
+                          <tr key={`${s.sellerCode}-detail`}>
+                            <td colSpan={8} style={{ padding: 0, background: 'var(--surface)' }}>
+                              <SellerPdvDetail seller={s} goal={selectedResult.goal} />
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       )}
@@ -291,8 +319,78 @@ function DiagnosticHint({ d, cfg }: { d?: ApurationDiagnostic; cfg?: CampaignRec
   )
 }
 
+/* ── Progress bar ────────────────────────────────────────── */
+function ProgressBar({ pct, goal, height = 8 }: { pct: number; goal?: ApurationGoal; height?: number }) {
+  const color = pct >= 100 ? 'var(--green, #22c55e)' : pct >= 70 ? 'var(--blue)' : pct >= 40 ? '#f59e0b' : 'var(--muted)'
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ flex: 1, background: 'var(--border)', borderRadius: 4, height, overflow: 'hidden', minWidth: 60 }}>
+        <div style={{ width: `${Math.min(100, pct)}%`, height: '100%', background: color, borderRadius: 4, transition: 'width .3s' }} />
+      </div>
+      <span style={{ fontSize: 10, color, fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, minWidth: 28, textAlign: 'right' }}>
+        {pct >= 100 ? (goal ? '✓' : `${pct}%`) : `${pct}%`}
+      </span>
+    </div>
+  )
+}
+
+/* ── Podium ──────────────────────────────────────────────── */
+function CampaignPodium({ sellers, goal }: { sellers: SellerResult[]; goal?: ApurationGoal }) {
+  if (sellers.length === 0) return null
+  const top = sellers.slice(0, 3)
+  const order = top.length === 1 ? [0] : top.length === 2 ? [1, 0] : [1, 0, 2]
+  const heights = [80, 110, 60]
+  const medals = ['🥇', '🥈', '🥉']
+  const labels = ['1º', '2º', '3º']
+
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 8, marginTop: 20, marginBottom: 4 }}>
+      {order.map(idx => {
+        const s = top[idx]
+        if (!s) return null
+        const pct = Math.min(100, Math.round((s.bestPdvProgress ?? 0) * 100))
+        const hasWon = s.qualifiedPdvs > 0
+        const h = heights[idx]
+        return (
+          <div key={s.sellerCode} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, maxWidth: 160 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textAlign: 'center', marginBottom: 4, color: 'var(--text)' }}>
+              {s.sellerName.split(' ')[0]}
+            </div>
+            {goal && (
+              <div style={{ width: '90%', marginBottom: 4 }}>
+                <ProgressBar pct={pct} goal={goal} height={6} />
+              </div>
+            )}
+            {hasWon && (
+              <div style={{ fontSize: 10, color: 'var(--blue)', fontWeight: 700, marginBottom: 2 }}>
+                {s.qualifiedPdvs} PDV{s.qualifiedPdvs > 1 ? 's' : ''} · {kpiCurrency(s.prizeVendedor)}
+              </div>
+            )}
+            <div style={{
+              width: '100%', height: h,
+              background: hasWon ? 'var(--blue)' : idx === 0 ? 'var(--red)' : 'var(--border)',
+              borderRadius: '4px 4px 0 0',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 24,
+            }}>
+              {medals[idx]}
+            </div>
+            <div style={{
+              width: '100%', textAlign: 'center', fontSize: 10, fontWeight: 700,
+              background: 'var(--border)', borderRadius: '0 0 4px 4px', padding: '2px 0',
+              color: 'var(--muted)',
+            }}>
+              {labels[idx]}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 /* ── PDV detail sub-table ────────────────────────────────── */
-function SellerPdvDetail({ seller }: { seller: SellerResult }) {
+function SellerPdvDetail({ seller, goal }: { seller: SellerResult; goal?: ApurationGoal }) {
   const qualified = seller.details.filter(d => d.qualified)
   const notQualified = seller.details.filter(d => !d.qualified)
 
@@ -305,15 +403,21 @@ function SellerPdvDetail({ seller }: { seller: SellerResult }) {
         <thead>
           <tr>
             <th>PDV</th>
+            {goal && <th style={{ minWidth: 140 }}>Progresso</th>}
             <th className="n-right">Valor / SKUs</th>
             <th>Status</th>
             <th>Motivo</th>
           </tr>
         </thead>
         <tbody>
-          {seller.details.slice(0, 50).map(d => (
-            <tr key={d.customerCode} className="gr-row" style={{ opacity: d.qualified ? 1 : 0.6 }}>
+          {seller.details.slice(0, 80).map(d => (
+            <tr key={d.customerCode} className="gr-row" style={{ opacity: d.qualified ? 1 : 0.75 }}>
               <td>{d.customerName || d.customerCode}</td>
+              {goal && (
+                <td style={{ minWidth: 140 }}>
+                  <ProgressBar pct={Math.min(100, d.progressPct ?? 0)} goal={goal} height={6} />
+                </td>
+              )}
               <td className="n-right" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
                 {d.value !== undefined ? kpiCurrency(d.value) : d.skuCount !== undefined ? `${d.skuCount} SKUs` : '—'}
               </td>
@@ -323,9 +427,9 @@ function SellerPdvDetail({ seller }: { seller: SellerResult }) {
               <td style={{ color: 'var(--muted)' }}>{d.reason ?? ''}</td>
             </tr>
           ))}
-          {seller.details.length > 50 && (
-            <tr><td colSpan={4} style={{ color: 'var(--muted)', textAlign: 'center', fontSize: 11 }}>
-              … e mais {seller.details.length - 50} PDVs
+          {seller.details.length > 80 && (
+            <tr><td colSpan={goal ? 5 : 4} style={{ color: 'var(--muted)', textAlign: 'center', fontSize: 11 }}>
+              … e mais {seller.details.length - 80} PDVs
             </td></tr>
           )}
         </tbody>

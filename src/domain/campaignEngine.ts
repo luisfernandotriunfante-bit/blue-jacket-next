@@ -149,6 +149,10 @@ export interface SellerResult {
   prizeGerente: number
   totalPrize: number
   details: PdvDetail[]
+  /** 0..1+ — melhor PDV como fração do critério (ex.: 0.8 = 80% do mínimo de SKUs) */
+  bestPdvProgress?: number
+  /** Soma do valor de compra de todos os PDVs do vendedor (desempate) */
+  totalValue?: number
 }
 
 export interface PdvDetail {
@@ -158,12 +162,19 @@ export interface PdvDetail {
   skuCount?: number
   qualified: boolean
   reason?: string
+  /** 0..100+ — percentual do critério atingido neste PDV */
+  progressPct?: number
 }
 
 export interface ApurationDiagnostic {
-  movementsInWindow: number   // movimentações dentro da janela de datas
-  movementsMatched: number    // dessas, quantas tinham código de produto correspondente
-  pdvsFound: number           // PDVs distintos com ao menos 1 movimento correspondente
+  movementsInWindow: number
+  movementsMatched: number
+  pdvsFound: number
+}
+
+export interface ApurationGoal {
+  metric: 'sku_count' | 'value'
+  target: number
 }
 
 export interface ApurationResult {
@@ -173,6 +184,7 @@ export interface ApurationResult {
   totalPrize: number
   sellers: SellerResult[]
   diagnostic?: ApurationDiagnostic
+  goal?: ApurationGoal
 }
 
 /* ── helpers ─────────────────────────────────────────────── */
@@ -327,29 +339,26 @@ function apurateMixSkus(
     })
   }
 
-  // Group by seller → customer → set of product codes
-  type PdvEntry = { name: string; codes: Set<string>; sellerCode: string }
+  type PdvEntry = { name: string; codes: Set<string>; value: number; sellerCode: string }
   const bySellerCustomer = new Map<string, Map<string, PdvEntry>>()
   let movementsMatched = 0
 
   for (const m of filtered) {
     const code = m.productCode?.toUpperCase()
     if (!code) continue
-    // when no SKU list is defined, all products count; otherwise restrict to the defined set
-    // also try manufacturerCode (often the EAN) as a fallback
     const mfr = m.manufacturerCode?.toUpperCase()
     if (allCodes.size > 0 && !allCodes.has(code) && !(mfr && allCodes.has(mfr))) continue
     const cust = m.customerCode ?? ''; if (!cust) continue
-
-    // CNPJ filter (we use customerCode as proxy; ideally match document)
     if (validCnpjs.size > 0 && !validCnpjs.has(cust) && !validCnpjs.has(fmtCnpj(m.customerCode ?? ''))) continue
 
     movementsMatched++
     const seller = m.sellerCode ?? '?'
     if (!bySellerCustomer.has(seller)) bySellerCustomer.set(seller, new Map())
     const custMap = bySellerCustomer.get(seller)!
-    if (!custMap.has(cust)) custMap.set(cust, { name: m.customerName ?? cust, codes: new Set(), sellerCode: seller })
-    custMap.get(cust)!.codes.add(code)
+    if (!custMap.has(cust)) custMap.set(cust, { name: m.customerName ?? cust, codes: new Set(), value: 0, sellerCode: seller })
+    const e = custMap.get(cust)!
+    e.codes.add(code)
+    e.value += m.value ?? 0
   }
 
   const pdvsFound = [...bySellerCustomer.values()].reduce((s, m) => s + m.size, 0)
@@ -365,15 +374,19 @@ function apurateMixSkus(
         [...mandatorySet].every(c => entry.codes.has(c))
       const totalSkus = entry.codes.size
       const qualified = hasMandatory && totalSkus >= cfg.minSkus
+      const progressPct = cfg.minSkus > 0 ? Math.round((totalSkus / cfg.minSkus) * 100) : (qualified ? 100 : 0)
 
       if (qualified) qualifiedPdvs++
       details.push({
         customerCode: custCode, customerName: entry.name,
-        skuCount: totalSkus, qualified,
+        skuCount: totalSkus, value: entry.value, qualified, progressPct,
         reason: qualified ? undefined : !hasMandatory ? 'Mandatórios faltando' : `${totalSkus}/${cfg.minSkus} SKUs`,
       })
     }
 
+    details.sort((a, b) => (b.progressPct - a.progressPct) || (b.value ?? 0) - (a.value ?? 0))
+    const bestPdvProgress = details.length > 0 ? (details[0].progressPct / 100) : 0
+    const totalValue = details.reduce((s, d) => s + (d.value ?? 0), 0)
     const prizeV = qualifiedPdvs * cfg.prize.vendedor
     const prizeS = qualifiedPdvs * cfg.prize.supervisor
     const prizeG = qualifiedPdvs * cfg.prize.gerente
@@ -381,16 +394,21 @@ function apurateMixSkus(
       sellerCode, sellerName: rca?.name ?? sellerCode,
       supervisorCode: rca?.supervisorCode ?? '', supervisorName: rca?.supervisor ?? '—',
       qualifiedPdvs, prizeVendedor: prizeV, prizeSupervisor: prizeS, prizeGerente: prizeG,
-      totalPrize: prizeV + prizeS + prizeG, details,
+      totalPrize: prizeV + prizeS + prizeG, details, bestPdvProgress, totalValue,
     })
   }
 
-  sellers.sort((a, b) => b.qualifiedPdvs - a.qualifiedPdvs)
+  sellers.sort((a, b) =>
+    b.qualifiedPdvs - a.qualifiedPdvs ||
+    b.bestPdvProgress - a.bestPdvProgress ||
+    b.totalValue - a.totalValue
+  )
   const totalPrize = sellers.reduce((s, r) => s + r.prizeVendedor, 0)
   return {
     campaignId: campaign.id, campaignName: campaign.name,
     totalPdvs: sellers.reduce((s, r) => s + r.qualifiedPdvs, 0), totalPrize, sellers,
     diagnostic: { movementsInWindow: filtered.length, movementsMatched, pdvsFound },
+    goal: { metric: 'sku_count', target: cfg.minSkus },
   }
 }
 
@@ -438,14 +456,18 @@ function apurateValorEans(
     for (const [custCode, entry] of custMap) {
       const hasAllCodes = !cfg.requireAllCodes || [...codeSet].every(c => entry.codes.has(c))
       const qualified = hasAllCodes && entry.value >= cfg.minValue
+      const progressPct = cfg.minValue > 0 ? Math.round((entry.value / cfg.minValue) * 100) : (qualified ? 100 : 0)
 
       if (qualified) qualifiedPdvs++
       details.push({
-        customerCode: custCode, customerName: entry.name, value: entry.value, qualified,
+        customerCode: custCode, customerName: entry.name, value: entry.value, qualified, progressPct,
         reason: qualified ? undefined : !hasAllCodes ? 'EANs faltando' : `R$${entry.value.toFixed(0)} < R$${cfg.minValue}`,
       })
     }
 
+    details.sort((a, b) => b.progressPct - a.progressPct)
+    const bestPdvProgress = details.length > 0 ? (details[0].progressPct / 100) : 0
+    const totalValue = details.reduce((s, d) => s + (d.value ?? 0), 0)
     const prizeV = qualifiedPdvs * cfg.prize.vendedor
     const prizeS = qualifiedPdvs * cfg.prize.supervisor
     const prizeG = qualifiedPdvs * cfg.prize.gerente
@@ -453,12 +475,21 @@ function apurateValorEans(
       sellerCode, sellerName: rca?.name ?? sellerCode,
       supervisorCode: rca?.supervisorCode ?? '', supervisorName: rca?.supervisor ?? '—',
       qualifiedPdvs, prizeVendedor: prizeV, prizeSupervisor: prizeS, prizeGerente: prizeG,
-      totalPrize: prizeV, details,
+      totalPrize: prizeV, details, bestPdvProgress, totalValue,
     })
   }
 
-  sellers.sort((a, b) => b.qualifiedPdvs - a.qualifiedPdvs)
-  return { campaignId: campaign.id, campaignName: campaign.name, totalPdvs: sellers.reduce((s, r) => s + r.qualifiedPdvs, 0), totalPrize: sellers.reduce((s, r) => s + r.prizeVendedor, 0), sellers }
+  sellers.sort((a, b) =>
+    b.qualifiedPdvs - a.qualifiedPdvs ||
+    b.bestPdvProgress - a.bestPdvProgress ||
+    b.totalValue - a.totalValue
+  )
+  return {
+    campaignId: campaign.id, campaignName: campaign.name,
+    totalPdvs: sellers.reduce((s, r) => s + r.qualifiedPdvs, 0),
+    totalPrize: sellers.reduce((s, r) => s + r.prizeVendedor, 0), sellers,
+    goal: { metric: 'value', target: cfg.minValue },
+  }
 }
 
 /* ── Cota (Acelere e Ganhe) ──────────────────────────────── */
