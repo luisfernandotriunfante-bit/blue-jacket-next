@@ -90,6 +90,7 @@ export function App() {
   const [tab, setTab] = useState<'uploads' | 'auditoria' | 'config' | 'rcas'>('uploads')
 
   const monthLabel = useMemo(() => fmtCompetencia(viewingComp ?? activeComp).toUpperCase(), [viewingComp, activeComp])
+  const displayComp = viewingComp ?? activeComp
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [rawFiles, setRawFiles] = useState<Record<string, File>>({})
   const [activeNotice, setActiveNotice] = useState<AuditItem | null>(null)
@@ -448,11 +449,11 @@ export function App() {
             <span className="so-month-label">{monthLabel}</span>
           </div>
         </header>
-        {selloutTab === 'dashboard' && <SellOutTab movementBase={effectiveMovements} productBase={effectiveProducts} monthLabel={monthLabel} />}
-        {selloutTab === 'gerencial' && <GerencialTab movementBase={effectiveMovements} monthLabel={monthLabel} />}
-        {selloutTab === 'clientes' && <ClientesTab movementBase={effectiveMovements} clientBase={effectiveClients} monthLabel={monthLabel} />}
+        {selloutTab === 'dashboard' && <SellOutTab movementBase={effectiveMovements} productBase={effectiveProducts} monthLabel={monthLabel} activeComp={displayComp} />}
+        {selloutTab === 'gerencial' && <GerencialTab movementBase={effectiveMovements} monthLabel={monthLabel} activeComp={displayComp} />}
+        {selloutTab === 'clientes' && <ClientesTab movementBase={effectiveMovements} clientBase={effectiveClients} monthLabel={monthLabel} activeComp={displayComp} />}
       </>) : section === 'estoque' ? <>
-        <StockTab productBase={effectiveProducts} receiptBase={effectiveReceipts} movementBase={effectiveMovements} productIndicators={snap ? null : productIndicators} />
+        <StockTab productBase={effectiveProducts} receiptBase={effectiveReceipts} movementBase={effectiveMovements} productIndicators={snap ? null : productIndicators} activeComp={displayComp} />
       </> : section === 'campanhas' ? <>
         <CampaignTab movementBase={effectiveMovements} productBase={effectiveProducts} clientBase={effectiveClients} rcas={effectiveRcas} campaignsOverride={effectiveCampaigns} readOnly={!!viewingComp} />
       </> : <>

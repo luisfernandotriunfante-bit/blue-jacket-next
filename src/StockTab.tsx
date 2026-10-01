@@ -44,11 +44,12 @@ function loadTags(): Tags {
   catch { return {} }
 }
 
-export function StockTab({ productBase, receiptBase, movementBase, productIndicators }: {
+export function StockTab({ productBase, receiptBase, movementBase, productIndicators, activeComp }: {
   productBase: CanonicalProduct[]
   receiptBase: CanonicalReceipt[]
   movementBase: CanonicalMovement[]
   productIndicators: ProductIndicators | null
+  activeComp: string
 }) {
   const [subTab, setSubTab] = useState<'estoque' | 'produtos' | 'lancamentos' | 'notas'>('estoque')
   const [search, setSearch] = useState('')
@@ -368,8 +369,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
   const notasKpis = useMemo(() => {
     const cartQty = arrivalInvoices.reduce((s, i) => s + i.totalQty, 0)
     const cartVal = arrivalInvoices.reduce((s, i) => s + i.totalValue, 0)
-    const now = new Date()
-    const curMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const curMonth = activeComp
     const recThisMonth = receivedInvoices.filter(i => (i.date ?? '').startsWith(curMonth))
     const recVal = recThisMonth.reduce((s, i) => s + i.totalValue, 0)
     const lastDate = receivedInvoices[0]?.date

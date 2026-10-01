@@ -38,22 +38,26 @@ function KpiCard({ label, value, sub }: { label: string; value: string; sub?: st
 }
 
 /* ── ClientesTab ─────────────────────────────────────── */
-export function ClientesTab({ movementBase, clientBase, monthLabel }: {
+export function ClientesTab({ movementBase, clientBase, monthLabel, activeComp }: {
   movementBase: CanonicalMovement[]
   clientBase: CanonicalClient[]
   monthLabel: string
+  activeComp: string
 }) {
   const [view, setView] = useState<'positivados' | 'nao-positivados'>('positivados')
   const [search, setSearch] = useState('')
   const [expandedCustomer, setExpandedCustomer] = useState<string | null>(null)
 
   const { monthStart, monthEnd } = useMemo(() => {
+    const [y, mo] = activeComp.split('-').map(Number)
+    const monthStart = `${activeComp}-01`
     const now = new Date()
-    return {
-      monthStart: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`,
-      monthEnd: now.toISOString().slice(0, 10),
-    }
-  }, [])
+    const curComp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const monthEnd = activeComp >= curComp
+      ? now.toISOString().slice(0, 10)
+      : `${activeComp}-${String(new Date(y, mo, 0).getDate()).padStart(2, '0')}`
+    return { monthStart, monthEnd }
+  }, [activeComp])
 
   const monthBase = useMemo(() =>
     movementBase.filter(m => { const d = m.movementDate ?? ''; return d >= monthStart && d <= monthEnd })

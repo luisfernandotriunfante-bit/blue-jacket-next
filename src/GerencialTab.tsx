@@ -144,9 +144,10 @@ interface SellerRow {
 }
 
 /* ── GerencialTab ────────────────────────────────────── */
-export function GerencialTab({ movementBase, monthLabel }: {
+export function GerencialTab({ movementBase, monthLabel, activeComp }: {
   movementBase: CanonicalMovement[]
   monthLabel: string
+  activeComp: string
 }) {
   const [rcas, setRcas] = useState<RcaRecord[]>(readRcas)
   const [expandedTeam, setExpandedTeam] = useState<string | null>(null)
@@ -159,12 +160,15 @@ export function GerencialTab({ movementBase, monthLabel }: {
   }, [])
 
   const { monthStart, monthEnd } = useMemo(() => {
+    const [y, mo] = activeComp.split('-').map(Number)
+    const monthStart = `${activeComp}-01`
     const now = new Date()
-    return {
-      monthStart: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`,
-      monthEnd: now.toISOString().slice(0, 10),
-    }
-  }, [])
+    const curComp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const monthEnd = activeComp >= curComp
+      ? now.toISOString().slice(0, 10)
+      : `${activeComp}-${String(new Date(y, mo, 0).getDate()).padStart(2, '0')}`
+    return { monthStart, monthEnd }
+  }, [activeComp])
 
   const monthBase = useMemo(() =>
     movementBase.filter(m => { const d = m.movementDate ?? ''; return d >= monthStart && d <= monthEnd })

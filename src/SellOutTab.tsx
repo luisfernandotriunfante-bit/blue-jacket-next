@@ -150,10 +150,11 @@ function areaPath(vals: number[], xFn: (i: number) => number, yFn: (v: number) =
 }
 
 /* ── SellOutTab ─────────────────────────────────────────── */
-export function SellOutTab({ movementBase, productBase, monthLabel }: {
+export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }: {
   movementBase: CanonicalMovement[]
   productBase: CanonicalProduct[]
   monthLabel: string
+  activeComp: string
 }) {
   const [windowOffset, setWindowOffset] = useState(0)
   const [compact, setCompact] = useState(false)
@@ -173,12 +174,15 @@ export function SellOutTab({ movementBase, productBase, monthLabel }: {
   }, [])
 
   const { monthStart, monthEnd } = useMemo(() => {
+    const [y, mo] = activeComp.split('-').map(Number)
+    const monthStart = `${activeComp}-01`
     const now = new Date()
-    return {
-      monthStart: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`,
-      monthEnd: now.toISOString().slice(0, 10),
-    }
-  }, [])
+    const curComp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const monthEnd = activeComp >= curComp
+      ? now.toISOString().slice(0, 10)
+      : `${activeComp}-${String(new Date(y, mo, 0).getDate()).padStart(2, '0')}`
+    return { monthStart, monthEnd }
+  }, [activeComp])
 
   const productByCode = useMemo(() => {
     const m = new Map<string, CanonicalProduct>()
