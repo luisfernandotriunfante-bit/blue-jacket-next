@@ -35,18 +35,22 @@ interface PanelProps {
   productBase: CanonicalProduct[]
   clientBase: CanonicalClient[]
   rcas: RcaRecord[]
+  campaignsOverride?: CampaignRecord[]
+  readOnly?: boolean
 }
 
-function CampaignPanel({ movementBase, productBase, clientBase, rcas }: PanelProps) {
-  const [campaigns, setCampaigns] = useState<CampaignRecord[]>(readCampaigns)
+function CampaignPanel({ movementBase, productBase, clientBase, rcas, campaignsOverride, readOnly }: PanelProps) {
+  const [liveCampaigns, setLiveCampaigns] = useState<CampaignRecord[]>(readCampaigns)
+  const campaigns = campaignsOverride ?? liveCampaigns
   const [selected, setSelected] = useState<string | null>(null)
   const [expandedSeller, setExpandedSeller] = useState<string | null>(null)
 
   useEffect(() => {
-    const onUpdate = () => setCampaigns(readCampaigns())
+    if (campaignsOverride) return
+    const onUpdate = () => setLiveCampaigns(readCampaigns())
     window.addEventListener('rj-campaigns-changed', onUpdate)
     return () => window.removeEventListener('rj-campaigns-changed', onUpdate)
-  }, [])
+  }, [campaignsOverride])
 
   const activeCampaigns = useMemo(
     () => campaigns.filter(c => c.status === 'active'),
@@ -299,9 +303,11 @@ interface CampaignTabProps {
   productBase: CanonicalProduct[]
   clientBase: CanonicalClient[]
   rcas: RcaRecord[]
+  campaignsOverride?: CampaignRecord[]
+  readOnly?: boolean
 }
 
-export function CampaignTab({ movementBase, productBase, clientBase, rcas }: CampaignTabProps) {
+export function CampaignTab({ movementBase, productBase, clientBase, rcas, campaignsOverride, readOnly }: CampaignTabProps) {
   const [subTab, setSubTab] = useState<'painel' | 'cadastro'>('painel')
 
   return (
@@ -324,8 +330,8 @@ export function CampaignTab({ movementBase, productBase, clientBase, rcas }: Cam
 
       <section className="content">
         {subTab === 'painel'
-          ? <CampaignPanel movementBase={movementBase} productBase={productBase} clientBase={clientBase} rcas={rcas} />
-          : <CampaignManager />}
+          ? <CampaignPanel movementBase={movementBase} productBase={productBase} clientBase={clientBase} rcas={rcas} campaignsOverride={campaignsOverride} readOnly={readOnly} />
+          : readOnly ? <p style={{ color: 'var(--muted)', padding: 24, fontSize: 13 }}>Cadastro indisponível em modo somente leitura.</p> : <CampaignManager />}
       </section>
     </>
   )
