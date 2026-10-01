@@ -160,12 +160,19 @@ export interface PdvDetail {
   reason?: string
 }
 
+export interface ApurationDiagnostic {
+  movementsInWindow: number   // movimentações dentro da janela de datas
+  movementsMatched: number    // dessas, quantas tinham código de produto correspondente
+  pdvsFound: number           // PDVs distintos com ao menos 1 movimento correspondente
+}
+
 export interface ApurationResult {
   campaignId: string
   campaignName: string
   totalPdvs: number
   totalPrize: number
   sellers: SellerResult[]
+  diagnostic?: ApurationDiagnostic
 }
 
 /* ── helpers ─────────────────────────────────────────────── */
@@ -305,6 +312,7 @@ function apurateMixSkus(
   // Group by seller → customer → set of product codes
   type PdvEntry = { name: string; codes: Set<string>; sellerCode: string }
   const bySellerCustomer = new Map<string, Map<string, PdvEntry>>()
+  let movementsMatched = 0
 
   for (const m of filtered) {
     const code = m.productCode?.toUpperCase()
@@ -316,12 +324,15 @@ function apurateMixSkus(
     // CNPJ filter (we use customerCode as proxy; ideally match document)
     if (validCnpjs.size > 0 && !validCnpjs.has(cust) && !validCnpjs.has(fmtCnpj(m.customerCode ?? ''))) continue
 
+    movementsMatched++
     const seller = m.sellerCode ?? '?'
     if (!bySellerCustomer.has(seller)) bySellerCustomer.set(seller, new Map())
     const custMap = bySellerCustomer.get(seller)!
     if (!custMap.has(cust)) custMap.set(cust, { name: m.customerName ?? cust, codes: new Set(), sellerCode: seller })
     custMap.get(cust)!.codes.add(code)
   }
+
+  const pdvsFound = [...bySellerCustomer.values()].reduce((s, m) => s + m.size, 0)
 
   const sellers: SellerResult[] = []
   for (const [sellerCode, custMap] of bySellerCustomer) {
@@ -356,7 +367,11 @@ function apurateMixSkus(
 
   sellers.sort((a, b) => b.qualifiedPdvs - a.qualifiedPdvs)
   const totalPrize = sellers.reduce((s, r) => s + r.prizeVendedor, 0)
-  return { campaignId: campaign.id, campaignName: campaign.name, totalPdvs: sellers.reduce((s, r) => s + r.qualifiedPdvs, 0), totalPrize, sellers }
+  return {
+    campaignId: campaign.id, campaignName: campaign.name,
+    totalPdvs: sellers.reduce((s, r) => s + r.qualifiedPdvs, 0), totalPrize, sellers,
+    diagnostic: { movementsInWindow: filtered.length, movementsMatched, pdvsFound },
+  }
 }
 
 /* ── Valor + EANs ────────────────────────────────────────── */

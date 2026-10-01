@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { CampaignManager, readCampaigns } from './CampaignManager'
-import { apurateCampaign, CAMPAIGN_TYPE_LABEL, type CampaignRecord, type ApurationResult, type SellerResult } from './domain/campaignEngine'
+import { apurateCampaign, CAMPAIGN_TYPE_LABEL, type CampaignRecord, type ApurationResult, type ApurationDiagnostic, type SellerResult } from './domain/campaignEngine'
 import type { CanonicalMovement } from './domain/movementMotor'
 import type { CanonicalProduct } from './domain/productMotor'
 import type { CanonicalClient } from './domain/clientMotor'
@@ -191,9 +191,7 @@ function CampaignPanel({ movementBase, productBase, clientBase, rcas, campaignsO
           </div>
 
           {selectedResult.sellers.length === 0 ? (
-            <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 16 }}>
-              Nenhuma movimentação encontrada para os parâmetros desta campanha.
-            </p>
+            <DiagnosticHint d={selectedResult.diagnostic} cfg={selectedCampaign.config} />
           ) : (
             <div style={{ overflowX: 'auto', marginTop: 16 }}>
               <table className="gr-table">
@@ -252,6 +250,42 @@ function CampaignPanel({ movementBase, productBase, clientBase, rcas, campaignsO
         </div>
       )}
     </div>
+  )
+}
+
+/* ── Diagnostic hint when result is empty ────────────────── */
+function DiagnosticHint({ d, cfg }: { d?: ApurationDiagnostic; cfg?: CampaignRecord['config'] }) {
+  if (!d) return null
+  const minSkus = cfg && 'minSkus' in cfg ? (cfg as { minSkus: number }).minSkus : null
+
+  if (d.movementsInWindow === 0) {
+    return (
+      <p style={{ color: 'var(--muted)', fontSize: 12, marginTop: 12, lineHeight: 1.6 }}>
+        <strong style={{ color: 'var(--red)' }}>0 movimentações no período da campanha.</strong><br />
+        Verifique se os dados importados no Motor de Movimentações cobrem as datas da campanha.
+      </p>
+    )
+  }
+  if (d.movementsMatched === 0) {
+    return (
+      <p style={{ color: 'var(--muted)', fontSize: 12, marginTop: 12, lineHeight: 1.6 }}>
+        <strong style={{ color: 'var(--red)' }}>{d.movementsInWindow.toLocaleString('pt-BR')} movimentações no período, mas nenhum produto correspondeu à lista.</strong><br />
+        Os EANs/códigos cadastrados na campanha precisam estar na base de produtos (Motor de Produtos) para serem convertidos para código Winthor. Confirme se o cadastro de produtos foi importado.
+      </p>
+    )
+  }
+  if (d.pdvsFound > 0) {
+    return (
+      <p style={{ color: 'var(--muted)', fontSize: 12, marginTop: 12, lineHeight: 1.6 }}>
+        <strong style={{ color: 'var(--red)' }}>{d.pdvsFound} PDV(s) com compras encontrados, mas nenhum atingiu o mínimo{minSkus ? ` de ${minSkus} SKUs` : ''}.</strong><br />
+        Revise o critério mínimo da campanha ou verifique se todos os produtos da lista estão no cadastro.
+      </p>
+    )
+  }
+  return (
+    <p style={{ color: 'var(--muted)', fontSize: 12, marginTop: 12 }}>
+      Nenhuma movimentação correspondeu aos critérios da campanha.
+    </p>
   )
 }
 
