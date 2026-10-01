@@ -270,7 +270,9 @@ function DiagnosticHint({ d, cfg }: { d?: ApurationDiagnostic; cfg?: CampaignRec
     return (
       <p style={{ color: 'var(--muted)', fontSize: 12, marginTop: 12, lineHeight: 1.6 }}>
         <strong style={{ color: 'var(--red)' }}>{d.movementsInWindow.toLocaleString('pt-BR')} movimentações no período, mas nenhum produto correspondeu à lista.</strong><br />
-        Os EANs/códigos cadastrados na campanha precisam estar na base de produtos (Motor de Produtos) para serem convertidos para código Winthor. Confirme se o cadastro de produtos foi importado.
+        Confira se os códigos cadastrados na campanha são os mesmos que aparecem na coluna <strong>CODPROD. WINTHOR</strong> do relatório de vendas (sem zeros à esquerda).<br />
+        Se quiser usar EANs ou código de fabricante, importe o Motor de Produtos para que a conversão seja feita automaticamente.<br />
+        <span style={{ color: 'var(--muted)', fontStyle: 'italic' }}>Dica: abra o console do navegador (F12) para ver os códigos comparados.</span>
       </p>
     )
   }
