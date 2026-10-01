@@ -219,7 +219,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
   const allDays = useMemo(() => {
     const map = new Map<string, { fat: number; afat: number; cFat: Set<string>; cTot: Set<string> }>()
     for (const m of monthBase) {
-      const day = m.movementDate ?? ''; if (!day) continue
+      const day = m.orderDate ?? m.movementDate ?? ''; if (!day) continue
       if (!map.has(day)) map.set(day, { fat: 0, afat: 0, cFat: new Set(), cTot: new Set() })
       const e = map.get(day)!
       if (m.movementType === 'venda_faturada') {
