@@ -317,6 +317,16 @@ function apurateMixSkus(
 
   const filtered = getWindowedMovements(movements, windowStart, windowEnd)
 
+  if (import.meta.env.DEV) {
+    console.debug('[CampaignEngine] mix_skus:', campaign.name, {
+      window: `${windowStart} → ${windowEnd}`,
+      movementsInWindow: filtered.length,
+      allCodesSize: allCodes.size,
+      allCodesSample: [...allCodes].slice(0, 20),
+      movementCodeSample: filtered.slice(0, 10).map(m => ({ productCode: m.productCode, manufacturerCode: m.manufacturerCode })),
+    })
+  }
+
   // Group by seller → customer → set of product codes
   type PdvEntry = { name: string; codes: Set<string>; sellerCode: string }
   const bySellerCustomer = new Map<string, Map<string, PdvEntry>>()
