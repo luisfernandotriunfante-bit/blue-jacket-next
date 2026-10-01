@@ -233,7 +233,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
       }
     }
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([date, d]) => ({
-      date, fat: d.fat, afat: d.afat, sellOut: d.fat + d.afat, posFat: d.cFat.size, posTotal: d.cTot.size,
+      date, fat: d.fat, afat: d.afat, sellOut: d.fat, posFat: d.cFat.size, posTotal: d.cTot.size,
     }))
   }, [monthBase])
 
