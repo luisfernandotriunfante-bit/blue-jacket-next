@@ -1,7 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
-import { CampaignManager, readCampaigns, type CampaignRecord } from './CampaignManager'
+import { CampaignManager, readCampaigns } from './CampaignManager'
+import { apurateCampaign, CAMPAIGN_TYPE_LABEL, type CampaignRecord, type ApurationResult, type SellerResult } from './domain/campaignEngine'
 import type { CanonicalMovement } from './domain/movementMotor'
 import type { CanonicalProduct } from './domain/productMotor'
+import type { CanonicalClient } from './domain/clientMotor'
+import type { RcaRecord } from './RcaManager'
 
 /* ── helpers ─────────────────────────────────────────────── */
 function kpiCurrency(v: number) {
@@ -30,11 +33,14 @@ function periodProgress(startDate: string, endDate: string): number {
 interface PanelProps {
   movementBase: CanonicalMovement[]
   productBase: CanonicalProduct[]
+  clientBase: CanonicalClient[]
+  rcas: RcaRecord[]
 }
 
-function CampaignPanel({ movementBase, productBase }: PanelProps) {
+function CampaignPanel({ movementBase, productBase, clientBase, rcas }: PanelProps) {
   const [campaigns, setCampaigns] = useState<CampaignRecord[]>(readCampaigns)
   const [selected, setSelected] = useState<string | null>(null)
+  const [expandedSeller, setExpandedSeller] = useState<string | null>(null)
 
   useEffect(() => {
     const onUpdate = () => setCampaigns(readCampaigns())
@@ -42,90 +48,27 @@ function CampaignPanel({ movementBase, productBase }: PanelProps) {
     return () => window.removeEventListener('rj-campaigns-changed', onUpdate)
   }, [])
 
-  // brand (lower) → set of productCodes
-  const brandProducts = useMemo(() => {
-    const map = new Map<string, Set<string>>()
-    for (const p of productBase) {
-      if (!p.brand || !p.internalCode) continue
-      const brand = p.brand.toLowerCase()
-      if (!map.has(brand)) map.set(brand, new Set())
-      map.get(brand)!.add(p.internalCode)
-    }
-    return map
-  }, [productBase])
-
   const activeCampaigns = useMemo(
     () => campaigns.filter(c => c.status === 'active'),
     [campaigns]
   )
 
-  // Compute stats per campaign
-  const stats = useMemo(() => {
-    return activeCampaigns.map(c => {
-      const codes = brandProducts.get(c.brand.toLowerCase())
-      const hasBrandData = productBase.length > 0
+  const hasMotors = movementBase.length > 0 || productBase.length > 0
 
-      if (!c.startDate || !c.endDate || !codes || codes.size === 0) {
-        return {
-          id: c.id, fat: 0, afat: 0, sellers: 0, clients: 0,
-          movements: [] as CanonicalMovement[],
-          noBrandData: !hasBrandData || !codes,
-          noDate: !c.startDate || !c.endDate,
-        }
-      }
-
-      const filtered = movementBase.filter(m =>
-        m.productCode && codes.has(m.productCode) &&
-        !!m.movementDate && m.movementDate >= c.startDate && m.movementDate <= c.endDate &&
-        (m.movementType === 'venda_faturada' || m.movementType === 'devolucao' || m.movementType === 'a_faturar')
-      )
-
-      let fat = 0, afat = 0
-      const sellers = new Set<string>()
-      const clients = new Set<string>()
-
-      for (const m of filtered) {
-        if (m.movementType === 'venda_faturada') {
-          fat += m.value ?? 0
-          if (m.sellerCode) sellers.add(m.sellerCode)
-          if (m.customerCode) clients.add(m.customerCode)
-        } else if (m.movementType === 'devolucao') {
-          fat += m.value ?? 0 // negativo, subtrai
-        } else {
-          afat += m.value ?? 0
-          if (m.sellerCode) sellers.add(m.sellerCode)
-        }
-      }
-
-      return {
-        id: c.id, fat, afat, sellers: sellers.size, clients: clients.size,
-        movements: filtered, noBrandData: false, noDate: false,
-      }
-    })
-  }, [activeCampaigns, movementBase, brandProducts, productBase.length])
-
-  // Seller ranking for selected campaign
-  const sellerRanking = useMemo(() => {
-    if (!selected) return []
-    const stat = stats.find(s => s.id === selected)
-    if (!stat || !stat.movements.length) return []
-
-    const map = new Map<string, { code: string; name: string; fat: number; clients: Set<string> }>()
-    for (const m of stat.movements) {
-      const code = m.sellerCode ?? '?'
-      if (!map.has(code)) map.set(code, { code, name: m.seller ?? code, fat: 0, clients: new Set() })
-      const e = map.get(code)!
-      if (m.movementType === 'venda_faturada') {
-        e.fat += m.value ?? 0
-        if (m.customerCode) e.clients.add(m.customerCode)
-      } else if (m.movementType === 'devolucao') {
-        e.fat += m.value ?? 0
+  // Run apuration for all active campaigns
+  const results = useMemo(() => {
+    if (!hasMotors) return new Map<string, ApurationResult>()
+    const map = new Map<string, ApurationResult>()
+    for (const c of activeCampaigns) {
+      if (!c.startDate || !c.endDate || !c.config) continue
+      try {
+        map.set(c.id, apurateCampaign(c, movementBase, productBase, clientBase, rcas))
+      } catch {
+        // apuration error — skip
       }
     }
-    return [...map.values()]
-      .sort((a, b) => b.fat - a.fat)
-      .map((s, i) => ({ ...s, rank: i + 1, clientCount: s.clients.size }))
-  }, [selected, stats])
+    return map
+  }, [activeCampaigns, movementBase, productBase, clientBase, rcas, hasMotors])
 
   if (activeCampaigns.length === 0) {
     return (
@@ -137,15 +80,18 @@ function CampaignPanel({ movementBase, productBase }: PanelProps) {
   }
 
   const selectedCampaign = selected ? activeCampaigns.find(c => c.id === selected) : null
-  const selectedStat = selected ? stats.find(s => s.id === selected) : null
+  const selectedResult = selected ? results.get(selected) : null
 
   return (
     <div>
+      {/* Campaign cards grid */}
       <div className="camp-grid">
-        {activeCampaigns.map((c, i) => {
-          const s = stats[i]
+        {activeCampaigns.map(c => {
+          const result = results.get(c.id)
           const progress = periodProgress(c.startDate, c.endDate)
           const isSelected = selected === c.id
+          const noDate = !c.startDate || !c.endDate
+          const noMotor = !hasMotors
 
           return (
             <div
@@ -153,12 +99,12 @@ function CampaignPanel({ movementBase, productBase }: PanelProps) {
               role="button"
               tabIndex={0}
               className={`camp-panel-card${isSelected ? ' camp-panel-card-sel' : ''}`}
-              onClick={() => setSelected(isSelected ? null : c.id)}
+              onClick={() => { setSelected(isSelected ? null : c.id); setExpandedSeller(null) }}
               onKeyDown={e => e.key === 'Enter' && setSelected(isSelected ? null : c.id)}
             >
               <div className="camp-card-header">
                 <div className="camp-card-title">{c.name}</div>
-                <span className="camp-brand-tag">{c.brand || '—'}</span>
+                <span className="camp-brand-tag">{c.config ? CAMPAIGN_TYPE_LABEL[c.config.type] : '—'}</span>
               </div>
 
               {(c.startDate || c.endDate) && (
@@ -173,86 +119,126 @@ function CampaignPanel({ movementBase, productBase }: PanelProps) {
                     className="camp-progress-fill"
                     style={{ width: `${progress}%`, background: progress >= 100 ? 'var(--muted)' : 'var(--blue)' }}
                   />
-                  <span className="camp-progress-label">{progress >= 100 ? 'Encerrada' : `${progress}% do período`}</span>
+                  <span className="camp-progress-label">
+                    {progress >= 100 ? 'Encerrada' : `${progress}% do período`}
+                  </span>
                 </div>
               )}
 
-              {s.noDate ? (
+              {noDate ? (
                 <p className="camp-no-data">Defina as datas da campanha para ver os resultados.</p>
-              ) : s.noBrandData ? (
-                <p className="camp-no-data">Processe os motores de Produtos e Movimentações para ver resultados desta campanha.</p>
-              ) : (
+              ) : noMotor ? (
+                <p className="camp-no-data">Processe os motores de Movimentações para ver resultados.</p>
+              ) : result ? (
                 <div className="camp-stats">
                   <div className="camp-stat">
-                    <span className="camp-stat-val">{kpiCurrency(s.fat)}</span>
-                    <span className="camp-stat-label">Faturado líq.</span>
+                    <span className="camp-stat-val">{result.totalPdvs}</span>
+                    <span className="camp-stat-label">PDVs qualificados</span>
                   </div>
-                  {s.afat > 0 && (
-                    <div className="camp-stat">
-                      <span className="camp-stat-val">{kpiCurrency(s.afat)}</span>
-                      <span className="camp-stat-label">A faturar</span>
-                    </div>
-                  )}
                   <div className="camp-stat">
-                    <span className="camp-stat-val">{s.sellers}</span>
+                    <span className="camp-stat-val">{kpiCurrency(result.totalPrize)}</span>
+                    <span className="camp-stat-label">Prêmio vendedores</span>
+                  </div>
+                  <div className="camp-stat">
+                    <span className="camp-stat-val">{result.sellers.length}</span>
                     <span className="camp-stat-label">Vendedores</span>
                   </div>
-                  <div className="camp-stat">
-                    <span className="camp-stat-val">{s.clients}</span>
-                    <span className="camp-stat-label">Clientes</span>
-                  </div>
                 </div>
-              )}
-
-              {c.mechanic && (
-                <div className="camp-card-mechanic" style={{ fontSize: 11, marginTop: 8 }}>
-                  {c.mechanic}
-                </div>
+              ) : (
+                <p className="camp-no-data">Sem dados para apurar.</p>
               )}
             </div>
           )
         })}
       </div>
 
-      {/* ── detalhe ranking ────────────────────────────── */}
-      {selectedCampaign && !selectedStat?.noBrandData && !selectedStat?.noDate && (
+      {/* Detail panel for selected campaign */}
+      {selectedCampaign && selectedResult && (
         <div className="camp-detail">
           <div className="camp-detail-header">
             <h3 style={{ margin: 0, fontSize: 13, color: 'var(--red)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
-              Ranking de vendedores — {selectedCampaign.name}
+              Apuração — {selectedCampaign.name}
             </h3>
             <span style={{ fontSize: 11, color: 'var(--muted)' }}>
               {fmtDate(selectedCampaign.startDate)} → {fmtDate(selectedCampaign.endDate)}
+              {selectedCampaign.config && ` · ${CAMPAIGN_TYPE_LABEL[selectedCampaign.config.type]}`}
             </span>
           </div>
 
-          {sellerRanking.length === 0 ? (
-            <p style={{ color: 'var(--muted)', fontSize: 13, margin: '12px 0 0' }}>
-              Sem movimentações encontradas neste período para a marca {selectedCampaign.brand}.
+          {/* Summary KPIs */}
+          <div className="camp-stats" style={{ marginTop: 12, marginBottom: 0 }}>
+            <div className="camp-stat">
+              <span className="camp-stat-val">{selectedResult.totalPdvs}</span>
+              <span className="camp-stat-label">PDVs qualificados</span>
+            </div>
+            <div className="camp-stat">
+              <span className="camp-stat-val">{kpiCurrency(selectedResult.totalPrize)}</span>
+              <span className="camp-stat-label">Total prêmios vendedores</span>
+            </div>
+            <div className="camp-stat">
+              <span className="camp-stat-val">{kpiCurrency(selectedResult.sellers.reduce((s, r) => s + r.prizeSupervisor, 0))}</span>
+              <span className="camp-stat-label">Total prêmios supervisores</span>
+            </div>
+            <div className="camp-stat">
+              <span className="camp-stat-val">{kpiCurrency(selectedResult.sellers.reduce((s, r) => s + r.prizeGerente, 0))}</span>
+              <span className="camp-stat-label">Total prêmios gerentes</span>
+            </div>
+          </div>
+
+          {selectedResult.sellers.length === 0 ? (
+            <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 16 }}>
+              Nenhuma movimentação encontrada para os parâmetros desta campanha.
             </p>
           ) : (
-            <div style={{ overflowX: 'auto', marginTop: 12 }}>
+            <div style={{ overflowX: 'auto', marginTop: 16 }}>
               <table className="gr-table">
                 <thead>
                   <tr>
                     <th>#</th>
                     <th>Vendedor</th>
-                    <th className="n-right">Faturado líq.</th>
-                    <th className="n-right">Clientes</th>
+                    <th>Supervisor</th>
+                    <th className="n-right">PDVs qualif.</th>
+                    <th className="n-right">Prêmio vend.</th>
+                    <th className="n-right">Prêmio sup.</th>
+                    <th style={{ width: 32 }} />
                   </tr>
                 </thead>
                 <tbody>
-                  {sellerRanking.map(s => (
-                    <tr key={s.code} className="gr-row">
-                      <td style={{ color: 'var(--muted)', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 12 }}>
-                        {s.rank === 1 ? '🥇' : s.rank === 2 ? '🥈' : s.rank === 3 ? '🥉' : s.rank}
-                      </td>
-                      <td style={{ fontWeight: 600 }}>{s.name}</td>
-                      <td className="n-right" style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700 }}>
-                        {kpiCurrency(s.fat)}
-                      </td>
-                      <td className="n-right" style={{ color: 'var(--muted)' }}>{s.clientCount}</td>
-                    </tr>
+                  {selectedResult.sellers.map((s, i) => (
+                    <>
+                      <tr
+                        key={s.sellerCode}
+                        className="gr-row"
+                        style={{ cursor: s.details.length > 0 ? 'pointer' : 'default' }}
+                        onClick={() => s.details.length > 0 && setExpandedSeller(expandedSeller === s.sellerCode ? null : s.sellerCode)}
+                      >
+                        <td style={{ color: 'var(--muted)', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 12 }}>
+                          {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
+                        </td>
+                        <td style={{ fontWeight: 600 }}>{s.sellerName}</td>
+                        <td style={{ color: 'var(--muted)', fontSize: 12 }}>{s.supervisorName}</td>
+                        <td className="n-right" style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700 }}>
+                          {s.qualifiedPdvs}
+                        </td>
+                        <td className="n-right" style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, color: 'var(--blue)' }}>
+                          {kpiCurrency(s.prizeVendedor)}
+                        </td>
+                        <td className="n-right" style={{ color: 'var(--muted)', fontSize: 12 }}>
+                          {kpiCurrency(s.prizeSupervisor)}
+                        </td>
+                        <td style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 12 }}>
+                          {s.details.length > 0 && (expandedSeller === s.sellerCode ? '▲' : '▼')}
+                        </td>
+                      </tr>
+
+                      {expandedSeller === s.sellerCode && s.details.length > 0 && (
+                        <tr key={`${s.sellerCode}-detail`}>
+                          <td colSpan={7} style={{ padding: 0, background: 'var(--surface)' }}>
+                            <SellerPdvDetail seller={s} />
+                          </td>
+                        </tr>
+                      )}
+                    </>
                   ))}
                 </tbody>
               </table>
@@ -264,13 +250,58 @@ function CampaignPanel({ movementBase, productBase }: PanelProps) {
   )
 }
 
+/* ── PDV detail sub-table ────────────────────────────────── */
+function SellerPdvDetail({ seller }: { seller: SellerResult }) {
+  const qualified = seller.details.filter(d => d.qualified)
+  const notQualified = seller.details.filter(d => !d.qualified)
+
+  return (
+    <div style={{ padding: '8px 16px 12px' }}>
+      <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>
+        PDVs de {seller.sellerName} · {qualified.length} qualificados · {notQualified.length} não qualificados
+      </div>
+      <table className="gr-table" style={{ fontSize: 11 }}>
+        <thead>
+          <tr>
+            <th>PDV</th>
+            <th className="n-right">Valor / SKUs</th>
+            <th>Status</th>
+            <th>Motivo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {seller.details.slice(0, 50).map(d => (
+            <tr key={d.customerCode} className="gr-row" style={{ opacity: d.qualified ? 1 : 0.6 }}>
+              <td>{d.customerName || d.customerCode}</td>
+              <td className="n-right" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+                {d.value !== undefined ? kpiCurrency(d.value) : d.skuCount !== undefined ? `${d.skuCount} SKUs` : '—'}
+              </td>
+              <td style={{ color: d.qualified ? 'var(--green, #22c55e)' : 'var(--muted)' }}>
+                {d.qualified ? '✓' : '✗'}
+              </td>
+              <td style={{ color: 'var(--muted)' }}>{d.reason ?? ''}</td>
+            </tr>
+          ))}
+          {seller.details.length > 50 && (
+            <tr><td colSpan={4} style={{ color: 'var(--muted)', textAlign: 'center', fontSize: 11 }}>
+              … e mais {seller.details.length - 50} PDVs
+            </td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 /* ── CampaignTab (entry point exported to App) ───────────── */
 interface CampaignTabProps {
   movementBase: CanonicalMovement[]
   productBase: CanonicalProduct[]
+  clientBase: CanonicalClient[]
+  rcas: RcaRecord[]
 }
 
-export function CampaignTab({ movementBase, productBase }: CampaignTabProps) {
+export function CampaignTab({ movementBase, productBase, clientBase, rcas }: CampaignTabProps) {
   const [subTab, setSubTab] = useState<'painel' | 'cadastro'>('painel')
 
   return (
@@ -293,7 +324,7 @@ export function CampaignTab({ movementBase, productBase }: CampaignTabProps) {
 
       <section className="content">
         {subTab === 'painel'
-          ? <CampaignPanel movementBase={movementBase} productBase={productBase} />
+          ? <CampaignPanel movementBase={movementBase} productBase={productBase} clientBase={clientBase} rcas={rcas} />
           : <CampaignManager />}
       </section>
     </>

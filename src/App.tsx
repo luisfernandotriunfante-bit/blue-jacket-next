@@ -14,7 +14,7 @@ import { StockTab } from './StockTab'
 import { SellOutTab } from './SellOutTab'
 import { GerencialTab } from './GerencialTab'
 import { ClientesTab } from './ClientesTab'
-import { RcaManager } from './RcaManager'
+import { RcaManager, readRcas, type RcaRecord } from './RcaManager'
 import { CampaignTab } from './CampaignTab'
 
 const motors: Array<{ id: Exclude<SourceArea, 'diario'>; name: string }> = [
@@ -51,6 +51,14 @@ function fileSize(size: number) { return size < 1_000_000 ? `${Math.max(1, Math.
 const dedupeList = (files: UploadedFile[] | undefined) => (files ?? []).filter((f, i, arr) => arr.findIndex(e => e.name === f.name && e.size === f.size) === i)
 
 export function App() {
+  const [rcas, setRcas] = useState<RcaRecord[]>(readRcas)
+
+  useEffect(() => {
+    const onUpdate = () => setRcas(readRcas())
+    window.addEventListener('rj-rcas-changed', onUpdate)
+    return () => window.removeEventListener('rj-rcas-changed', onUpdate)
+  }, [])
+
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
   const [section, setSection] = useState<'sellout' | 'estoque' | 'campanhas' | 'administracao'>('sellout')
   const [selloutTab, setSelloutTab] = useState<'dashboard' | 'gerencial' | 'clientes'>('dashboard')
@@ -371,7 +379,7 @@ export function App() {
       </>) : section === 'estoque' ? <>
         <StockTab productBase={productBase} receiptBase={receiptBase} movementBase={movementBase} productIndicators={productIndicators} />
       </> : section === 'campanhas' ? <>
-        <CampaignTab movementBase={movementBase} productBase={productBase} />
+        <CampaignTab movementBase={movementBase} productBase={productBase} clientBase={clientBase} rcas={rcas} />
       </> : <>
       <header className="topbar stock-topbar" aria-label="Administração">
         <button type="button" className={`stock-nav-btn${tab === 'uploads' ? ' on' : ''}`} onClick={() => { setTab('uploads'); setActiveNotice(null) }}>Uploads</button>

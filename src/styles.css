@@ -644,3 +644,19 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 .camp-no-data { font-size: 11px; color: var(--muted); margin: 4px 0 0; font-style: italic; }
 .camp-detail { margin-top: 28px; padding: 20px; background: var(--surface); border: 1px solid var(--blue); border-radius: 12px; }
 .camp-detail-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; flex-wrap: wrap; }
+
+/* ── Campaign type selector ───────────────────────────────────── */
+.camp-type-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; margin-top: 4px; }
+.camp-type-btn { border: 1px solid var(--border); background: transparent; color: var(--muted); border-radius: 8px; padding: 7px 12px; font-size: 12px; font-weight: 600; text-align: left; transition: border-color .15s, color .15s, background .15s; }
+.camp-type-btn:hover { border-color: var(--blue); color: var(--text); }
+.camp-type-btn.on { border-color: var(--blue); background: color-mix(in srgb, var(--blue) 12%, transparent); color: var(--blue); }
+
+/* ── Campaign config section heading ─────────────────────────── */
+.camp-cfg-section { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 12px; }
+.camp-cfg-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--red); }
+
+/* ── Prize row inside form ────────────────────────────────────── */
+.camp-prize-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; width: 100%; }
+.camp-prize-field { display: flex; flex-direction: column; gap: 4px; }
+.camp-prize-field label { font-size: 11px; color: var(--muted); font-weight: 600; }
+.camp-prize-field input { border: 1px solid var(--border); background: var(--background); color: var(--text); border-radius: 6px; padding: 5px 8px; font-size: 13px; width: 100%; }
