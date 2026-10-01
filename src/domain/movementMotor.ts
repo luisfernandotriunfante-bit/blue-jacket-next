@@ -71,7 +71,7 @@ export async function processMovementMotor(files: File[]): Promise<MovementMotor
       const needed = ['DATA MOVIMENTO', 'COD. CLIENTE', 'CODPROD. WINTHOR', 'STATUS PEDIDO', 'TIPO VENDA']
       if (needed.some(label => index(label) < 0)) { audits.push(audit('move-sales-layout', 'O relatório de vendas mudou', 'Envie o relatório de vendas no formato habitual.', 'As colunas necessárias não foram encontradas nas posições esperadas. Nenhuma venda foi usada.', 'action')); continue }
       for (const row of sheet.slice(sheet.indexOf(salesHeader) + 1)) {
-        const movementDate = date(row[index('DATA MOVIMENTO')]); const customerCode = code(row[index('COD. CLIENTE')]); const productCode = code(row[index('CODPROD. WINTHOR')])
+        const movementDate = date(row[index('DATA EMISSAO NF')] ?? row[index('DATA MOVIMENTO')]); const customerCode = code(row[index('COD. CLIENTE')]); const productCode = code(row[index('CODPROD. WINTHOR')])
         if (!movementDate || !customerCode || !productCode) continue
         const saleType = text(row[index('TIPO VENDA')])?.toUpperCase(); const orderStatus = text(row[index('STATUS PEDIDO')])?.toUpperCase()
         const movementType: MovementType = saleType === 'DEVOLUCAO' ? 'devolucao' : saleType === 'BONIFICACAO' ? 'bonificacao' : orderStatus === 'A FATURAR' ? 'a_faturar' : 'venda_faturada'
