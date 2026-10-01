@@ -200,6 +200,31 @@ function buildCnpjSet(cnpjs: string[]) {
   return new Set(cnpjs.map(fmtCnpj).filter(Boolean))
 }
 
+/** EAN / manufacturerCode → Winthor internalCode */
+function buildEanToWinthorMap(productBase: CanonicalProduct[]) {
+  const m = new Map<string, string>()
+  for (const p of productBase) {
+    if (!p.internalCode) continue
+    const winthor = p.internalCode.toUpperCase()
+    if (p.ean) m.set(p.ean.toUpperCase(), winthor)
+    if (p.manufacturerCode) m.set(p.manufacturerCode.toUpperCase(), winthor)
+  }
+  return m
+}
+
+/** Expand a list of codes: each entry is kept as-is AND resolved via EAN/manufacturer → Winthor */
+function resolveProductCodes(codes: string[], eanMap: Map<string, string>): Set<string> {
+  const result = new Set<string>()
+  for (const c of codes) {
+    const upper = c.trim().toUpperCase()
+    if (!upper) continue
+    result.add(upper)
+    const resolved = eanMap.get(upper)
+    if (resolved) result.add(resolved)
+  }
+  return result
+}
+
 /** productCode → category (from productBase) */
 function buildCategoryMap(productBase: CanonicalProduct[]) {
   const m = new Map<string, string>()
@@ -263,12 +288,14 @@ function apurateMixSkus(
   cfg: MixSkusConfig,
   campaign: CampaignRecord,
   movements: CanonicalMovement[],
+  productBase: CanonicalProduct[],
   rcas: RcaRecord[]
 ): ApurationResult {
   const windowStart = expandStart(campaign.endDate || new Date().toISOString().slice(0, 10), cfg.windowMonths)
   const windowEnd = campaign.endDate || new Date().toISOString().slice(0, 10)
-  const mandatorySet = buildProductCodeSet(cfg.mandatoryCodes)
-  const optionalSet = buildProductCodeSet(cfg.optionalCodes)
+  const eanMap = buildEanToWinthorMap(productBase)
+  const mandatorySet = resolveProductCodes(cfg.mandatoryCodes, eanMap)
+  const optionalSet = resolveProductCodes(cfg.optionalCodes, eanMap)
   const allCodes = new Set([...mandatorySet, ...optionalSet])
   const validCnpjs = buildCnpjSet(cfg.validCnpjs)
   const rcaMap = buildRcaMap(rcas)
@@ -337,11 +364,13 @@ function apurateValorEans(
   cfg: ValorEansConfig,
   campaign: CampaignRecord,
   movements: CanonicalMovement[],
+  productBase: CanonicalProduct[],
   rcas: RcaRecord[]
 ): ApurationResult {
   const windowStart = expandStart(campaign.endDate || new Date().toISOString().slice(0, 10), cfg.windowMonths)
   const windowEnd = campaign.endDate || new Date().toISOString().slice(0, 10)
-  const codeSet = buildProductCodeSet(cfg.productCodes)
+  const eanMap = buildEanToWinthorMap(productBase)
+  const codeSet = resolveProductCodes(cfg.productCodes, eanMap)
   const validCnpjs = buildCnpjSet(cfg.validCnpjs)
   const rcaMap = buildRcaMap(rcas)
 
@@ -1003,8 +1032,8 @@ export function apurateCampaign(
 ): ApurationResult {
   const cfg = campaign.config
   switch (cfg.type) {
-    case 'mix_skus':            return apurateMixSkus(cfg, campaign, movements, rcas)
-    case 'valor_eans':          return apurateValorEans(cfg, campaign, movements, rcas)
+    case 'mix_skus':            return apurateMixSkus(cfg, campaign, movements, productBase, rcas)
+    case 'valor_eans':          return apurateValorEans(cfg, campaign, movements, productBase, rcas)
     case 'cota':                return apurateCota(cfg, campaign, movements, rcas)
     case 'vizinhanca_qtd':      return apurateVizinhancaQtd(cfg, campaign, movements, clientBase, productBase, rcas)
     case 'vizinhanca_familias': return apurateVizinhancaFamilias(cfg, campaign, movements, clientBase, productBase, rcas)
