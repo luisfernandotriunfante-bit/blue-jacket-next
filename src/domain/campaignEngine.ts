@@ -281,7 +281,9 @@ function apurateMixSkus(
 
   for (const m of filtered) {
     const code = m.productCode?.toUpperCase()
-    if (!code || !allCodes.has(code)) continue
+    if (!code) continue
+    // when no SKU list is defined, all products count; otherwise restrict to the defined set
+    if (allCodes.size > 0 && !allCodes.has(code)) continue
     const cust = m.customerCode ?? ''; if (!cust) continue
 
     // CNPJ filter (we use customerCode as proxy; ideally match document)
