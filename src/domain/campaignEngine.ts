@@ -219,14 +219,22 @@ function buildEanToWinthorMap(productBase: CanonicalProduct[]) {
   return m
 }
 
-/** Expand a list of codes: each entry is kept as-is AND resolved via EAN/manufacturer → Winthor */
+/** Normalize a code the same way the movement motor does (strips leading zeros, .0 suffix, spaces) */
+function normalizeCode(raw: string): string {
+  return raw.replace(/\s/g, '').replace(/\.0$/, '').replace(/^0+(?=\d)/, '').toUpperCase()
+}
+
+/** Expand a list of codes: each entry is kept as-is AND normalized AND resolved via EAN/manufacturer → Winthor */
 function resolveProductCodes(codes: string[], eanMap: Map<string, string>): Set<string> {
   const result = new Set<string>()
   for (const c of codes) {
-    const upper = c.trim().toUpperCase()
-    if (!upper) continue
+    const raw = c.trim()
+    if (!raw) continue
+    const upper = raw.toUpperCase()
+    const norm = normalizeCode(raw)
     result.add(upper)
-    const resolved = eanMap.get(upper)
+    if (norm && norm !== upper) result.add(norm)
+    const resolved = eanMap.get(upper) ?? eanMap.get(norm)
     if (resolved) result.add(resolved)
   }
   return result
@@ -318,7 +326,9 @@ function apurateMixSkus(
     const code = m.productCode?.toUpperCase()
     if (!code) continue
     // when no SKU list is defined, all products count; otherwise restrict to the defined set
-    if (allCodes.size > 0 && !allCodes.has(code)) continue
+    // also try manufacturerCode (often the EAN) as a fallback
+    const mfr = m.manufacturerCode?.toUpperCase()
+    if (allCodes.size > 0 && !allCodes.has(code) && !(mfr && allCodes.has(mfr))) continue
     const cust = m.customerCode ?? ''; if (!cust) continue
 
     // CNPJ filter (we use customerCode as proxy; ideally match document)
