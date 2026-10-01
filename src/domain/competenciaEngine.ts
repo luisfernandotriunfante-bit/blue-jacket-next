@@ -62,6 +62,23 @@ export function currentCompetenciaCode(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 }
 
+const ACTIVE_COMP_KEY = 'rj-active-comp'
+
+export function getActiveComp(): string {
+  try {
+    return localStorage.getItem(ACTIVE_COMP_KEY) ?? currentCompetenciaCode()
+  } catch {
+    return currentCompetenciaCode()
+  }
+}
+
+export function setActiveComp(comp: string): void {
+  try {
+    localStorage.setItem(ACTIVE_COMP_KEY, comp)
+    window.dispatchEvent(new Event('rj-active-comp-changed'))
+  } catch { /* */ }
+}
+
 const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 
 export function fmtCompetencia(comp: string): string {

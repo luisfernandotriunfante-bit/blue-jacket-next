@@ -17,7 +17,7 @@ import { ClientesTab } from './ClientesTab'
 import { RcaManager, readRcas, type RcaRecord } from './RcaManager'
 import { CampaignTab } from './CampaignTab'
 import { readCampaigns } from './CampaignManager'
-import { saveCompetenciaSnap, loadCompetenciaSnap, listClosedCompetencias, currentCompetenciaCode, fmtCompetencia, type CompetenciaSnapshot } from './domain/competenciaEngine'
+import { saveCompetenciaSnap, loadCompetenciaSnap, listClosedCompetencias, fmtCompetencia, getActiveComp, setActiveComp, type CompetenciaSnapshot } from './domain/competenciaEngine'
 
 const motors: Array<{ id: Exclude<SourceArea, 'diario'>; name: string }> = [
   { id: 'produtos', name: 'Produtos' },
@@ -61,9 +61,17 @@ export function App() {
     return () => window.removeEventListener('rj-rcas-changed', onUpdate)
   }, [])
 
+  const [activeComp, setActiveCompState] = useState<string>(getActiveComp)
   const [viewingComp, setViewingComp] = useState<string | null>(null)
   const [closedComps, setClosedComps] = useState<string[]>(listClosedCompetencias)
   const [snap, setSnap] = useState<CompetenciaSnapshot | null>(null)
+
+  function changeActiveComp(comp: string) {
+    setActiveComp(comp)
+    setActiveCompState(comp)
+    setViewingComp(null)
+    setSnap(null)
+  }
 
   useEffect(() => {
     const onUpdate = () => setClosedComps(listClosedCompetencias())
@@ -81,10 +89,7 @@ export function App() {
   const [selloutTab, setSelloutTab] = useState<'dashboard' | 'gerencial' | 'clientes'>('dashboard')
   const [tab, setTab] = useState<'uploads' | 'auditoria' | 'config' | 'rcas'>('uploads')
 
-  const monthLabel = useMemo(() => {
-    if (viewingComp) return fmtCompetencia(viewingComp).toUpperCase()
-    return new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase()
-  }, [viewingComp])
+  const monthLabel = useMemo(() => fmtCompetencia(viewingComp ?? activeComp).toUpperCase(), [viewingComp, activeComp])
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [rawFiles, setRawFiles] = useState<Record<string, File>>({})
   const [activeNotice, setActiveNotice] = useState<AuditItem | null>(null)
@@ -287,7 +292,9 @@ export function App() {
     setProcessingAll(false)
   }
   function fechaCompetencia() {
-    const comp = currentCompetenciaCode()
+    const comp = activeComp
+    const label = fmtCompetencia(comp)
+    if (!confirm(`Fechar competência ${label}?\n\nIsso salvará uma fotografia de todos os dados atuais. A competência ficará acessível em modo somente leitura.`)) return
     const markupPct = (() => { try { return localStorage.getItem('rj-markup-pct') ?? '' } catch { return '' } })()
     const covDays = (() => { try { return localStorage.getItem('rj-cov-days') ?? '' } catch { return '' } })()
     const selloutMeta = (() => { try { return localStorage.getItem('rj-sellout-meta') ?? '' } catch { return '' } })()
@@ -307,7 +314,9 @@ export function App() {
       selloutMeta,
       positivMeta,
     })
-    if (ok) alert(`Competência ${fmtCompetencia(comp)} fechada com sucesso!`)
+    if (ok) {
+      setViewingComp(comp)
+    }
   }
 
   const effectiveMovements = snap ? snap.movements : movementBase
@@ -382,16 +391,15 @@ export function App() {
         <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" /></svg>
         <span className="nav-label">Administração</span>
       </button>
-      <div className="comp-switcher">
-        <span className="comp-label">Competência</span>
-        <select className="comp-select" value={viewingComp ?? ''} onChange={e => setViewingComp(e.target.value || null)}>
-          <option value="">Atual (ao vivo)</option>
-          {closedComps.map(c => <option key={c} value={c}>{fmtCompetencia(c)}</option>)}
-        </select>
-        <button className="comp-fecha-btn" type="button" onClick={fechaCompetencia} title="Fechar competência atual e salvar fotografia">
-          Fechar competência
-        </button>
-      </div>
+      {closedComps.length > 0 && (
+        <div className="comp-switcher">
+          <span className="comp-label">Ver histórico</span>
+          <select className="comp-select" value={viewingComp ?? ''} onChange={e => setViewingComp(e.target.value || null)}>
+            <option value="">Ao vivo — {fmtCompetencia(activeComp)}</option>
+            {closedComps.map(c => <option key={c} value={c}>{fmtCompetencia(c)}</option>)}
+          </select>
+        </div>
+      )}
       <div className="sidebar-bottom">
         <button className="theme-toggle" type="button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
           <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" /></svg>
@@ -466,7 +474,7 @@ export function App() {
         <div className="audit-heading"><h2>AUDITORIA</h2><button className="secondary-button" type="button" onClick={downloadAiJson}>Gerar resumo para IA</button></div>
         <div className="notice-list">{audit.map(item => <button className={`notice ${item.level}`} key={item.id} type="button" onClick={() => setActiveNotice(item)}><span>{item.title}</span><small>{item.instruction}</small></button>)}</div>
       </section> : tab === 'config' ? <section className="content">
-        <ConfigTab />
+        <ConfigTab activeComp={activeComp} onChangeComp={changeActiveComp} onFecha={fechaCompetencia} />
       </section> : <section className="content">
         <RcaManager />
       </section>}
@@ -476,7 +484,15 @@ export function App() {
   </div>
 }
 
-function ConfigTab() {
+function ConfigTab({ activeComp, onChangeComp, onFecha }: { activeComp: string; onChangeComp: (c: string) => void; onFecha: () => void }) {
+  const [compInput, setCompInput] = useState(activeComp)
+
+  function handleAbrir() {
+    const m = compInput.match(/^(\d{4})-(\d{2})$/)
+    if (!m || parseInt(m[2]) < 1 || parseInt(m[2]) > 12) { alert('Formato inválido. Use AAAA-MM, ex: 2025-09'); return }
+    onChangeComp(compInput)
+  }
+
   const [markupInput, setMarkupInput] = useState<string>(() => {
     try { const v = localStorage.getItem('rj-markup-pct'); return v ? v : '' }
     catch { return '' }
@@ -552,6 +568,41 @@ function ConfigTab() {
 
   return (
     <div className="config-page">
+      <h2>COMPETÊNCIA</h2>
+      <div className="config-group">
+        <label className="config-label">Competência em aberto</label>
+        <p className="config-help">
+          Define qual mês está sendo trabalhado. Suba os arquivos e processe os motores normalmente.
+          Quando os dados estiverem corretos, feche a competência para salvar a fotografia.
+        </p>
+        <div className="config-input-row">
+          <input
+            className="config-input"
+            style={{ width: 110 }}
+            type="text"
+            placeholder="AAAA-MM"
+            value={compInput}
+            onChange={e => setCompInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleAbrir()}
+          />
+          <button className="process-button" style={{ margin: 0 }} type="button" onClick={handleAbrir}>
+            Abrir competência
+          </button>
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <button
+            className="process-button"
+            style={{ margin: 0, background: 'transparent', border: '1px solid var(--red)', color: 'var(--red)' }}
+            type="button"
+            onClick={onFecha}
+          >
+            Fechar competência atual ({fmtCompetencia(activeComp)})
+          </button>
+          <p className="config-help" style={{ marginTop: 6 }}>
+            Salva uma fotografia de todos os dados e torna esta competência somente leitura.
+          </p>
+        </div>
+      </div>
       <h2>CONFIGURAÇÕES MANUAIS</h2>
       <div className="config-group">
         <label className="config-label" htmlFor="cfg-markup">Markup médio (%)</label>
