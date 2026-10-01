@@ -5,6 +5,7 @@ export type MovementType = 'venda_faturada' | 'a_faturar' | 'devolucao' | 'bonif
 export type CanonicalMovement = {
   id: string
   movementDate?: string
+  orderDate?: string   // DATA MOVIMENTO (data do pedido) — estável, não muda com re-importações
   movementType: MovementType
   orderId?: string
   invoiceNumber?: string
@@ -71,13 +72,13 @@ export async function processMovementMotor(files: File[]): Promise<MovementMotor
       const needed = ['DATA MOVIMENTO', 'COD. CLIENTE', 'CODPROD. WINTHOR', 'STATUS PEDIDO', 'TIPO VENDA']
       if (needed.some(label => index(label) < 0)) { audits.push(audit('move-sales-layout', 'O relatório de vendas mudou', 'Envie o relatório de vendas no formato habitual.', 'As colunas necessárias não foram encontradas nas posições esperadas. Nenhuma venda foi usada.', 'action')); continue }
       for (const row of sheet.slice(sheet.indexOf(salesHeader) + 1)) {
-        const movementDate = date(row[index('DATA MOVIMENTO')]); const customerCode = code(row[index('COD. CLIENTE')]); const productCode = code(row[index('CODPROD. WINTHOR')])
+        const orderDate = date(row[index('DATA MOVIMENTO')]); const movementDate = date(row[index('DATA EMISSAO NF')]) ?? orderDate; const customerCode = code(row[index('COD. CLIENTE')]); const productCode = code(row[index('CODPROD. WINTHOR')])
         if (!movementDate || !customerCode || !productCode) continue
         const saleType = text(row[index('TIPO VENDA')])?.toUpperCase(); const orderStatus = text(row[index('STATUS PEDIDO')])?.toUpperCase()
         const movementType: MovementType = saleType === 'DEVOLUCAO' ? 'devolucao' : saleType === 'BONIFICACAO' ? 'bonificacao' : orderStatus === 'A FATURAR' ? 'a_faturar' : 'venda_faturada'
         const orderId = code(row[index('NUMERO PED. WINTHOR')]); const key = `${customerCode}|${productCode}`; saleKeys.add(key)
         const sellerCode = code(row[index('COD. VENDEDOR')]) ?? code(row[index('CODVENDEDOR')]) ?? code(row[index('CODIGO VENDEDOR')])
-        movements.push({ id: `ATUAL:VENDA:${movementDate}:${orderId ?? ''}:${customerCode}:${productCode}:${movements.length}`, movementDate, movementType, orderId, invoiceNumber: code(row[index('NUMERO NOTA FISCAL')]), customerCode, customerDocument: code(row[index('CNPJ/CPF CLIENTE')]), customerName: text(row[index('NOME CLIENTE')]), productCode, manufacturerCode: code(row[index('CODIGO FABRICANTE')]), description: text(row[index('DESCRICAO PRODUTO')]), quantity: number(row[index('UNIDADES VENDIDAS')]), value: number(row[index('VALOR NOTA R$')]), orderStatus, saleType, sellerCode, seller: text(row[index('VENDEDOR')]), sources: ['Vendas atuais'] }); salesFound++
+        movements.push({ id: `ATUAL:VENDA:${movementDate}:${orderId ?? ''}:${customerCode}:${productCode}:${movements.length}`, movementDate, orderDate, movementType, orderId, invoiceNumber: code(row[index('NUMERO NOTA FISCAL')]), customerCode, customerDocument: code(row[index('CNPJ/CPF CLIENTE')]), customerName: text(row[index('NOME CLIENTE')]), productCode, manufacturerCode: code(row[index('CODIGO FABRICANTE')]), description: text(row[index('DESCRICAO PRODUTO')]), quantity: number(row[index('UNIDADES VENDIDAS')]), value: number(row[index('VALOR NOTA R$')]), orderStatus, saleType, sellerCode, seller: text(row[index('VENDEDOR')]), sources: ['Vendas atuais'] }); salesFound++
       }
       continue
     }

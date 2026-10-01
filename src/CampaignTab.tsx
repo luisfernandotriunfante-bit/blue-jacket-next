@@ -8,9 +8,10 @@ import type { RcaRecord } from './RcaManager'
 
 /* ── helpers ─────────────────────────────────────────────── */
 function kpiCurrency(v: number) {
-  if (Math.abs(v) >= 1_000_000) return `R$ ${(v / 1_000_000).toFixed(1)}M`
-  if (Math.abs(v) >= 1_000) return `R$ ${(v / 1_000).toFixed(0)}K`
-  return `R$ ${Math.round(v).toLocaleString('pt-BR')}`
+  const abs = Math.abs(v), sign = v < 0 ? '-' : ''
+  if (abs >= 1_000_000) return `${sign}R$ ${(abs / 1_000_000).toFixed(2)}M`
+  if (abs >= 1_000) return `${sign}R$ ${(abs / 1_000).toFixed(2)}K`
+  return `${sign}R$ ${abs.toFixed(2)}`
 }
 
 function fmtDate(iso: string) {

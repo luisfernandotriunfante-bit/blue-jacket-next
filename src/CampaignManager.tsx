@@ -103,6 +103,138 @@ function textToGoalTiers(text: string): CustomConfig['goalTiers'] {
   }).filter(t => t.prize > 0)
 }
 
+/* ── UI primitives ───────────────────────────────────── */
+
+const WINDOW_PRESETS = [
+  { label: 'Mensal', months: 1 },
+  { label: 'Bimestral', months: 2 },
+  { label: 'Trimestral', months: 3 },
+  { label: 'Semestral', months: 6 },
+  { label: 'Anual', months: 12 },
+]
+
+function WindowMonthsField({ months, onChange }: { months: number; onChange: (v: number) => void }) {
+  return (
+    <div className="rca-field rca-field-full">
+      <label>Janela de acompanhamento</label>
+      <div className="camp-chip-group">
+        {WINDOW_PRESETS.map(p => (
+          <button key={p.months} type="button"
+            className={`camp-chip${months === p.months ? ' on' : ''}`}
+            onClick={() => onChange(p.months)}>
+            {p.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const FAIXAS_OPCOES = [1, 2, 3, 4, 5]
+
+function FaixaButtons({ faixas, onChange }: { faixas: number[]; onChange: (v: number[]) => void }) {
+  const toggle = (n: number) => onChange(
+    faixas.includes(n) ? faixas.filter(x => x !== n) : [...faixas, n].sort((a, b) => a - b)
+  )
+  return (
+    <div className="rca-field rca-field-full">
+      <label>Faixas de clientes (vazio = todas)</label>
+      <div className="camp-chip-group">
+        {FAIXAS_OPCOES.map(n => (
+          <button key={n} type="button"
+            className={`camp-chip${faixas.includes(n) ? ' on' : ''}`}
+            onClick={() => toggle(n)}>
+            Faixa {n}
+          </button>
+        ))}
+        {faixas.length > 0 && (
+          <button type="button" className="camp-chip clear" onClick={() => onChange([])}>
+            Limpar
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const PERFIS_OPCOES = [
+  { value: 'varejo', label: 'Varejo' },
+  { value: 'vizinhança pequena', label: 'Viz. Pequena' },
+  { value: 'vizinhança grande', label: 'Viz. Grande' },
+  { value: 'hiper', label: 'Hiper' },
+  { value: 'super', label: 'Super' },
+  { value: 'farmácia', label: 'Farmácia' },
+]
+
+function PerfilButtons({ perfis, onChange }: { perfis: string[]; onChange: (v: string[]) => void }) {
+  const norm = (p: string) => p.toLowerCase().trim()
+  const toggle = (v: string) => {
+    const n = norm(v)
+    onChange(perfis.some(x => norm(x) === n) ? perfis.filter(x => norm(x) !== n) : [...perfis, v])
+  }
+  return (
+    <div className="rca-field rca-field-full">
+      <label>Perfil / Canal (vazio = todos)</label>
+      <div className="camp-chip-group">
+        {PERFIS_OPCOES.map(p => (
+          <button key={p.value} type="button"
+            className={`camp-chip${perfis.some(x => norm(x) === p.value) ? ' on' : ''}`}
+            onClick={() => toggle(p.value)}>
+            {p.label}
+          </button>
+        ))}
+        {perfis.length > 0 && (
+          <button type="button" className="camp-chip clear" onClick={() => onChange([])}>
+            Limpar
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function YesNoToggle({
+  label, value, onChange,
+  trueLabel = 'Sim', falseLabel = 'Não',
+}: {
+  label: string; value: boolean; onChange: (v: boolean) => void
+  trueLabel?: string; falseLabel?: string
+}) {
+  return (
+    <div className="rca-field rca-field-full">
+      <label>{label}</label>
+      <div className="rca-btn-group">
+        <button type="button" className={`rca-opt-btn${value ? ' on' : ''}`} onClick={() => onChange(true)}>{trueLabel}</button>
+        <button type="button" className={`rca-opt-btn${!value ? ' on' : ''}`} onClick={() => onChange(false)}>{falseLabel}</button>
+      </div>
+    </div>
+  )
+}
+
+function CnpjFilterField({ cnpjs, onChange }: { cnpjs: string[]; onChange: (v: string[]) => void }) {
+  const [show, setShow] = useState(cnpjs.length > 0)
+  return (
+    <>
+      <YesNoToggle
+        label="Restringir a CNPJs específicos?"
+        value={show}
+        trueLabel="Sim, só alguns"
+        falseLabel="Não, todos os clientes"
+        onChange={v => { setShow(v); if (!v) onChange([]) }}
+      />
+      {show && (
+        <div className="rca-field rca-field-full">
+          <label>CNPJs válidos (um por linha)</label>
+          <textarea className="camp-textarea" rows={3}
+            value={codeListToText(cnpjs)}
+            onChange={e => onChange(textToCodeList(e.target.value))}
+            placeholder="12345678000100&#10;98765432000100" />
+        </div>
+      )}
+    </>
+  )
+}
+
 /* ── CampaignForm ────────────────────────────────────── */
 interface FormProps {
   record: CampaignRecord
@@ -121,10 +253,6 @@ function CampaignForm({ record, isNew, onSave, onCancel }: FormProps) {
   }
   function setCfg(cfg: CampaignConfig) {
     setR(v => ({ ...v, config: cfg }))
-    setErrors([])
-  }
-  function changeCfgField<K extends string>(key: K, val: unknown) {
-    setR(v => ({ ...v, config: { ...v.config, [key]: val } as CampaignConfig }))
     setErrors([])
   }
 
@@ -250,73 +378,76 @@ function PrizeFields({ prize, onChange }: { prize: { vendedor: number; superviso
   return (
     <div className="camp-prize-row">
       <div className="camp-prize-field">
-        <label>Prêmio vendedor (R$)</label>
+        <label>Vendedor (R$)</label>
         <input type="number" min={0} value={prize.vendedor} onChange={e => onChange({ ...prize, vendedor: parseFloat(e.target.value) || 0 })} />
       </div>
       <div className="camp-prize-field">
-        <label>Prêmio supervisor (R$)</label>
+        <label>Supervisor (R$)</label>
         <input type="number" min={0} value={prize.supervisor} onChange={e => onChange({ ...prize, supervisor: parseFloat(e.target.value) || 0 })} />
       </div>
       <div className="camp-prize-field">
-        <label>Prêmio gerente (R$)</label>
+        <label>Gerente (R$)</label>
         <input type="number" min={0} value={prize.gerente} onChange={e => onChange({ ...prize, gerente: parseFloat(e.target.value) || 0 })} />
       </div>
     </div>
   )
 }
 
-function FaixaPerfilFields({ faixas, perfis, onChange }: { faixas: number[]; perfis: string[]; onChange: (faixas: number[], perfis: string[]) => void }) {
-  return (
-    <>
-      <div className="rca-field">
-        <label>Faixas (ex.: 4,5)</label>
-        <input
-          value={faixas.join(',')}
-          onChange={e => onChange(e.target.value.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n)), perfis)}
-          placeholder="4,5"
-        />
-      </div>
-      <div className="rca-field">
-        <label>Perfis (ex.: varejo)</label>
-        <input
-          value={perfis.join(',')}
-          onChange={e => onChange(faixas, e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-          placeholder="varejo"
-        />
-      </div>
-    </>
-  )
-}
-
 function MixSkusFields({ cfg, onChange }: { cfg: MixSkusConfig; onChange: (c: CampaignConfig) => void }) {
+  const [showSKUList, setShowSKUList] = useState(cfg.mandatoryCodes.length > 0 || cfg.optionalCodes.length > 0)
+  const [showMandatory, setShowMandatory] = useState(cfg.mandatoryCodes.length > 0)
+
   return (
     <>
-      <div className="rca-field rca-field-full">
-        <label>Códigos mandatórios (um por linha)</label>
-        <textarea className="camp-textarea" rows={4} value={codeListToText(cfg.mandatoryCodes)}
-          onChange={e => onChange({ ...cfg, mandatoryCodes: textToCodeList(e.target.value) })}
-          placeholder="Ex.: 12345&#10;67890" />
-      </div>
-      <div className="rca-field rca-field-full">
-        <label>Demais códigos válidos (um por linha)</label>
-        <textarea className="camp-textarea" rows={4} value={codeListToText(cfg.optionalCodes)}
-          onChange={e => onChange({ ...cfg, optionalCodes: textToCodeList(e.target.value) })}
-          placeholder="Ex.: 11111&#10;22222" />
-      </div>
+      <WindowMonthsField months={cfg.windowMonths} onChange={v => onChange({ ...cfg, windowMonths: v })} />
+
+      <hr className="camp-section-divider" />
+
+      <YesNoToggle
+        label="Usa lista de SKUs específica?"
+        value={showSKUList}
+        trueLabel="Sim, lista definida"
+        falseLabel="Não, todos os produtos"
+        onChange={v => { setShowSKUList(v); if (!v) { setShowMandatory(false); onChange({ ...cfg, mandatoryCodes: [], optionalCodes: [] }) } }}
+      />
+
+      {showSKUList && (
+        <>
+          <YesNoToggle
+            label="Tem itens mandatórios?"
+            value={showMandatory}
+            onChange={v => { setShowMandatory(v); if (!v) onChange({ ...cfg, mandatoryCodes: [] }) }}
+          />
+
+          {showMandatory && (
+            <div className="rca-field rca-field-full">
+              <label>Códigos mandatórios (um por linha)</label>
+              <textarea className="camp-textarea" rows={4} value={codeListToText(cfg.mandatoryCodes)}
+                onChange={e => onChange({ ...cfg, mandatoryCodes: textToCodeList(e.target.value) })}
+                placeholder="Ex.: 12345&#10;67890" />
+            </div>
+          )}
+
+          <div className="rca-field rca-field-full">
+            <label>{showMandatory ? 'Demais códigos válidos (um por linha)' : 'Códigos válidos (um por linha)'}</label>
+            <textarea className="camp-textarea" rows={4} value={codeListToText(cfg.optionalCodes)}
+              onChange={e => onChange({ ...cfg, optionalCodes: textToCodeList(e.target.value) })}
+              placeholder="Ex.: 11111&#10;22222" />
+          </div>
+        </>
+      )}
+
       <div className="rca-field">
         <label>Mínimo de SKUs</label>
         <input type="number" min={1} value={cfg.minSkus} onChange={e => onChange({ ...cfg, minSkus: parseInt(e.target.value) || 1 })} />
       </div>
-      <div className="rca-field">
-        <label>Janela (meses)</label>
-        <input type="number" min={1} max={12} value={cfg.windowMonths} onChange={e => onChange({ ...cfg, windowMonths: parseInt(e.target.value) || 1 })} />
-      </div>
-      <div className="rca-field rca-field-full">
-        <label>CNPJs válidos (um por linha, vazio = todos)</label>
-        <textarea className="camp-textarea" rows={3} value={codeListToText(cfg.validCnpjs)}
-          onChange={e => onChange({ ...cfg, validCnpjs: textToCodeList(e.target.value) })}
-          placeholder="Opcional — deixe vazio para aceitar todos os CNPJs" />
-      </div>
+
+      <hr className="camp-section-divider" />
+
+      <CnpjFilterField cnpjs={cfg.validCnpjs} onChange={v => onChange({ ...cfg, validCnpjs: v })} />
+
+      <hr className="camp-section-divider" />
+
       <div className="rca-field rca-field-full">
         <label>Prêmios por PDV qualificado</label>
         <PrizeFields prize={cfg.prize} onChange={p => onChange({ ...cfg, prize: p })} />
@@ -328,33 +459,36 @@ function MixSkusFields({ cfg, onChange }: { cfg: MixSkusConfig; onChange: (c: Ca
 function ValorEansFields({ cfg, onChange }: { cfg: ValorEansConfig; onChange: (c: CampaignConfig) => void }) {
   return (
     <>
+      <WindowMonthsField months={cfg.windowMonths} onChange={v => onChange({ ...cfg, windowMonths: v })} />
+
+      <hr className="camp-section-divider" />
+
       <div className="rca-field rca-field-full">
         <label>Códigos de produto obrigatórios (um por linha)</label>
         <textarea className="camp-textarea" rows={4} value={codeListToText(cfg.productCodes)}
           onChange={e => onChange({ ...cfg, productCodes: textToCodeList(e.target.value) })}
           placeholder="Ex.: 12345&#10;67890" />
       </div>
-      <div className="rca-field">
-        <label>Exige todos os códigos?</label>
-        <div className="rca-btn-group">
-          <button type="button" className={`rca-opt-btn${cfg.requireAllCodes ? ' on' : ''}`} onClick={() => onChange({ ...cfg, requireAllCodes: true })}>Todos</button>
-          <button type="button" className={`rca-opt-btn${!cfg.requireAllCodes ? ' on' : ''}`} onClick={() => onChange({ ...cfg, requireAllCodes: false })}>Qualquer um</button>
-        </div>
-      </div>
+
+      <YesNoToggle
+        label="Exige todos os códigos?"
+        value={cfg.requireAllCodes}
+        trueLabel="Todos obrigatórios"
+        falseLabel="Qualquer um"
+        onChange={v => onChange({ ...cfg, requireAllCodes: v })}
+      />
+
       <div className="rca-field">
         <label>Valor mínimo (R$)</label>
         <input type="number" min={0} value={cfg.minValue} onChange={e => onChange({ ...cfg, minValue: parseFloat(e.target.value) || 0 })} />
       </div>
-      <div className="rca-field">
-        <label>Janela (meses)</label>
-        <input type="number" min={1} max={12} value={cfg.windowMonths} onChange={e => onChange({ ...cfg, windowMonths: parseInt(e.target.value) || 1 })} />
-      </div>
-      <div className="rca-field rca-field-full">
-        <label>CNPJs válidos (um por linha, vazio = todos)</label>
-        <textarea className="camp-textarea" rows={3} value={codeListToText(cfg.validCnpjs)}
-          onChange={e => onChange({ ...cfg, validCnpjs: textToCodeList(e.target.value) })}
-          placeholder="Opcional" />
-      </div>
+
+      <hr className="camp-section-divider" />
+
+      <CnpjFilterField cnpjs={cfg.validCnpjs} onChange={v => onChange({ ...cfg, validCnpjs: v })} />
+
+      <hr className="camp-section-divider" />
+
       <div className="rca-field rca-field-full">
         <label>Prêmios por PDV qualificado</label>
         <PrizeFields prize={cfg.prize} onChange={p => onChange({ ...cfg, prize: p })} />
@@ -370,14 +504,18 @@ function CotaFields({ cfg, onChange }: { cfg: CotaConfig; onChange: (c: Campaign
         <label>% meta até dia 20 (informativo)</label>
         <input type="number" min={0} max={100} value={cfg.day20Threshold} onChange={e => onChange({ ...cfg, day20Threshold: parseFloat(e.target.value) || 0 })} />
       </div>
+
+      <hr className="camp-section-divider" />
+
       <div className="rca-field rca-field-full">
-        <label>Faixas de prêmio por meta (maxMeta:prêmio, 0=acima de tudo)</label>
+        <label>Faixas de prêmio por meta (maxMeta:prêmio, 0 = acima de tudo)</label>
         <textarea className="camp-textarea" rows={4}
           value={prizeTiersToText(cfg.prizeTiers)}
           onChange={e => onChange({ ...cfg, prizeTiers: textToPrizeTiers(e.target.value) })}
           placeholder="50000:500&#10;100000:1000&#10;0:1500" />
         <small style={{ color: 'var(--muted)', fontSize: 11 }}>Formato: maxMeta:prêmio. Use 0 como maxMeta para a última faixa (sem teto).</small>
       </div>
+
       <div className="rca-field">
         <label>Prêmio supervisor (R$)</label>
         <input type="number" min={0} value={cfg.supervisorPrize} onChange={e => onChange({ ...cfg, supervisorPrize: parseFloat(e.target.value) || 0 })} />
@@ -393,7 +531,11 @@ function CotaFields({ cfg, onChange }: { cfg: CotaConfig; onChange: (c: Campaign
 function VizinhancaQtdFields({ cfg, onChange }: { cfg: VizinhancaQtdConfig; onChange: (c: CampaignConfig) => void }) {
   return (
     <>
-      <FaixaPerfilFields faixas={cfg.faixas} perfis={cfg.perfis} onChange={(f, p) => onChange({ ...cfg, faixas: f, perfis: p })} />
+      <FaixaButtons faixas={cfg.faixas} onChange={f => onChange({ ...cfg, faixas: f })} />
+      <PerfilButtons perfis={cfg.perfis} onChange={p => onChange({ ...cfg, perfis: p })} />
+
+      <hr className="camp-section-divider" />
+
       <div className="rca-field rca-field-full">
         <label>Quantidades por categoria (categoria:min, um por linha)</label>
         <textarea className="camp-textarea" rows={4}
@@ -401,6 +543,9 @@ function VizinhancaQtdFields({ cfg, onChange }: { cfg: VizinhancaQtdConfig; onCh
           onChange={e => onChange({ ...cfg, categoryRequirements: textToCategoryReqs(e.target.value) })}
           placeholder="creme dental:12&#10;escova:6&#10;enxaguante:1" />
       </div>
+
+      <hr className="camp-section-divider" />
+
       <div className="rca-field rca-field-full">
         <label>Prêmios por PDV qualificado</label>
         <PrizeFields prize={cfg.prize} onChange={p => onChange({ ...cfg, prize: p })} />
@@ -412,7 +557,11 @@ function VizinhancaQtdFields({ cfg, onChange }: { cfg: VizinhancaQtdConfig; onCh
 function VizinhancaFamiliasFields({ cfg, onChange }: { cfg: VizinhancaFamiliasConfig; onChange: (c: CampaignConfig) => void }) {
   return (
     <>
-      <FaixaPerfilFields faixas={cfg.faixas} perfis={cfg.perfis} onChange={(f, p) => onChange({ ...cfg, faixas: f, perfis: p })} />
+      <FaixaButtons faixas={cfg.faixas} onChange={f => onChange({ ...cfg, faixas: f })} />
+      <PerfilButtons perfis={cfg.perfis} onChange={p => onChange({ ...cfg, perfis: p })} />
+
+      <hr className="camp-section-divider" />
+
       <div className="rca-field">
         <label>Mínimo de famílias</label>
         <input type="number" min={1} value={cfg.minFamilies} onChange={e => onChange({ ...cfg, minFamilies: parseInt(e.target.value) || 1 })} />
@@ -424,6 +573,9 @@ function VizinhancaFamiliasFields({ cfg, onChange }: { cfg: VizinhancaFamiliasCo
           onChange={e => onChange({ ...cfg, mandatoryFamilies: textToCodeList(e.target.value) })}
           placeholder="CD Total&#10;Escova Colgate&#10;Enxaguante" />
       </div>
+
+      <hr className="camp-section-divider" />
+
       <div className="rca-field rca-field-full">
         <label>Prêmios por PDV qualificado</label>
         <PrizeFields prize={cfg.prize} onChange={p => onChange({ ...cfg, prize: p })} />
@@ -435,7 +587,11 @@ function VizinhancaFamiliasFields({ cfg, onChange }: { cfg: VizinhancaFamiliasCo
 function VizinhancaHairFields({ cfg, onChange }: { cfg: VizinhancaHairConfig; onChange: (c: CampaignConfig) => void }) {
   return (
     <>
-      <FaixaPerfilFields faixas={cfg.faixas} perfis={cfg.perfis} onChange={(f, p) => onChange({ ...cfg, faixas: f, perfis: p })} />
+      <FaixaButtons faixas={cfg.faixas} onChange={f => onChange({ ...cfg, faixas: f })} />
+      <PerfilButtons perfis={cfg.perfis} onChange={p => onChange({ ...cfg, perfis: p })} />
+
+      <hr className="camp-section-divider" />
+
       <div className="rca-field rca-field-full">
         <label>Patamares (minSKUs:prêmio por PDV, um por linha)</label>
         <textarea className="camp-textarea" rows={3}
@@ -443,6 +599,9 @@ function VizinhancaHairFields({ cfg, onChange }: { cfg: VizinhancaHairConfig; on
           onChange={e => onChange({ ...cfg, tiers: textToTiers(e.target.value) })}
           placeholder="15:20&#10;25:50" />
       </div>
+
+      <hr className="camp-section-divider" />
+
       <div className="rca-field">
         <label>Multiplicador supervisor (ex.: 0.5)</label>
         <input type="number" min={0} step={0.1} value={cfg.supervisorMultiplier} onChange={e => onChange({ ...cfg, supervisorMultiplier: parseFloat(e.target.value) || 0 })} />
@@ -455,16 +614,45 @@ function VizinhancaHairFields({ cfg, onChange }: { cfg: VizinhancaHairConfig; on
   )
 }
 
+function MetaCnpjFields({ cfg, onChange }: { cfg: MetaCnpjConfig; onChange: (c: CampaignConfig) => void }) {
+  return (
+    <>
+      <div className="rca-field rca-field-full">
+        <label>Códigos de produto (um por linha)</label>
+        <textarea className="camp-textarea" rows={4} value={codeListToText(cfg.productCodes)}
+          onChange={e => onChange({ ...cfg, productCodes: textToCodeList(e.target.value) })}
+          placeholder="Ex.: 12345&#10;67890" />
+      </div>
+
+      <hr className="camp-section-divider" />
+
+      <div className="rca-field rca-field-full">
+        <label>Meta por CNPJ (cnpj:meta, um por linha)</label>
+        <textarea className="camp-textarea" rows={5}
+          value={cnpjRecordToText(cfg.goalByCnpj)}
+          onChange={e => onChange({ ...cfg, goalByCnpj: textToCnpjRecord(e.target.value) })}
+          placeholder="12345678000100:5&#10;98765432000100:3" />
+        <small style={{ color: 'var(--muted)', fontSize: 11 }}>Formato: CNPJ:quantidade de SKUs esperados</small>
+      </div>
+
+      <hr className="camp-section-divider" />
+
+      <div className="rca-field rca-field-full">
+        <label>Prêmios por PDV qualificado</label>
+        <PrizeFields prize={cfg.prize} onChange={p => onChange({ ...cfg, prize: p })} />
+      </div>
+    </>
+  )
+}
+
 function CustomFields({ cfg, onChange }: { cfg: CustomConfig; onChange: (c: CampaignConfig) => void }) {
-  const isSellerUnit = cfg.unit === 'seller'
+  const [showMandatory, setShowMandatory] = useState(cfg.mandatoryCodes.length > 0)
+  const [showFamilies, setShowFamilies] = useState(cfg.mandatoryFamilies.length > 0)
+
   const showCategoryReqs = cfg.metric === 'qty_by_category'
-  const showFamilies = cfg.metric === 'family_count'
-  const showFaixaPerfil = cfg.faixas.length > 0 || cfg.perfis.length > 0 || isSellerUnit === false
   const showMetricTiers = cfg.prizeType === 'tiered_metric'
   const showGoalTiers = cfg.prizeType === 'tiered_goal'
   const showFlatPrize = cfg.prizeType === 'flat'
-  const showSupervisorMultiplier = cfg.supervisorMultiplier > 0
-  const showGerenteMultiplier = cfg.gerenteMultiplier > 0
 
   return (
     <>
@@ -482,6 +670,8 @@ function CustomFields({ cfg, onChange }: { cfg: CustomConfig; onChange: (c: Camp
         <small style={{ color: 'var(--muted)', fontSize: 11, marginTop: 4 }}>Carregar preenche todos os campos com os valores padrão do modelo escolhido.</small>
       </div>
 
+      <hr className="camp-section-divider" />
+
       {/* Unidade de apuração */}
       <div className="rca-field rca-field-full">
         <label>Unidade de apuração</label>
@@ -491,16 +681,40 @@ function CustomFields({ cfg, onChange }: { cfg: CustomConfig; onChange: (c: Camp
         </div>
       </div>
 
+      {/* Público */}
+      {cfg.unit === 'pdv' && (
+        <>
+          <FaixaButtons faixas={cfg.faixas} onChange={f => onChange({ ...cfg, faixas: f })} />
+          <PerfilButtons perfis={cfg.perfis} onChange={p => onChange({ ...cfg, perfis: p })} />
+        </>
+      )}
+
+      <hr className="camp-section-divider" />
+
+      {/* Janela */}
+      {cfg.unit === 'pdv' && (
+        <WindowMonthsField months={cfg.windowMonths} onChange={v => onChange({ ...cfg, windowMonths: v })} />
+      )}
+
+      {/* day20Threshold (seller) */}
+      {cfg.unit === 'seller' && (
+        <div className="rca-field">
+          <label>% meta até dia 20 (informativo)</label>
+          <input type="number" min={0} max={100} value={cfg.day20Threshold}
+            onChange={e => onChange({ ...cfg, day20Threshold: parseFloat(e.target.value) || 0 })} />
+        </div>
+      )}
+
       {/* Métrica */}
       <div className="rca-field rca-field-full">
         <label>Métrica de qualificação</label>
-        <div className="camp-type-grid">
+        <div className="camp-chip-group">
           {(cfg.unit === 'pdv'
             ? [['sku_count', 'Qtd. de SKUs'], ['value', 'Valor (R$)'], ['family_count', 'Qtd. de Famílias'], ['qty_by_category', 'Qtd. por Categoria']] as const
             : [['seller_goal_pct', '% da Meta do Vendedor']] as const
           ).map(([v, label]) => (
             <button key={v} type="button"
-              className={`camp-type-btn${cfg.metric === v ? ' on' : ''}`}
+              className={`camp-chip${cfg.metric === v ? ' on' : ''}`}
               onClick={() => onChange({ ...cfg, metric: v as CustomConfig['metric'] })}>
               {label}
             </button>
@@ -519,29 +733,7 @@ function CustomFields({ cfg, onChange }: { cfg: CustomConfig; onChange: (c: Camp
         </div>
       )}
 
-      {/* Janela de meses */}
-      {cfg.unit === 'pdv' && (
-        <div className="rca-field">
-          <label>Janela (meses)</label>
-          <input type="number" min={1} max={12} value={cfg.windowMonths}
-            onChange={e => onChange({ ...cfg, windowMonths: parseInt(e.target.value) || 1 })} />
-        </div>
-      )}
-
-      {/* Faixa e perfil */}
-      {cfg.unit === 'pdv' && (
-        <FaixaPerfilFields faixas={cfg.faixas} perfis={cfg.perfis}
-          onChange={(f, p) => onChange({ ...cfg, faixas: f, perfis: p })} />
-      )}
-
-      {/* day20Threshold (seller) */}
-      {cfg.unit === 'seller' && (
-        <div className="rca-field">
-          <label>% meta até dia 20 (informativo)</label>
-          <input type="number" min={0} max={100} value={cfg.day20Threshold}
-            onChange={e => onChange({ ...cfg, day20Threshold: parseFloat(e.target.value) || 0 })} />
-        </div>
-      )}
+      <hr className="camp-section-divider" />
 
       {/* Produtos */}
       <div className="rca-field rca-field-full">
@@ -553,39 +745,40 @@ function CustomFields({ cfg, onChange }: { cfg: CustomConfig; onChange: (c: Camp
 
       {/* Mandatórios */}
       {cfg.metric === 'sku_count' && (
-        <div className="rca-field rca-field-full">
-          <label>Códigos mandatórios (subconjunto obrigatório, um por linha)</label>
-          <textarea className="camp-textarea" rows={3} value={codeListToText(cfg.mandatoryCodes)}
-            onChange={e => onChange({ ...cfg, mandatoryCodes: textToCodeList(e.target.value) })}
-            placeholder="Opcional" />
-        </div>
+        <>
+          <YesNoToggle
+            label="Tem itens mandatórios?"
+            value={showMandatory}
+            onChange={v => { setShowMandatory(v); if (!v) onChange({ ...cfg, mandatoryCodes: [] }) }}
+          />
+          {showMandatory && (
+            <div className="rca-field rca-field-full">
+              <label>Códigos mandatórios (subconjunto obrigatório, um por linha)</label>
+              <textarea className="camp-textarea" rows={3} value={codeListToText(cfg.mandatoryCodes)}
+                onChange={e => onChange({ ...cfg, mandatoryCodes: textToCodeList(e.target.value) })}
+                placeholder="Opcional" />
+            </div>
+          )}
+        </>
       )}
 
-      {/* CNPJs válidos */}
-      <div className="rca-field rca-field-full">
-        <label>CNPJs válidos (um por linha, vazio = todos)</label>
-        <textarea className="camp-textarea" rows={3} value={codeListToText(cfg.validCnpjs)}
-          onChange={e => onChange({ ...cfg, validCnpjs: textToCodeList(e.target.value) })}
-          placeholder="Opcional" />
-      </div>
-
-      {/* Meta por CNPJ (sobrescreve threshold) */}
-      <div className="rca-field rca-field-full">
-        <label>Meta por CNPJ — sobrescreve mínimo (cnpj:meta, um por linha)</label>
-        <textarea className="camp-textarea" rows={4}
-          value={cnpjRecordToText(cfg.goalByCnpj)}
-          onChange={e => onChange({ ...cfg, goalByCnpj: textToCnpjRecord(e.target.value) })}
-          placeholder="Opcional — ex.: 12345678000100:5" />
-      </div>
-
       {/* Famílias mandatórias */}
-      {showFamilies && (
-        <div className="rca-field rca-field-full">
-          <label>Famílias obrigatórias (uma por linha)</label>
-          <textarea className="camp-textarea" rows={3} value={cfg.mandatoryFamilies.join('\n')}
-            onChange={e => onChange({ ...cfg, mandatoryFamilies: textToCodeList(e.target.value) })}
-            placeholder="Ex.: CD Total&#10;Escova Colgate" />
-        </div>
+      {cfg.metric === 'family_count' && (
+        <>
+          <YesNoToggle
+            label="Tem famílias obrigatórias?"
+            value={showFamilies}
+            onChange={v => { setShowFamilies(v); if (!v) onChange({ ...cfg, mandatoryFamilies: [] }) }}
+          />
+          {showFamilies && (
+            <div className="rca-field rca-field-full">
+              <label>Famílias obrigatórias (uma por linha)</label>
+              <textarea className="camp-textarea" rows={3} value={cfg.mandatoryFamilies.join('\n')}
+                onChange={e => onChange({ ...cfg, mandatoryFamilies: textToCodeList(e.target.value) })}
+                placeholder="Ex.: CD Total&#10;Escova Colgate" />
+            </div>
+          )}
+        </>
       )}
 
       {/* Quantidades por categoria */}
@@ -599,6 +792,22 @@ function CustomFields({ cfg, onChange }: { cfg: CustomConfig; onChange: (c: Camp
         </div>
       )}
 
+      <hr className="camp-section-divider" />
+
+      {/* CNPJs */}
+      <CnpjFilterField cnpjs={cfg.validCnpjs} onChange={v => onChange({ ...cfg, validCnpjs: v })} />
+
+      {/* Meta por CNPJ (sobrescreve threshold) */}
+      <div className="rca-field rca-field-full">
+        <label>Meta individual por CNPJ — sobrescreve mínimo (cnpj:meta, um por linha)</label>
+        <textarea className="camp-textarea" rows={4}
+          value={cnpjRecordToText(cfg.goalByCnpj)}
+          onChange={e => onChange({ ...cfg, goalByCnpj: textToCnpjRecord(e.target.value) })}
+          placeholder="Opcional — ex.: 12345678000100:5" />
+      </div>
+
+      <hr className="camp-section-divider" />
+
       {/* Tipo de prêmio */}
       <div className="rca-field rca-field-full">
         <label>Tipo de prêmio</label>
@@ -609,7 +818,6 @@ function CustomFields({ cfg, onChange }: { cfg: CustomConfig; onChange: (c: Camp
         </div>
       </div>
 
-      {/* Prêmio flat */}
       {showFlatPrize && (
         <div className="rca-field rca-field-full">
           <label>Prêmios por PDV/vendedor qualificado</label>
@@ -617,7 +825,6 @@ function CustomFields({ cfg, onChange }: { cfg: CustomConfig; onChange: (c: Camp
         </div>
       )}
 
-      {/* Patamares por métrica */}
       {showMetricTiers && (
         <div className="rca-field rca-field-full">
           <label>Patamares de prêmio (minValor:prêmio por PDV, um por linha)</label>
@@ -625,11 +832,10 @@ function CustomFields({ cfg, onChange }: { cfg: CustomConfig; onChange: (c: Camp
             value={metricTiersToText(cfg.metricTiers)}
             onChange={e => onChange({ ...cfg, metricTiers: textToMetricTiers(e.target.value) })}
             placeholder="15:20&#10;25:50" />
-          <small style={{ color: 'var(--muted)', fontSize: 11 }}>Formato: minSKUs/valor:prêmio. Maior patamar aplicável vence.</small>
+          <small style={{ color: 'var(--muted)', fontSize: 11 }}>Maior patamar aplicável vence.</small>
         </div>
       )}
 
-      {/* Faixas por meta */}
       {showGoalTiers && (
         <div className="rca-field rca-field-full">
           <label>Faixas de prêmio por meta (maxMeta:prêmio, 0=sem teto)</label>
@@ -652,7 +858,7 @@ function CustomFields({ cfg, onChange }: { cfg: CustomConfig; onChange: (c: Camp
           onChange={e => onChange({ ...cfg, gerentePrize: parseFloat(e.target.value) || 0 })} />
       </div>
       <div className="rca-field">
-        <label>Multiplicador supervisor (ex.: 0.5 = 50% do total vendedor)</label>
+        <label>Multiplicador supervisor (ex.: 0.5)</label>
         <input type="number" min={0} step={0.05} value={cfg.supervisorMultiplier}
           onChange={e => onChange({ ...cfg, supervisorMultiplier: parseFloat(e.target.value) || 0 })} />
       </div>
@@ -663,31 +869,6 @@ function CustomFields({ cfg, onChange }: { cfg: CustomConfig; onChange: (c: Camp
       </div>
       <div style={{ gridColumn: '1 / -1', fontSize: 11, color: 'var(--muted)', marginTop: -4 }}>
         Se o multiplicador for &gt; 0, ele substitui o valor fixo de supervisor/gerente.
-      </div>
-    </>
-  )
-}
-
-function MetaCnpjFields({ cfg, onChange }: { cfg: MetaCnpjConfig; onChange: (c: CampaignConfig) => void }) {
-  return (
-    <>
-      <div className="rca-field rca-field-full">
-        <label>Códigos de produto (um por linha)</label>
-        <textarea className="camp-textarea" rows={4} value={codeListToText(cfg.productCodes)}
-          onChange={e => onChange({ ...cfg, productCodes: textToCodeList(e.target.value) })}
-          placeholder="Ex.: 12345&#10;67890" />
-      </div>
-      <div className="rca-field rca-field-full">
-        <label>Meta por CNPJ (cnpj:meta, um por linha)</label>
-        <textarea className="camp-textarea" rows={5}
-          value={cnpjRecordToText(cfg.goalByCnpj)}
-          onChange={e => onChange({ ...cfg, goalByCnpj: textToCnpjRecord(e.target.value) })}
-          placeholder="12345678000100:5&#10;98765432000100:3" />
-        <small style={{ color: 'var(--muted)', fontSize: 11 }}>Formato: CNPJ:quantidade de SKUs esperados</small>
-      </div>
-      <div className="rca-field rca-field-full">
-        <label>Prêmios por PDV qualificado</label>
-        <PrizeFields prize={cfg.prize} onChange={p => onChange({ ...cfg, prize: p })} />
       </div>
     </>
   )

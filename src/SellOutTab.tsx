@@ -8,9 +8,9 @@ import type { CommercialLine } from './domain/productGrouping'
 const brlFull = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const kpiCurrency = (n: number) => {
   const abs = Math.abs(n), sign = n < 0 ? '-' : ''
-  if (abs >= 1_000_000) return `${sign}R$ ${(abs / 1_000_000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}M`
-  if (abs >= 1_000) return `${sign}R$ ${(abs / 1_000).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}K`
-  return `${sign}R$ ${abs.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  if (abs >= 1_000_000) return `${sign}R$ ${(abs / 1_000_000).toFixed(2)}M`
+  if (abs >= 1_000) return `${sign}R$ ${(abs / 1_000).toFixed(2)}K`
+  return `${sign}R$ ${abs.toFixed(2)}`
 }
 const fmtDay = (d: string) => { const p = d.split('-'); return p.length === 3 ? `${p[2]}/${p[1]}` : d }
 const fmtNum = (n: number) => n.toLocaleString('pt-BR')
@@ -219,7 +219,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
   const allDays = useMemo(() => {
     const map = new Map<string, { fat: number; afat: number; cFat: Set<string>; cTot: Set<string> }>()
     for (const m of monthBase) {
-      const day = m.movementDate ?? ''; if (!day) continue
+      const day = m.orderDate ?? m.movementDate ?? ''; if (!day) continue
       if (!map.has(day)) map.set(day, { fat: 0, afat: 0, cFat: new Set(), cTot: new Set() })
       const e = map.get(day)!
       if (m.movementType === 'venda_faturada') {
