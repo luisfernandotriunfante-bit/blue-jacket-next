@@ -12,6 +12,7 @@ export type CampaignType =
   | 'vizinhanca_familias'  // Número de famílias (Desconto Progressivo)
   | 'vizinhanca_hair'      // SKUs Hair por patamar (Transição Hair)
   | 'meta_cnpj'            // Meta de SKUs novos por CNPJ (Underfill)
+  | 'custom'               // Personalizado — configura qualquer mecânica via parâmetros
 
 export interface PrizeLevel {
   vendedor: number
@@ -82,6 +83,38 @@ export interface MetaCnpjConfig {
   prize: PrizeLevel
 }
 
+/* ── Tipo personalizado (genérico) ───────────────────────── */
+export interface CustomConfig {
+  type: 'custom'
+
+  // Escopo
+  productCodes: string[]        // vazio = todos
+  mandatoryCodes: string[]      // subset de productCodes que devem estar presentes
+  validCnpjs: string[]          // vazio = todos
+  faixas: number[]              // vazio = todas
+  perfis: string[]              // vazio = todos
+  windowMonths: number          // 1 = mês atual; N = janela backward a partir de endDate
+
+  // Qualificação
+  unit: 'pdv' | 'seller'
+  metric: 'sku_count' | 'value' | 'family_count' | 'qty_by_category' | 'seller_goal_pct'
+  threshold: number             // min SKUs, min R$, min famílias ou % meta
+  categoryRequirements: Array<{ category: string; min: number }>
+  mandatoryFamilies: string[]
+  day20Threshold: number        // informativo (seller_goal_pct)
+  goalByCnpj: Record<string, number>  // sobrescreve threshold por CNPJ
+
+  // Prêmio
+  prizeType: 'flat' | 'tiered_metric' | 'tiered_goal'
+  prize: PrizeLevel                                           // flat
+  metricTiers: Array<{ minValue: number; prize: number }>    // tiered_metric
+  goalTiers: Array<{ maxGoal: number; prize: number }>       // tiered_goal
+  supervisorPrize: number
+  gerentePrize: number
+  supervisorMultiplier: number   // se > 0 usa em vez de supervisorPrize/prize.supervisor
+  gerenteMultiplier: number
+}
+
 export type CampaignConfig =
   | MixSkusConfig
   | ValorEansConfig
@@ -90,6 +123,7 @@ export type CampaignConfig =
   | VizinhancaFamiliasConfig
   | VizinhancaHairConfig
   | MetaCnpjConfig
+  | CustomConfig
 
 /* ── CampaignRecord (full) ───────────────────────────────── */
 export interface CampaignRecord {
@@ -726,6 +760,237 @@ function apurateMetaCnpj(
   return { campaignId: campaign.id, campaignName: campaign.name, totalPdvs: sellers.reduce((s, r) => s + r.qualifiedPdvs, 0), totalPrize: sellers.reduce((s, r) => s + r.prizeVendedor, 0), sellers }
 }
 
+/* ── Personalizado (genérico) ────────────────────────────── */
+function apurateCustom(
+  cfg: CustomConfig,
+  campaign: CampaignRecord,
+  movements: CanonicalMovement[],
+  productBase: CanonicalProduct[],
+  clientBase: CanonicalClient[],
+  rcas: RcaRecord[]
+): ApurationResult {
+  const today = new Date().toISOString().slice(0, 10)
+  const windowEnd = campaign.endDate || today
+  const windowStart = cfg.windowMonths > 1
+    ? expandStart(windowEnd, cfg.windowMonths)
+    : (campaign.startDate || expandStart(windowEnd, 1))
+
+  const rcaMap = buildRcaMap(rcas)
+  const clientMap = buildClientMap(clientBase)
+  const categoryMap = buildCategoryMap(productBase)
+  const familyMap = buildFamilyMap(productBase)
+
+  const productSet = buildProductCodeSet(cfg.productCodes)
+  const mandatorySet = buildProductCodeSet(cfg.mandatoryCodes)
+  const cnpjSet = buildCnpjSet(cfg.validCnpjs)
+  const faixaSet = new Set(cfg.faixas.map(String))
+  const perfilSet = new Set(cfg.perfis.map(p => p.toLowerCase()))
+
+  const goalByCnpjNorm: Record<string, number> = {}
+  for (const [k, v] of Object.entries(cfg.goalByCnpj)) goalByCnpjNorm[fmtCnpj(k)] = v
+
+  /* ── unit = seller ── */
+  if (cfg.unit === 'seller') {
+    const startDate = campaign.startDate || windowStart
+    const day20 = startDate.slice(0, 7) + '-20'
+    const allMovs = getWindowedMovements(movements, startDate, windowEnd, ['venda_faturada', 'devolucao'])
+
+    const bySeller = new Map<string, { fat: number; fatUntil20: number }>()
+    for (const m of allMovs) {
+      if (productSet.size > 0) {
+        const code = m.productCode?.toUpperCase()
+        if (!code || !productSet.has(code)) continue
+      }
+      const seller = m.sellerCode ?? '?'
+      if (!bySeller.has(seller)) bySeller.set(seller, { fat: 0, fatUntil20: 0 })
+      const e = bySeller.get(seller)!
+      e.fat += m.value ?? 0
+      if (m.movementDate && m.movementDate <= day20) e.fatUntil20 += m.value ?? 0
+    }
+
+    const sellers: SellerResult[] = []
+    for (const [sellerCode, data] of bySeller) {
+      const rca = rcaMap.get(sellerCode)
+      const goal = rca?.goal ?? 0
+      if (!goal) continue
+
+      const pct = goal > 0 ? (data.fat / goal) * 100 : 0
+      const qualified = pct >= (cfg.threshold || 100)
+
+      let prizeV = 0
+      if (qualified) {
+        if (cfg.prizeType === 'flat') {
+          prizeV = cfg.prize.vendedor
+        } else if (cfg.prizeType === 'tiered_goal') {
+          const sorted = [...cfg.goalTiers].sort((a, b) => (a.maxGoal || Infinity) - (b.maxGoal || Infinity))
+          const tier = sorted.find(t => !t.maxGoal || goal <= t.maxGoal)
+          prizeV = tier?.prize ?? 0
+        } else if (cfg.prizeType === 'tiered_metric') {
+          const sorted = [...cfg.metricTiers].sort((a, b) => b.minValue - a.minValue)
+          const tier = sorted.find(t => pct >= t.minValue)
+          prizeV = tier?.prize ?? 0
+        }
+      }
+
+      const prizeS = cfg.supervisorMultiplier > 0
+        ? Math.round(prizeV * cfg.supervisorMultiplier)
+        : (qualified ? cfg.supervisorPrize : 0)
+      const prizeG = cfg.gerenteMultiplier > 0
+        ? Math.round(prizeV * cfg.gerenteMultiplier)
+        : (qualified ? cfg.gerentePrize : 0)
+
+      sellers.push({
+        sellerCode, sellerName: rca?.name ?? sellerCode,
+        supervisorCode: rca?.supervisorCode ?? '', supervisorName: rca?.supervisor ?? '—',
+        qualifiedPdvs: qualified ? 1 : 0,
+        prizeVendedor: prizeV, prizeSupervisor: prizeS, prizeGerente: prizeG,
+        totalPrize: prizeV + prizeS + prizeG,
+        details: [{
+          customerCode: sellerCode, customerName: rca?.name ?? sellerCode,
+          value: data.fat, qualified,
+          reason: qualified ? undefined : `${pct.toFixed(0)}% da meta (mín ${cfg.threshold || 100}%)`,
+        }],
+      })
+    }
+
+    sellers.sort((a, b) => b.prizeVendedor - a.prizeVendedor)
+    return {
+      campaignId: campaign.id, campaignName: campaign.name,
+      totalPdvs: sellers.filter(s => s.qualifiedPdvs > 0).length,
+      totalPrize: sellers.reduce((s, r) => s + r.prizeVendedor, 0),
+      sellers,
+    }
+  }
+
+  /* ── unit = pdv ── */
+  type PdvEntry = {
+    name: string; codes: Set<string>; value: number
+    families: Set<string>; qtdByCategory: Record<string, number>
+  }
+  const bySellerCustomer = new Map<string, Map<string, PdvEntry>>()
+
+  const filtered = getWindowedMovements(movements, windowStart, windowEnd)
+  for (const m of filtered) {
+    const code = m.productCode?.toUpperCase()
+    const cust = m.customerCode ?? ''; if (!cust) continue
+    if (productSet.size > 0 && (!code || !productSet.has(code))) continue
+
+    if (cnpjSet.size > 0) {
+      const cli = clientMap.get(cust)
+      const cnpj = cli?.cnpj ?? fmtCnpj(cust)
+      if (!cnpjSet.has(cnpj) && !cnpjSet.has(cust)) continue
+    }
+    if (faixaSet.size > 0 || perfilSet.size > 0) {
+      const cli = clientMap.get(cust)
+      if (!cli) continue
+      if (faixaSet.size > 0 && !faixaSet.has(cli.faixa)) continue
+      if (perfilSet.size > 0 && !perfilSet.has(cli.perfil.toLowerCase())) continue
+    }
+
+    const seller = m.sellerCode ?? '?'
+    if (!bySellerCustomer.has(seller)) bySellerCustomer.set(seller, new Map())
+    const custMap = bySellerCustomer.get(seller)!
+    if (!custMap.has(cust)) custMap.set(cust, { name: m.customerName ?? cust, codes: new Set(), value: 0, families: new Set(), qtdByCategory: {} })
+    const e = custMap.get(cust)!
+
+    if (code) {
+      e.codes.add(code)
+      e.value += m.value ?? 0
+      const fam = familyMap.get(code); if (fam) e.families.add(fam)
+      const cat = categoryMap.get(code); if (cat) e.qtdByCategory[cat] = (e.qtdByCategory[cat] ?? 0) + (m.quantity ?? 1)
+    }
+  }
+
+  const sortedMetricTiers = [...cfg.metricTiers].sort((a, b) => b.minValue - a.minValue)
+
+  const sellers: SellerResult[] = []
+  for (const [sellerCode, custMap] of bySellerCustomer) {
+    const rca = rcaMap.get(sellerCode)
+    const details: PdvDetail[] = []
+    let qualifiedPdvs = 0
+    let totalPrizeV = 0
+
+    for (const [custCode, entry] of custMap) {
+      const hasMandatory = mandatorySet.size === 0 || [...mandatorySet].every(c => entry.codes.has(c))
+      const hasMandatoryFamilies = cfg.mandatoryFamilies.length === 0 ||
+        cfg.mandatoryFamilies.every(f => [...entry.families].some(ef => ef.includes(f.toLowerCase())))
+
+      const cli = clientMap.get(custCode)
+      const cnpj = cli?.cnpj ?? fmtCnpj(custCode)
+      const effectiveThreshold = goalByCnpjNorm[cnpj] !== undefined ? goalByCnpjNorm[cnpj] : cfg.threshold
+
+      let metricValue = 0
+      let qualified = false
+      let reason: string | undefined
+
+      if (cfg.metric === 'sku_count') {
+        metricValue = entry.codes.size
+        qualified = hasMandatory && hasMandatoryFamilies && metricValue >= effectiveThreshold
+        if (!qualified) reason = !hasMandatory ? 'Mandatórios faltando' : `${metricValue}/${effectiveThreshold} SKUs`
+      } else if (cfg.metric === 'value') {
+        metricValue = entry.value
+        qualified = hasMandatory && metricValue >= effectiveThreshold
+        if (!qualified) reason = !hasMandatory ? 'Mandatórios faltando' : `R$${metricValue.toFixed(0)} < R$${effectiveThreshold}`
+      } else if (cfg.metric === 'family_count') {
+        metricValue = entry.families.size
+        qualified = hasMandatory && hasMandatoryFamilies && metricValue >= effectiveThreshold
+        if (!qualified) reason = !hasMandatoryFamilies ? 'Famílias mandatórias faltando' : `${metricValue}/${effectiveThreshold} famílias`
+      } else if (cfg.metric === 'qty_by_category') {
+        const allMet = cfg.categoryRequirements.every(req => {
+          const total = Object.entries(entry.qtdByCategory)
+            .filter(([cat]) => cat.includes(req.category.toLowerCase()))
+            .reduce((s, [, q]) => s + q, 0)
+          return total >= req.min
+        })
+        metricValue = Object.values(entry.qtdByCategory).reduce((s, q) => s + q, 0)
+        qualified = allMet
+        if (!qualified) reason = 'Quantidades insuficientes por categoria'
+      }
+
+      let pdvPrize = 0
+      if (qualified) {
+        if (cfg.prizeType === 'flat') {
+          pdvPrize = cfg.prize.vendedor
+        } else if (cfg.prizeType === 'tiered_metric') {
+          const tier = sortedMetricTiers.find(t => metricValue >= t.minValue)
+          pdvPrize = tier?.prize ?? 0
+        }
+        qualifiedPdvs++
+        totalPrizeV += pdvPrize
+      }
+
+      details.push({
+        customerCode: custCode, customerName: entry.name,
+        value: cfg.metric === 'value' ? metricValue : undefined,
+        skuCount: cfg.metric !== 'value' ? metricValue : undefined,
+        qualified, reason,
+      })
+    }
+
+    const prizeS = cfg.supervisorMultiplier > 0
+      ? Math.round(totalPrizeV * cfg.supervisorMultiplier)
+      : qualifiedPdvs * cfg.supervisorPrize
+    const prizeG = cfg.gerenteMultiplier > 0
+      ? Math.round(totalPrizeV * cfg.gerenteMultiplier)
+      : qualifiedPdvs * cfg.gerentePrize
+
+    sellers.push({
+      sellerCode, sellerName: rca?.name ?? sellerCode,
+      supervisorCode: rca?.supervisorCode ?? '', supervisorName: rca?.supervisor ?? '—',
+      qualifiedPdvs, prizeVendedor: totalPrizeV, prizeSupervisor: prizeS, prizeGerente: prizeG,
+      totalPrize: totalPrizeV + prizeS + prizeG, details,
+    })
+  }
+
+  sellers.sort((a, b) => b.qualifiedPdvs - a.qualifiedPdvs)
+  return {
+    campaignId: campaign.id, campaignName: campaign.name,
+    totalPdvs: sellers.reduce((s, r) => s + r.qualifiedPdvs, 0),
+    totalPrize: sellers.reduce((s, r) => s + r.prizeVendedor, 0),
+    sellers,
+  }
+}
+
 /* ── Main dispatch ───────────────────────────────────────── */
 export function apurateCampaign(
   campaign: CampaignRecord,
@@ -743,6 +1008,7 @@ export function apurateCampaign(
     case 'vizinhanca_familias': return apurateVizinhancaFamilias(cfg, campaign, movements, clientBase, productBase, rcas)
     case 'vizinhanca_hair':     return apurateVizinhancaHair(cfg, campaign, movements, clientBase, productBase, rcas)
     case 'meta_cnpj':           return apurateMetaCnpj(cfg, campaign, movements, clientBase, rcas)
+    case 'custom':              return apurateCustom(cfg, campaign, movements, productBase, clientBase, rcas)
   }
 }
 
@@ -756,6 +1022,17 @@ export function defaultConfig(type: CampaignType): CampaignConfig {
     case 'vizinhanca_familias': return { type, faixas: [4, 5], perfis: ['varejo'], mandatoryFamilies: ['CD Total', 'Escova Colgate', 'Enxaguante'], minFamilies: 12, prize: { vendedor: 20, supervisor: 10, gerente: 5 } }
     case 'vizinhanca_hair': return { type, faixas: [4, 5], perfis: ['varejo'], tiers: [{ minSkus: 15, prize: 20 }, { minSkus: 25, prize: 50 }], supervisorMultiplier: 0.5, gerenteMultiplier: 0.25 }
     case 'meta_cnpj': return { type, productCodes: [], goalByCnpj: {}, prize: { vendedor: 500, supervisor: 500, gerente: 0 } }
+    case 'custom': return {
+      type, unit: 'pdv', metric: 'sku_count', threshold: 10, windowMonths: 1,
+      productCodes: [], mandatoryCodes: [], validCnpjs: [],
+      faixas: [], perfis: [],
+      categoryRequirements: [], mandatoryFamilies: [],
+      day20Threshold: 0, goalByCnpj: {},
+      prizeType: 'flat', prize: { vendedor: 0, supervisor: 0, gerente: 0 },
+      metricTiers: [], goalTiers: [],
+      supervisorPrize: 0, gerentePrize: 0,
+      supervisorMultiplier: 0, gerenteMultiplier: 0,
+    }
   }
 }
 
@@ -767,4 +1044,103 @@ export const CAMPAIGN_TYPE_LABEL: Record<CampaignType, string> = {
   vizinhanca_familias: 'Vizinhança — Famílias',
   vizinhanca_hair: 'Vizinhança — Hair',
   meta_cnpj: 'Meta por CNPJ',
+  custom: 'Personalizado',
 }
+
+/* ── Templates prontos para o tipo Personalizado ─────────── */
+export const CUSTOM_TEMPLATES: Array<{ label: string; config: CustomConfig }> = [
+  {
+    label: 'Mix de SKUs',
+    config: {
+      type: 'custom', unit: 'pdv', metric: 'sku_count', threshold: 17, windowMonths: 3,
+      productCodes: [], mandatoryCodes: [], validCnpjs: [],
+      faixas: [], perfis: [],
+      categoryRequirements: [], mandatoryFamilies: [],
+      day20Threshold: 0, goalByCnpj: {},
+      prizeType: 'flat', prize: { vendedor: 300, supervisor: 200, gerente: 0 },
+      metricTiers: [], goalTiers: [],
+      supervisorPrize: 0, gerentePrize: 0, supervisorMultiplier: 0, gerenteMultiplier: 0,
+    },
+  },
+  {
+    label: 'Valor + EANs',
+    config: {
+      type: 'custom', unit: 'pdv', metric: 'value', threshold: 150, windowMonths: 3,
+      productCodes: [], mandatoryCodes: [], validCnpjs: [],
+      faixas: [], perfis: [],
+      categoryRequirements: [], mandatoryFamilies: [],
+      day20Threshold: 0, goalByCnpj: {},
+      prizeType: 'flat', prize: { vendedor: 30, supervisor: 15, gerente: 5 },
+      metricTiers: [], goalTiers: [],
+      supervisorPrize: 0, gerentePrize: 0, supervisorMultiplier: 0, gerenteMultiplier: 0,
+    },
+  },
+  {
+    label: 'Cota (Acelere)',
+    config: {
+      type: 'custom', unit: 'seller', metric: 'seller_goal_pct', threshold: 100, windowMonths: 1,
+      productCodes: [], mandatoryCodes: [], validCnpjs: [],
+      faixas: [], perfis: [],
+      categoryRequirements: [], mandatoryFamilies: [],
+      day20Threshold: 70, goalByCnpj: {},
+      prizeType: 'tiered_goal', prize: { vendedor: 0, supervisor: 0, gerente: 0 },
+      metricTiers: [],
+      goalTiers: [{ maxGoal: 50000, prize: 500 }, { maxGoal: 100000, prize: 1000 }, { maxGoal: 0, prize: 1500 }],
+      supervisorPrize: 1000, gerentePrize: 2000, supervisorMultiplier: 0, gerenteMultiplier: 0,
+    },
+  },
+  {
+    label: 'Vizinhança — Quantidades',
+    config: {
+      type: 'custom', unit: 'pdv', metric: 'qty_by_category', threshold: 0, windowMonths: 1,
+      productCodes: [], mandatoryCodes: [], validCnpjs: [],
+      faixas: [4, 5], perfis: ['varejo'],
+      categoryRequirements: [{ category: 'creme dental', min: 12 }, { category: 'escova', min: 6 }, { category: 'enxaguante', min: 1 }],
+      mandatoryFamilies: [],
+      day20Threshold: 0, goalByCnpj: {},
+      prizeType: 'flat', prize: { vendedor: 20, supervisor: 10, gerente: 5 },
+      metricTiers: [], goalTiers: [],
+      supervisorPrize: 0, gerentePrize: 0, supervisorMultiplier: 0, gerenteMultiplier: 0,
+    },
+  },
+  {
+    label: 'Vizinhança — Famílias',
+    config: {
+      type: 'custom', unit: 'pdv', metric: 'family_count', threshold: 12, windowMonths: 1,
+      productCodes: [], mandatoryCodes: [], validCnpjs: [],
+      faixas: [4, 5], perfis: ['varejo'],
+      categoryRequirements: [], mandatoryFamilies: ['CD Total', 'Escova Colgate', 'Enxaguante'],
+      day20Threshold: 0, goalByCnpj: {},
+      prizeType: 'flat', prize: { vendedor: 20, supervisor: 10, gerente: 5 },
+      metricTiers: [], goalTiers: [],
+      supervisorPrize: 0, gerentePrize: 0, supervisorMultiplier: 0, gerenteMultiplier: 0,
+    },
+  },
+  {
+    label: 'Vizinhança — Hair',
+    config: {
+      type: 'custom', unit: 'pdv', metric: 'sku_count', threshold: 0, windowMonths: 1,
+      productCodes: [], mandatoryCodes: [], validCnpjs: [],
+      faixas: [4, 5], perfis: ['varejo'],
+      categoryRequirements: [], mandatoryFamilies: [],
+      day20Threshold: 0, goalByCnpj: {},
+      prizeType: 'tiered_metric', prize: { vendedor: 0, supervisor: 0, gerente: 0 },
+      metricTiers: [{ minValue: 15, prize: 20 }, { minValue: 25, prize: 50 }],
+      goalTiers: [],
+      supervisorPrize: 0, gerentePrize: 0, supervisorMultiplier: 0.5, gerenteMultiplier: 0.25,
+    },
+  },
+  {
+    label: 'Meta por CNPJ',
+    config: {
+      type: 'custom', unit: 'pdv', metric: 'sku_count', threshold: 1, windowMonths: 1,
+      productCodes: [], mandatoryCodes: [], validCnpjs: [],
+      faixas: [], perfis: [],
+      categoryRequirements: [], mandatoryFamilies: [],
+      day20Threshold: 0, goalByCnpj: {},
+      prizeType: 'flat', prize: { vendedor: 500, supervisor: 500, gerente: 0 },
+      metricTiers: [], goalTiers: [],
+      supervisorPrize: 0, gerentePrize: 0, supervisorMultiplier: 0, gerenteMultiplier: 0,
+    },
+  },
+]
