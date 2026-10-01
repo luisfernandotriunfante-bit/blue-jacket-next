@@ -16,6 +16,8 @@ import { GerencialTab } from './GerencialTab'
 import { ClientesTab } from './ClientesTab'
 import { RcaManager, readRcas, type RcaRecord } from './RcaManager'
 import { CampaignTab } from './CampaignTab'
+import { readCampaigns } from './CampaignManager'
+import { saveCompetenciaSnap, loadCompetenciaSnap, listClosedCompetencias, currentCompetenciaCode, fmtCompetencia, type CompetenciaSnapshot } from './domain/competenciaEngine'
 
 const motors: Array<{ id: Exclude<SourceArea, 'diario'>; name: string }> = [
   { id: 'produtos', name: 'Produtos' },
@@ -59,12 +61,30 @@ export function App() {
     return () => window.removeEventListener('rj-rcas-changed', onUpdate)
   }, [])
 
+  const [viewingComp, setViewingComp] = useState<string | null>(null)
+  const [closedComps, setClosedComps] = useState<string[]>(listClosedCompetencias)
+  const [snap, setSnap] = useState<CompetenciaSnapshot | null>(null)
+
+  useEffect(() => {
+    const onUpdate = () => setClosedComps(listClosedCompetencias())
+    window.addEventListener('rj-competencias-changed', onUpdate)
+    return () => window.removeEventListener('rj-competencias-changed', onUpdate)
+  }, [])
+
+  useEffect(() => {
+    if (!viewingComp) { setSnap(null); return }
+    setSnap(loadCompetenciaSnap(viewingComp))
+  }, [viewingComp])
+
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
   const [section, setSection] = useState<'sellout' | 'estoque' | 'campanhas' | 'administracao'>('sellout')
   const [selloutTab, setSelloutTab] = useState<'dashboard' | 'gerencial' | 'clientes'>('dashboard')
   const [tab, setTab] = useState<'uploads' | 'auditoria' | 'config' | 'rcas'>('uploads')
 
-  const monthLabel = useMemo(() => new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase(), [])
+  const monthLabel = useMemo(() => {
+    if (viewingComp) return fmtCompetencia(viewingComp).toUpperCase()
+    return new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase()
+  }, [viewingComp])
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [rawFiles, setRawFiles] = useState<Record<string, File>>({})
   const [activeNotice, setActiveNotice] = useState<AuditItem | null>(null)
@@ -266,6 +286,37 @@ export function App() {
     await Promise.all(toRun)
     setProcessingAll(false)
   }
+  function fechaCompetencia() {
+    const comp = currentCompetenciaCode()
+    const markupPct = (() => { try { return localStorage.getItem('rj-markup-pct') ?? '' } catch { return '' } })()
+    const covDays = (() => { try { return localStorage.getItem('rj-cov-days') ?? '' } catch { return '' } })()
+    const selloutMeta = (() => { try { return localStorage.getItem('rj-sellout-meta') ?? '' } catch { return '' } })()
+    const positivMeta = (() => { try { return localStorage.getItem('rj-positiv-meta') ?? '' } catch { return '' } })()
+    const ok = saveCompetenciaSnap({
+      competencia: comp,
+      closedAt: new Date().toISOString(),
+      movements: movementBase,
+      products: productBase,
+      clients: clientBase,
+      history: historyBase,
+      receipts: receiptBase,
+      rcas,
+      campaigns: readCampaigns(),
+      markupPct,
+      covDays,
+      selloutMeta,
+      positivMeta,
+    })
+    if (ok) alert(`Competência ${fmtCompetencia(comp)} fechada com sucesso!`)
+  }
+
+  const effectiveMovements = snap ? snap.movements : movementBase
+  const effectiveProducts = snap ? snap.products : productBase
+  const effectiveClients = snap ? snap.clients : clientBase
+  const effectiveReceipts = snap ? snap.receipts : receiptBase
+  const effectiveRcas = snap ? snap.rcas : rcas
+  const effectiveCampaigns = snap ? snap.campaigns : undefined
+
   function downloadClientBase() { const url = URL.createObjectURL(new Blob([JSON.stringify(clientBase, null, 2)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = 'base-canonica-clientes.json'; link.click(); URL.revokeObjectURL(url) }
   function downloadClientExcel() {
     const rows = clientBase.map(client => ({
@@ -331,6 +382,16 @@ export function App() {
         <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" /></svg>
         <span className="nav-label">Administração</span>
       </button>
+      <div className="comp-switcher">
+        <span className="comp-label">Competência</span>
+        <select className="comp-select" value={viewingComp ?? ''} onChange={e => setViewingComp(e.target.value || null)}>
+          <option value="">Atual (ao vivo)</option>
+          {closedComps.map(c => <option key={c} value={c}>{fmtCompetencia(c)}</option>)}
+        </select>
+        <button className="comp-fecha-btn" type="button" onClick={fechaCompetencia} title="Fechar competência atual e salvar fotografia">
+          Fechar competência
+        </button>
+      </div>
       <div className="sidebar-bottom">
         <button className="theme-toggle" type="button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
           <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" /></svg>
@@ -361,6 +422,12 @@ export function App() {
       </button>
     </nav>
     <main className="main">
+      {viewingComp && snap && (
+        <div className="comp-readonly-bar">
+          <span>Fotografia de <strong>{fmtCompetencia(viewingComp)}</strong> · fechada em {new Date(snap.closedAt).toLocaleDateString('pt-BR')} — somente leitura</span>
+          <button type="button" className="comp-close-btn" onClick={() => setViewingComp(null)}>Voltar ao vivo</button>
+        </div>
+      )}
       {section === 'sellout' ? (<>
         <header className="topbar" aria-label="Sell out" style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'stretch', borderBottom: '1px solid var(--border)' }}>
           <div />
@@ -373,13 +440,13 @@ export function App() {
             <span className="so-month-label">{monthLabel}</span>
           </div>
         </header>
-        {selloutTab === 'dashboard' && <SellOutTab movementBase={movementBase} productBase={productBase} monthLabel={monthLabel} />}
-        {selloutTab === 'gerencial' && <GerencialTab movementBase={movementBase} monthLabel={monthLabel} />}
-        {selloutTab === 'clientes' && <ClientesTab movementBase={movementBase} clientBase={clientBase} monthLabel={monthLabel} />}
+        {selloutTab === 'dashboard' && <SellOutTab movementBase={effectiveMovements} productBase={effectiveProducts} monthLabel={monthLabel} />}
+        {selloutTab === 'gerencial' && <GerencialTab movementBase={effectiveMovements} monthLabel={monthLabel} />}
+        {selloutTab === 'clientes' && <ClientesTab movementBase={effectiveMovements} clientBase={effectiveClients} monthLabel={monthLabel} />}
       </>) : section === 'estoque' ? <>
-        <StockTab productBase={productBase} receiptBase={receiptBase} movementBase={movementBase} productIndicators={productIndicators} />
+        <StockTab productBase={effectiveProducts} receiptBase={effectiveReceipts} movementBase={effectiveMovements} productIndicators={snap ? null : productIndicators} />
       </> : section === 'campanhas' ? <>
-        <CampaignTab movementBase={movementBase} productBase={productBase} clientBase={clientBase} rcas={rcas} />
+        <CampaignTab movementBase={effectiveMovements} productBase={effectiveProducts} clientBase={effectiveClients} rcas={effectiveRcas} campaignsOverride={effectiveCampaigns} readOnly={!!viewingComp} />
       </> : <>
       <header className="topbar stock-topbar" aria-label="Administração">
         <button type="button" className={`stock-nav-btn${tab === 'uploads' ? ' on' : ''}`} onClick={() => { setTab('uploads'); setActiveNotice(null) }}>Uploads</button>
