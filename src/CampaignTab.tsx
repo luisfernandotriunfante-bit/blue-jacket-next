@@ -295,13 +295,41 @@ function DiagnosticHint({ d, cfg }: { d?: ApurationDiagnostic; cfg?: CampaignRec
     )
   }
   if (d.movementsMatched === 0) {
+    const campaignCodes = d.campaignCodesSample ?? []
+    const movCodes = d.movementCodesSample ?? []
     return (
-      <p style={{ color: 'var(--muted)', fontSize: 12, marginTop: 12, lineHeight: 1.6 }}>
-        <strong style={{ color: 'var(--red)' }}>{d.movementsInWindow.toLocaleString('pt-BR')} movimentações no período, mas nenhum produto correspondeu à lista.</strong><br />
-        Confira se os códigos cadastrados na campanha são os mesmos que aparecem na coluna <strong>CODPROD. WINTHOR</strong> do relatório de vendas (sem zeros à esquerda).<br />
-        Se quiser usar EANs ou código de fabricante, importe o Motor de Produtos para que a conversão seja feita automaticamente.<br />
-        <span style={{ color: 'var(--muted)', fontStyle: 'italic' }}>Dica: abra o console do navegador (F12) para ver os códigos comparados.</span>
-      </p>
+      <div style={{ marginTop: 12 }}>
+        <p style={{ color: 'var(--red)', fontSize: 12, fontWeight: 700, margin: '0 0 8px' }}>
+          {d.movementsInWindow.toLocaleString('pt-BR')} movimentações no período, mas nenhum produto correspondeu à lista.
+        </p>
+        {(campaignCodes.length > 0 || movCodes.length > 0) && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 10 }}>
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 10px' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--red)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.05em' }}>
+                Códigos na campanha ({campaignCodes.length}{campaignCodes.length === 15 ? '+' : ''})
+              </div>
+              {campaignCodes.length === 0 ? (
+                <span style={{ fontSize: 11, color: 'var(--muted)' }}>Nenhum código cadastrado — todos os produtos contam</span>
+              ) : campaignCodes.map(c => (
+                <div key={c} style={{ fontFamily: 'monospace', fontSize: 11, padding: '2px 0', borderBottom: '1px solid var(--border)', color: 'var(--text)' }}>{c}</div>
+              ))}
+            </div>
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 10px' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.05em' }}>
+                Produtos nas movimentações ({movCodes.length}{movCodes.length === 15 ? '+' : ''})
+              </div>
+              {movCodes.length === 0 ? (
+                <span style={{ fontSize: 11, color: 'var(--muted)' }}>Nenhuma movimentação com produto no período</span>
+              ) : movCodes.map(c => (
+                <div key={c} style={{ fontFamily: 'monospace', fontSize: 11, padding: '2px 0', borderBottom: '1px solid var(--border)', color: campaignCodes.includes(c) ? 'var(--green, #22c55e)' : 'var(--text)' }}>{c}</div>
+              ))}
+            </div>
+          </div>
+        )}
+        <p style={{ fontSize: 11, color: 'var(--muted)', margin: 0, lineHeight: 1.6 }}>
+          Compare as duas colunas: os códigos precisam ser idênticos. Se a campanha usa EANs e as movimentações mostram códigos Winthor, importe o <strong>Motor de Produtos</strong> para a conversão ser feita automaticamente.
+        </p>
+      </div>
     )
   }
   if (d.pdvsFound > 0) {

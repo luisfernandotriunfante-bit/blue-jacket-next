@@ -170,6 +170,10 @@ export interface ApurationDiagnostic {
   movementsInWindow: number
   movementsMatched: number
   pdvsFound: number
+  /** Primeiros códigos que a campanha procurou nas movimentações */
+  campaignCodesSample?: string[]
+  /** Primeiros productCode das movimentações na janela */
+  movementCodesSample?: string[]
 }
 
 export interface ApurationGoal {
@@ -407,7 +411,11 @@ function apurateMixSkus(
   return {
     campaignId: campaign.id, campaignName: campaign.name,
     totalPdvs: sellers.reduce((s, r) => s + r.qualifiedPdvs, 0), totalPrize, sellers,
-    diagnostic: { movementsInWindow: filtered.length, movementsMatched, pdvsFound },
+    diagnostic: {
+      movementsInWindow: filtered.length, movementsMatched, pdvsFound,
+      campaignCodesSample: [...allCodes].slice(0, 15),
+      movementCodesSample: [...new Set(filtered.map(m => m.productCode).filter(Boolean))].slice(0, 15) as string[],
+    },
     goal: { metric: 'sku_count', target: cfg.minSkus },
   }
 }
