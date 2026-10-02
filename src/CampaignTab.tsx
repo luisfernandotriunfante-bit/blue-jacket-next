@@ -297,6 +297,30 @@ function DiagnosticHint({ d, cfg }: { d?: ApurationDiagnostic; cfg?: CampaignRec
   if (d.movementsMatched === 0) {
     const campaignCodes = d.campaignCodesSample ?? []
     const movCodes = d.movementCodesSample ?? []
+
+    // EAN codes entered but product base not imported — show a clear, actionable error
+    if (d.eanWithoutProductBase) {
+      return (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ background: '#fef3c7', border: '2px solid #f59e0b', borderRadius: 8, padding: '12px 16px', marginBottom: 10 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: '#92400e', marginBottom: 6 }}>
+              ⚠️ EAN detectado — Base de Produtos não importada
+            </div>
+            <p style={{ fontSize: 12, color: '#78350f', margin: '0 0 8px', lineHeight: 1.6 }}>
+              Seus códigos de produto são <strong>EANs (código de barras)</strong>, mas as movimentações do Winthor usam <strong>códigos internos</strong> diferentes.
+              Para converter automaticamente, você precisa importar o <strong>Motor de Produtos</strong> com a tabela de cadastro de produtos do Winthor.
+            </p>
+            <p style={{ fontSize: 12, color: '#78350f', margin: 0, lineHeight: 1.6 }}>
+              Enquanto isso, você também pode substituir os EANs pelos <strong>códigos CODPROD do Winthor</strong> diretamente na configuração da campanha.
+            </p>
+          </div>
+          <p style={{ color: 'var(--red)', fontSize: 12, fontWeight: 700, margin: '0 0 8px' }}>
+            {d.movementsInWindow.toLocaleString('pt-BR')} movimentações no período, mas nenhum produto correspondeu.
+          </p>
+        </div>
+      )
+    }
+
     return (
       <div style={{ marginTop: 12 }}>
         <p style={{ color: 'var(--red)', fontSize: 12, fontWeight: 700, margin: '0 0 8px' }}>

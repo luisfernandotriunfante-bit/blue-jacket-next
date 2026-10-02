@@ -174,6 +174,8 @@ export interface ApurationDiagnostic {
   campaignCodesSample?: string[]
   /** Primeiros productCode das movimentações na janela */
   movementCodesSample?: string[]
+  /** true quando os códigos da campanha parecem EAN (13 dígitos) mas a base de produtos não foi importada */
+  eanWithoutProductBase?: boolean
 }
 
 export interface ApurationGoal {
@@ -333,6 +335,13 @@ function apurateMixSkus(
 
   const filtered = getWindowedMovements(movements, windowStart, windowEnd)
 
+  // Detect if campaign codes look like EANs (13 numeric digits) but product base wasn't imported
+  const isEanLike = (c: string) => /^\d{13}$/.test(c.replace(/\s/g, ''))
+  const allRawCodes = [...cfg.mandatoryCodes, ...cfg.optionalCodes].map(c => c.trim()).filter(Boolean)
+  const eanWithoutProductBase = allRawCodes.length > 0
+    && allRawCodes.some(isEanLike)
+    && productBase.length === 0
+
   if (import.meta.env.DEV) {
     console.debug('[CampaignEngine] mix_skus:', campaign.name, {
       window: `${windowStart} → ${windowEnd}`,
@@ -340,6 +349,7 @@ function apurateMixSkus(
       allCodesSize: allCodes.size,
       allCodesSample: [...allCodes].slice(0, 20),
       movementCodeSample: filtered.slice(0, 10).map(m => ({ productCode: m.productCode, manufacturerCode: m.manufacturerCode })),
+      eanWithoutProductBase,
     })
   }
 
@@ -415,6 +425,7 @@ function apurateMixSkus(
       movementsInWindow: filtered.length, movementsMatched, pdvsFound,
       campaignCodesSample: [...allCodes].slice(0, 15),
       movementCodesSample: [...new Set(filtered.map(m => m.productCode).filter(Boolean))].slice(0, 15) as string[],
+      eanWithoutProductBase,
     },
     goal: { metric: 'sku_count', target: cfg.minSkus },
   }
