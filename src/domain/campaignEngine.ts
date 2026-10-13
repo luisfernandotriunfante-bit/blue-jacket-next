@@ -363,7 +363,11 @@ function apurateMixSkus(
     const mfr = m.manufacturerCode?.toUpperCase()
     if (allCodes.size > 0 && !allCodes.has(code) && !(mfr && allCodes.has(mfr))) continue
     const cust = m.customerCode ?? ''; if (!cust) continue
-    if (validCnpjs.size > 0 && !validCnpjs.has(cust) && !validCnpjs.has(fmtCnpj(m.customerCode ?? ''))) continue
+    if (validCnpjs.size > 0) {
+      const doc = fmtCnpj(m.customerDocument ?? '')
+      const docPadded = doc.padStart(14, '0')
+      if (!validCnpjs.has(doc) && !validCnpjs.has(docPadded)) continue
+    }
 
     movementsMatched++
     const seller = m.sellerCode ?? '?'

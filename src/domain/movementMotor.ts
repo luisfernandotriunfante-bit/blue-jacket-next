@@ -56,6 +56,7 @@ type Row = unknown[]
 const norm = (value: unknown) => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
 const text = (value: unknown) => { const result = String(value ?? '').trim(); return result || undefined }
 const code = (value: unknown) => { const result = String(value ?? '').replace(/\.0$/, '').replace(/\s/g, '').replace(/^0+(?=\d)/, ''); return result || undefined }
+const cnpj = (value: unknown) => { const result = String(value ?? '').replace(/\D/g, ''); return result || undefined }
 const number = (value: unknown) => { const raw = String(value ?? '').trim(); const normal = raw.includes(',') && raw.includes('.') ? (raw.lastIndexOf(',') < raw.lastIndexOf('.') ? raw.replace(/,/g, '') : raw.replace(/\./g, '').replace(',', '.')) : raw.replace(',', '.'); const result = Number(normal); return Number.isFinite(result) ? result : undefined }
 const date = (value: unknown) => { const raw = String(value ?? '').trim(); const match = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})/); return match ? `${match[3]}-${match[2]}-${match[1]}` : undefined }
 const rowsFrom = async (file: File) => { const book = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: 'array' }); return book.SheetNames.map(name => XLSX.utils.sheet_to_json<Row>(book.Sheets[name], { header: 1, defval: '', raw: false })) }
@@ -78,7 +79,7 @@ export async function processMovementMotor(files: File[]): Promise<MovementMotor
         const movementType: MovementType = saleType === 'DEVOLUCAO' ? 'devolucao' : saleType === 'BONIFICACAO' ? 'bonificacao' : orderStatus === 'A FATURAR' ? 'a_faturar' : 'venda_faturada'
         const orderId = code(row[index('NUMERO PED. WINTHOR')]); const key = `${customerCode}|${productCode}`; saleKeys.add(key)
         const sellerCode = code(row[index('COD. VENDEDOR')]) ?? code(row[index('CODVENDEDOR')]) ?? code(row[index('CODIGO VENDEDOR')])
-        movements.push({ id: `ATUAL:VENDA:${movementDate}:${orderId ?? ''}:${customerCode}:${productCode}:${movements.length}`, movementDate, orderDate, movementType, orderId, invoiceNumber: code(row[index('NUMERO NOTA FISCAL')]), customerCode, customerDocument: code(row[index('CNPJ/CPF CLIENTE')]), customerName: text(row[index('NOME CLIENTE')]), productCode, manufacturerCode: code(row[index('CODIGO FABRICANTE')]), description: text(row[index('DESCRICAO PRODUTO')]), quantity: number(row[index('UNIDADES VENDIDAS')]), value: number(row[index('VALOR NOTA R$')]), orderStatus, saleType, sellerCode, seller: text(row[index('VENDEDOR')]), sources: ['Vendas atuais'] }); salesFound++
+        movements.push({ id: `ATUAL:VENDA:${movementDate}:${orderId ?? ''}:${customerCode}:${productCode}:${movements.length}`, movementDate, orderDate, movementType, orderId, invoiceNumber: code(row[index('NUMERO NOTA FISCAL')]), customerCode, customerDocument: cnpj(row[index('CNPJ/CPF CLIENTE')]), customerName: text(row[index('NOME CLIENTE')]), productCode, manufacturerCode: code(row[index('CODIGO FABRICANTE')]), description: text(row[index('DESCRICAO PRODUTO')]), quantity: number(row[index('UNIDADES VENDIDAS')]), value: number(row[index('VALOR NOTA R$')]), orderStatus, saleType, sellerCode, seller: text(row[index('VENDEDOR')]), sources: ['Vendas atuais'] }); salesFound++
       }
       continue
     }
