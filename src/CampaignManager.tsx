@@ -46,6 +46,27 @@ function codeListToText(codes: string[]) { return codes.join('\n') }
 function textToCodeList(text: string) {
   return text.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean)
 }
+
+/** Textarea que preserva linhas vazias durante digitação e só converte ao sair do campo */
+function CodeTextarea({ value, onChange, rows = 4, placeholder }: {
+  value: string[]
+  onChange: (codes: string[]) => void
+  rows?: number
+  placeholder?: string
+}) {
+  const [text, setText] = useState(() => codeListToText(value))
+  useEffect(() => { setText(codeListToText(value)) }, [value.join('\n')])
+  return (
+    <textarea
+      className="camp-textarea"
+      rows={rows}
+      value={text}
+      onChange={e => setText(e.target.value)}
+      onBlur={() => onChange(textToCodeList(text))}
+      placeholder={placeholder}
+    />
+  )
+}
 function cnpjRecordToText(obj: Record<string, number>) {
   return Object.entries(obj).map(([k, v]) => `${k}:${v}`).join('\n')
 }
@@ -225,9 +246,7 @@ function CnpjFilterField({ cnpjs, onChange }: { cnpjs: string[]; onChange: (v: s
       {show && (
         <div className="rca-field rca-field-full">
           <label>CNPJs válidos (um por linha)</label>
-          <textarea className="camp-textarea" rows={3}
-            value={codeListToText(cnpjs)}
-            onChange={e => onChange(textToCodeList(e.target.value))}
+          <CodeTextarea rows={3} value={cnpjs} onChange={onChange}
             placeholder="12345678000100&#10;98765432000100" />
         </div>
       )}
@@ -422,16 +441,16 @@ function MixSkusFields({ cfg, onChange }: { cfg: MixSkusConfig; onChange: (c: Ca
           {showMandatory && (
             <div className="rca-field rca-field-full">
               <label>Códigos mandatórios (um por linha)</label>
-              <textarea className="camp-textarea" rows={4} value={codeListToText(cfg.mandatoryCodes)}
-                onChange={e => onChange({ ...cfg, mandatoryCodes: textToCodeList(e.target.value) })}
+              <CodeTextarea rows={4} value={cfg.mandatoryCodes}
+                onChange={v => onChange({ ...cfg, mandatoryCodes: v })}
                 placeholder="Ex.: 12345&#10;67890" />
             </div>
           )}
 
           <div className="rca-field rca-field-full">
             <label>{showMandatory ? 'Demais códigos válidos (um por linha)' : 'Códigos válidos (um por linha)'}</label>
-            <textarea className="camp-textarea" rows={4} value={codeListToText(cfg.optionalCodes)}
-              onChange={e => onChange({ ...cfg, optionalCodes: textToCodeList(e.target.value) })}
+            <CodeTextarea rows={4} value={cfg.optionalCodes}
+              onChange={v => onChange({ ...cfg, optionalCodes: v })}
               placeholder="Ex.: 11111&#10;22222" />
           </div>
         </>
@@ -465,8 +484,8 @@ function ValorEansFields({ cfg, onChange }: { cfg: ValorEansConfig; onChange: (c
 
       <div className="rca-field rca-field-full">
         <label>Códigos de produto obrigatórios (um por linha)</label>
-        <textarea className="camp-textarea" rows={4} value={codeListToText(cfg.productCodes)}
-          onChange={e => onChange({ ...cfg, productCodes: textToCodeList(e.target.value) })}
+        <CodeTextarea rows={4} value={cfg.productCodes}
+          onChange={v => onChange({ ...cfg, productCodes: v })}
           placeholder="Ex.: 12345&#10;67890" />
       </div>
 
@@ -619,8 +638,8 @@ function MetaCnpjFields({ cfg, onChange }: { cfg: MetaCnpjConfig; onChange: (c: 
     <>
       <div className="rca-field rca-field-full">
         <label>Códigos de produto (um por linha)</label>
-        <textarea className="camp-textarea" rows={4} value={codeListToText(cfg.productCodes)}
-          onChange={e => onChange({ ...cfg, productCodes: textToCodeList(e.target.value) })}
+        <CodeTextarea rows={4} value={cfg.productCodes}
+          onChange={v => onChange({ ...cfg, productCodes: v })}
           placeholder="Ex.: 12345&#10;67890" />
       </div>
 
@@ -738,8 +757,8 @@ function CustomFields({ cfg, onChange }: { cfg: CustomConfig; onChange: (c: Camp
       {/* Produtos */}
       <div className="rca-field rca-field-full">
         <label>Códigos de produto (um por linha, vazio = todos)</label>
-        <textarea className="camp-textarea" rows={4} value={codeListToText(cfg.productCodes)}
-          onChange={e => onChange({ ...cfg, productCodes: textToCodeList(e.target.value) })}
+        <CodeTextarea rows={4} value={cfg.productCodes}
+          onChange={v => onChange({ ...cfg, productCodes: v })}
           placeholder="Opcional — deixe vazio para considerar todos os produtos" />
       </div>
 
@@ -754,8 +773,8 @@ function CustomFields({ cfg, onChange }: { cfg: CustomConfig; onChange: (c: Camp
           {showMandatory && (
             <div className="rca-field rca-field-full">
               <label>Códigos mandatórios (subconjunto obrigatório, um por linha)</label>
-              <textarea className="camp-textarea" rows={3} value={codeListToText(cfg.mandatoryCodes)}
-                onChange={e => onChange({ ...cfg, mandatoryCodes: textToCodeList(e.target.value) })}
+              <CodeTextarea rows={3} value={cfg.mandatoryCodes}
+                onChange={v => onChange({ ...cfg, mandatoryCodes: v })}
                 placeholder="Opcional" />
             </div>
           )}
