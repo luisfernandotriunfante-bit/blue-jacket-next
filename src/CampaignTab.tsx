@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { CampaignManager, readCampaigns } from './CampaignManager'
-import { apurateCampaign, CAMPAIGN_TYPE_LABEL, type CampaignRecord, type ApurationResult, type ApurationDiagnostic, type ApurationGoal, type SellerResult } from './domain/campaignEngine'
+import { apurateCampaign, CAMPAIGN_TYPE_LABEL, type CampaignRecord, type ApurationResult, type ApurationDiagnostic, type ApurationGoal, type SellerResult, type PdvDetail } from './domain/campaignEngine'
 import type { CanonicalMovement } from './domain/movementMotor'
 import type { CanonicalProduct } from './domain/productMotor'
 import type { CanonicalClient } from './domain/clientMotor'
@@ -442,9 +442,79 @@ function CampaignPodium({ sellers, goal }: { sellers: SellerResult[]; goal?: Apu
 }
 
 /* ── PDV detail sub-table ────────────────────────────────── */
+function MissingMandatoryPanel({ d }: { d: PdvDetail }) {
+  if (!d.missingMandatory?.length) return null
+  return (
+    <div style={{ background: 'rgba(239,68,68,0.08)', borderLeft: '3px solid rgba(239,68,68,0.5)', margin: '0 0 2px 0', padding: '8px 12px' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(239,68,68,0.9)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+        Obrigatórios faltando ({d.missingMandatory.length})
+      </div>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+        <thead>
+          <tr>
+            <th style={{ textAlign: 'left', color: 'var(--muted)', fontWeight: 500, paddingBottom: 4 }}>Código</th>
+            <th style={{ textAlign: 'left', color: 'var(--muted)', fontWeight: 500, paddingBottom: 4 }}>Produto</th>
+          </tr>
+        </thead>
+        <tbody>
+          {d.missingMandatory.map(m => (
+            <tr key={m.code}>
+              <td style={{ padding: '3px 8px 3px 0', fontFamily: 'Space Grotesk, monospace', color: 'rgba(239,68,68,0.85)', whiteSpace: 'nowrap' }}>{m.code}</td>
+              <td style={{ padding: '3px 0', color: 'var(--fg)' }}>{m.description ?? <span style={{ color: 'var(--muted)' }}>—</span>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function PdvRow({ d, goal, colSpan }: { d: PdvDetail; goal?: ApurationGoal; colSpan: number }) {
+  const [open, setOpen] = useState(false)
+  const canExpand = !!d.missingMandatory?.length
+  return (
+    <>
+      <tr
+        className="gr-row"
+        style={{ opacity: d.qualified ? 1 : 0.75, cursor: canExpand ? 'pointer' : undefined }}
+        onClick={() => canExpand && setOpen(v => !v)}
+      >
+        <td>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            {canExpand && (
+              <span style={{ fontSize: 9, color: 'var(--muted)', lineHeight: 1 }}>{open ? '▼' : '▶'}</span>
+            )}
+            {d.customerName || d.customerCode}
+          </span>
+        </td>
+        {goal && (
+          <td style={{ minWidth: 140 }}>
+            <ProgressBar pct={Math.min(100, d.progressPct ?? 0)} goal={goal} height={6} />
+          </td>
+        )}
+        <td className="n-right" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+          {d.value !== undefined ? kpiCurrency(d.value) : d.skuCount !== undefined ? `${d.skuCount} SKUs` : '—'}
+        </td>
+        <td style={{ color: d.qualified ? 'var(--green, #22c55e)' : 'var(--muted)' }}>
+          {d.qualified ? '✓' : '✗'}
+        </td>
+        <td style={{ color: 'var(--muted)' }}>{d.reason ?? ''}</td>
+      </tr>
+      {open && canExpand && (
+        <tr>
+          <td colSpan={colSpan} style={{ padding: 0 }}>
+            <MissingMandatoryPanel d={d} />
+          </td>
+        </tr>
+      )}
+    </>
+  )
+}
+
 function SellerPdvDetail({ seller, goal }: { seller: SellerResult; goal?: ApurationGoal }) {
   const qualified = seller.details.filter(d => d.qualified)
   const notQualified = seller.details.filter(d => !d.qualified)
+  const colSpan = goal ? 5 : 4
 
   return (
     <div style={{ padding: '8px 16px 12px' }}>
@@ -463,24 +533,10 @@ function SellerPdvDetail({ seller, goal }: { seller: SellerResult; goal?: Apurat
         </thead>
         <tbody>
           {seller.details.slice(0, 80).map(d => (
-            <tr key={d.customerCode} className="gr-row" style={{ opacity: d.qualified ? 1 : 0.75 }}>
-              <td>{d.customerName || d.customerCode}</td>
-              {goal && (
-                <td style={{ minWidth: 140 }}>
-                  <ProgressBar pct={Math.min(100, d.progressPct ?? 0)} goal={goal} height={6} />
-                </td>
-              )}
-              <td className="n-right" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
-                {d.value !== undefined ? kpiCurrency(d.value) : d.skuCount !== undefined ? `${d.skuCount} SKUs` : '—'}
-              </td>
-              <td style={{ color: d.qualified ? 'var(--green, #22c55e)' : 'var(--muted)' }}>
-                {d.qualified ? '✓' : '✗'}
-              </td>
-              <td style={{ color: 'var(--muted)' }}>{d.reason ?? ''}</td>
-            </tr>
+            <PdvRow key={d.customerCode} d={d} goal={goal} colSpan={colSpan} />
           ))}
           {seller.details.length > 80 && (
-            <tr><td colSpan={goal ? 5 : 4} style={{ color: 'var(--muted)', textAlign: 'center', fontSize: 11 }}>
+            <tr><td colSpan={colSpan} style={{ color: 'var(--muted)', textAlign: 'center', fontSize: 11 }}>
               … e mais {seller.details.length - 80} PDVs
             </td></tr>
           )}

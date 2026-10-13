@@ -164,6 +164,8 @@ export interface PdvDetail {
   reason?: string
   /** 0..100+ — percentual do critério atingido neste PDV */
   progressPct?: number
+  /** Obrigatórios que este PDV ainda não comprou (só para mix_skus) */
+  missingMandatory?: { code: string; description?: string }[]
 }
 
 export interface ApurationDiagnostic {
@@ -331,6 +333,9 @@ function apurateMixSkus(
   const optionalSet = resolveProductCodes(cfg.optionalCodes, eanMap)
   const allCodes = new Set([...mandatorySet, ...optionalSet])
   const validCnpjs = buildCnpjSet(cfg.validCnpjs)
+  // mapa código Winthor → descrição (para exibir nome do produto faltante)
+  const codeToDesc = new Map<string, string>()
+  for (const p of productBase) { if (p.internalCode && p.description) codeToDesc.set(p.internalCode, p.description) }
   const rcaMap = buildRcaMap(rcas)
 
   const filtered = getWindowedMovements(movements, windowStart, windowEnd)
@@ -394,11 +399,16 @@ function apurateMixSkus(
       const qualified = hasMandatory && totalSkus >= cfg.minSkus
       const progressPct = cfg.minSkus > 0 ? Math.round((totalSkus / cfg.minSkus) * 100) : (qualified ? 100 : 0)
 
+      const missingMandatory = hasMandatory ? [] : [...mandatorySet]
+        .filter(c => !entry.codes.has(c))
+        .map(c => ({ code: c, description: codeToDesc.get(c) }))
+
       if (qualified) qualifiedPdvs++
       details.push({
         customerCode: custCode, customerName: entry.name,
         skuCount: totalSkus, value: entry.value, qualified, progressPct,
         reason: qualified ? undefined : !hasMandatory ? 'Mandatórios faltando' : `${totalSkus}/${cfg.minSkus} SKUs`,
+        missingMandatory: missingMandatory.length > 0 ? missingMandatory : undefined,
       })
     }
 
