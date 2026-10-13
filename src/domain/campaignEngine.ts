@@ -178,6 +178,12 @@ export interface ApurationDiagnostic {
   movementCodesSample?: string[]
   /** true quando os códigos da campanha parecem EAN (13 dígitos) mas a base de produtos não foi importada */
   eanWithoutProductBase?: boolean
+  /** Estatísticas de CNPJs quando a campanha tem restrição de clientes */
+  cnpjStats?: {
+    total: number      // CNPJs cadastrados na campanha
+    found: number      // CNPJs que apareceram nas movimentações do período
+    notFound: number   // CNPJs sem nenhuma movimentação no período
+  }
 }
 
 export interface ApurationGoal {
@@ -361,6 +367,7 @@ function apurateMixSkus(
   type PdvEntry = { name: string; codes: Set<string>; value: number; sellerCode: string }
   const bySellerCustomer = new Map<string, Map<string, PdvEntry>>()
   let movementsMatched = 0
+  const foundCnpjs = new Set<string>()
 
   for (const m of filtered) {
     const code = m.productCode?.toUpperCase()
@@ -372,6 +379,7 @@ function apurateMixSkus(
       const doc = fmtCnpj(m.customerDocument ?? '')
       const docPadded = doc.padStart(14, '0')
       if (!validCnpjs.has(doc) && !validCnpjs.has(docPadded)) continue
+      foundCnpjs.add(validCnpjs.has(doc) ? doc : docPadded)
     }
 
     movementsMatched++
@@ -440,6 +448,11 @@ function apurateMixSkus(
       campaignCodesSample: [...allCodes].slice(0, 15),
       movementCodesSample: [...new Set(filtered.map(m => m.productCode).filter(Boolean))].slice(0, 15) as string[],
       eanWithoutProductBase,
+      cnpjStats: validCnpjs.size > 0 ? {
+        total: validCnpjs.size,
+        found: foundCnpjs.size,
+        notFound: validCnpjs.size - foundCnpjs.size,
+      } : undefined,
     },
     goal: { metric: 'sku_count', target: cfg.minSkus },
   }
