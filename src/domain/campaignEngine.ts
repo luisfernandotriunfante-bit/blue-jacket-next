@@ -164,6 +164,8 @@ export interface PdvDetail {
   reason?: string
   /** 0..100+ — percentual do critério atingido neste PDV */
   progressPct?: number
+  /** Obrigatórios que este PDV já comprou no período (só para mix_skus) */
+  doneMandatory?: { code: string; description?: string }[]
   /** Obrigatórios que este PDV ainda não comprou (só para mix_skus) */
   missingMandatory?: { code: string; description?: string }[]
 }
@@ -407,15 +409,19 @@ function apurateMixSkus(
       const qualified = hasMandatory && totalSkus >= cfg.minSkus
       const progressPct = cfg.minSkus > 0 ? Math.round((totalSkus / cfg.minSkus) * 100) : (qualified ? 100 : 0)
 
-      const missingMandatory = hasMandatory ? [] : [...mandatorySet]
-        .filter(c => !entry.codes.has(c))
-        .map(c => ({ code: c, description: codeToDesc.get(c) }))
+      const missingMandatory = mandatorySet.size > 0
+        ? [...mandatorySet].filter(c => !entry.codes.has(c)).map(c => ({ code: c, description: codeToDesc.get(c) }))
+        : []
+      const doneMandatory = mandatorySet.size > 0
+        ? [...mandatorySet].filter(c => entry.codes.has(c)).map(c => ({ code: c, description: codeToDesc.get(c) }))
+        : []
 
       if (qualified) qualifiedPdvs++
       details.push({
         customerCode: custCode, customerName: entry.name,
         skuCount: totalSkus, value: entry.value, qualified, progressPct,
         reason: qualified ? undefined : !hasMandatory ? 'Mandatórios faltando' : `${totalSkus}/${cfg.minSkus} SKUs`,
+        doneMandatory: doneMandatory.length > 0 ? doneMandatory : undefined,
         missingMandatory: missingMandatory.length > 0 ? missingMandatory : undefined,
       })
     }
