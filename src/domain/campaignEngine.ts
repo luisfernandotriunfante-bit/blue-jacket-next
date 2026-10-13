@@ -491,16 +491,22 @@ function apurateValorEans(
   const validCnpjs = buildCnpjSet(cfg.validCnpjs)
   const rcaMap = buildRcaMap(rcas)
 
-  const filtered = getWindowedMovements(movements, windowStart, windowEnd, ['venda_faturada', 'devolucao'])
+  const filtered = getWindowedMovements(movements, windowStart, windowEnd, ['venda_faturada', 'a_faturar', 'devolucao'])
 
   type PdvEntry = { name: string; value: number; codes: Set<string>; sellerCode: string }
   const bySellerCustomer = new Map<string, Map<string, PdvEntry>>()
 
   for (const m of filtered) {
     const code = m.productCode?.toUpperCase()
-    if (!code || !codeSet.has(code)) continue
+    const mfr = m.manufacturerCode?.toUpperCase()
+    const matchedCode = code && codeSet.has(code) ? code : (mfr && codeSet.has(mfr) ? mfr : null)
+    if (!matchedCode) continue
     const cust = m.customerCode ?? ''; if (!cust) continue
-    if (validCnpjs.size > 0 && !validCnpjs.has(cust)) continue
+    if (validCnpjs.size > 0) {
+      const doc = fmtCnpj(m.customerDocument ?? '')
+      const docPadded = doc.padStart(14, '0')
+      if (!validCnpjs.has(doc) && !validCnpjs.has(docPadded)) continue
+    }
 
     const seller = m.sellerCode ?? '?'
     if (!bySellerCustomer.has(seller)) bySellerCustomer.set(seller, new Map())
@@ -508,7 +514,7 @@ function apurateValorEans(
     if (!custMap.has(cust)) custMap.set(cust, { name: m.customerName ?? cust, value: 0, codes: new Set(), sellerCode: seller })
     const e = custMap.get(cust)!
     e.value += m.value ?? 0
-    if (m.movementType === 'venda_faturada') e.codes.add(code)
+    if (m.movementType !== 'devolucao') e.codes.add(matchedCode)
   }
 
   const sellers: SellerResult[] = []
