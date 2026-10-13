@@ -202,6 +202,27 @@ function CampaignPanel({ movementBase, productBase, clientBase, rcas, campaignsO
             </div>
           </div>
 
+          {/* CNPJ stats — só aparece quando a campanha tem restrição de clientes */}
+          {selectedResult.diagnostic?.cnpjStats && (() => {
+            const cs = selectedResult.diagnostic.cnpjStats!
+            return (
+              <div style={{ display: 'flex', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
+                <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 16px', minWidth: 120 }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'Space Grotesk, sans-serif', color: 'var(--text)' }}>{cs.total}</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--muted)', marginTop: 2 }}>CNPJs na campanha</div>
+                </div>
+                <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 16px', minWidth: 120 }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'Space Grotesk, sans-serif', color: cs.found > 0 ? 'var(--green, #22c55e)' : 'var(--muted)' }}>{cs.found}</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--muted)', marginTop: 2 }}>Com movimentação</div>
+                </div>
+                <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 16px', minWidth: 120 }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'Space Grotesk, sans-serif', color: cs.notFound > 0 ? 'var(--red)' : 'var(--muted)' }}>{cs.notFound}</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--muted)', marginTop: 2 }}>Sem movimentação</div>
+                </div>
+              </div>
+            )
+          })()}
+
           {selectedResult.sellers.length === 0 ? (
             <DiagnosticHint d={selectedResult.diagnostic} cfg={selectedCampaign.config} />
           ) : (
@@ -445,22 +466,22 @@ function CampaignPodium({ sellers, goal }: { sellers: SellerResult[]; goal?: Apu
 function MissingMandatoryPanel({ d }: { d: PdvDetail }) {
   if (!d.missingMandatory?.length) return null
   return (
-    <div style={{ background: 'rgba(239,68,68,0.08)', borderLeft: '3px solid rgba(239,68,68,0.5)', margin: '0 0 2px 0', padding: '8px 12px' }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(239,68,68,0.9)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
-        Obrigatórios faltando ({d.missingMandatory.length})
+    <div style={{ background: 'var(--surface-raised)', borderLeft: '3px solid var(--red)', margin: '0 0 1px 0', padding: '10px 14px 10px 16px' }}>
+      <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--red)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
+        Obrigatórios faltando — {d.missingMandatory.length}
       </div>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+      <table className="gr-table" style={{ fontSize: 11 }}>
         <thead>
           <tr>
-            <th style={{ textAlign: 'left', color: 'var(--muted)', fontWeight: 500, paddingBottom: 4 }}>Código</th>
-            <th style={{ textAlign: 'left', color: 'var(--muted)', fontWeight: 500, paddingBottom: 4 }}>Produto</th>
+            <th style={{ width: 110 }}>Código</th>
+            <th>Produto</th>
           </tr>
         </thead>
         <tbody>
           {d.missingMandatory.map(m => (
-            <tr key={m.code}>
-              <td style={{ padding: '3px 8px 3px 0', fontFamily: 'Space Grotesk, monospace', color: 'rgba(239,68,68,0.85)', whiteSpace: 'nowrap' }}>{m.code}</td>
-              <td style={{ padding: '3px 0', color: 'var(--fg)' }}>{m.description ?? <span style={{ color: 'var(--muted)' }}>—</span>}</td>
+            <tr key={m.code} className="gr-row">
+              <td style={{ fontFamily: 'Space Grotesk, monospace', color: 'var(--red)', whiteSpace: 'nowrap' }}>{m.code}</td>
+              <td style={{ color: 'var(--text)' }}>{m.description ?? <span style={{ color: 'var(--muted)' }}>—</span>}</td>
             </tr>
           ))}
         </tbody>
