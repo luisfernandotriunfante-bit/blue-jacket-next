@@ -402,8 +402,8 @@ function apurateMixSkus(
       })
     }
 
-    details.sort((a, b) => (b.progressPct - a.progressPct) || (b.value ?? 0) - (a.value ?? 0))
-    const bestPdvProgress = details.length > 0 ? (details[0].progressPct / 100) : 0
+    details.sort((a, b) => ((b.progressPct ?? 0) - (a.progressPct ?? 0)) || (b.value ?? 0) - (a.value ?? 0))
+    const bestPdvProgress = details.length > 0 ? ((details[0].progressPct ?? 0) / 100) : 0
     const totalValue = details.reduce((s, d) => s + (d.value ?? 0), 0)
     const prizeV = qualifiedPdvs * cfg.prize.vendedor
     const prizeS = qualifiedPdvs * cfg.prize.supervisor
@@ -418,8 +418,8 @@ function apurateMixSkus(
 
   sellers.sort((a, b) =>
     b.qualifiedPdvs - a.qualifiedPdvs ||
-    b.bestPdvProgress - a.bestPdvProgress ||
-    b.totalValue - a.totalValue
+    (b.bestPdvProgress ?? 0) - (a.bestPdvProgress ?? 0) ||
+    (b.totalValue ?? 0) - (a.totalValue ?? 0)
   )
   const totalPrize = sellers.reduce((s, r) => s + r.prizeVendedor, 0)
   return {
@@ -488,8 +488,8 @@ function apurateValorEans(
       })
     }
 
-    details.sort((a, b) => b.progressPct - a.progressPct)
-    const bestPdvProgress = details.length > 0 ? (details[0].progressPct / 100) : 0
+    details.sort((a, b) => (b.progressPct ?? 0) - (a.progressPct ?? 0))
+    const bestPdvProgress = details.length > 0 ? ((details[0].progressPct ?? 0) / 100) : 0
     const totalValue = details.reduce((s, d) => s + (d.value ?? 0), 0)
     const prizeV = qualifiedPdvs * cfg.prize.vendedor
     const prizeS = qualifiedPdvs * cfg.prize.supervisor
@@ -504,8 +504,8 @@ function apurateValorEans(
 
   sellers.sort((a, b) =>
     b.qualifiedPdvs - a.qualifiedPdvs ||
-    b.bestPdvProgress - a.bestPdvProgress ||
-    b.totalValue - a.totalValue
+    (b.bestPdvProgress ?? 0) - (a.bestPdvProgress ?? 0) ||
+    (b.totalValue ?? 0) - (a.totalValue ?? 0)
   )
   return {
     campaignId: campaign.id, campaignName: campaign.name,
