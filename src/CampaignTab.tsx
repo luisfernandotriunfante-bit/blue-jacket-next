@@ -449,27 +449,54 @@ function CampaignPodium({ sellers, goal }: { sellers: SellerResult[]; goal?: Apu
 }
 
 /* ── PDV detail sub-table ────────────────────────────────── */
-function MandatoryDetailPanel({ d }: { d: PdvDetail }) {
-  const done = d.doneMandatory ?? []
-  const missing = d.missingMandatory ?? []
-  if (done.length === 0 && missing.length === 0) return null
-  const all = [
-    ...done.map(m => ({ ...m, done: true })),
-    ...missing.map(m => ({ ...m, done: false })),
-  ]
+type ItemEntry = { code: string; description?: string; done: boolean }
+
+function ItemSection({ label, items, accent }: { label: string; items: ItemEntry[]; accent: string }) {
+  if (items.length === 0) return null
   return (
-    <div style={{ background: 'var(--surface-raised)', borderLeft: '3px solid var(--border)', margin: '0 0 1px 0', padding: '10px 14px 10px 16px' }}>
-      <div style={{ display: 'flex', gap: 16, marginBottom: 8 }}>
-        {done.length > 0 && (
-          <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--green, #22c55e)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-            ✓ {done.length} comprado{done.length > 1 ? 's' : ''}
+    <>
+      <tr>
+        <td colSpan={3} style={{ padding: '6px 0 2px', borderBottom: 'none' }}>
+          <span style={{ fontSize: 9, fontWeight: 800, color: accent, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            {label}
           </span>
-        )}
-        {missing.length > 0 && (
-          <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--red)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-            ✗ {missing.length} faltando
-          </span>
-        )}
+        </td>
+      </tr>
+      {items.map(m => (
+        <tr key={m.code} className="gr-row" style={{ opacity: m.done ? 1 : 0.8 }}>
+          <td style={{ textAlign: 'center', fontSize: 12, width: 24 }}>
+            {m.done
+              ? <span style={{ color: 'var(--green, #22c55e)' }}>✓</span>
+              : <span style={{ color: 'var(--red)' }}>✗</span>
+            }
+          </td>
+          <td style={{ fontFamily: 'Space Grotesk, monospace', color: m.done ? 'var(--text)' : 'var(--red)', whiteSpace: 'nowrap', width: 110 }}>{m.code}</td>
+          <td style={{ color: 'var(--text)' }}>{m.description ?? <span style={{ color: 'var(--muted)' }}>—</span>}</td>
+        </tr>
+      ))}
+    </>
+  )
+}
+
+function MandatoryDetailPanel({ d }: { d: PdvDetail }) {
+  const doneMand  = (d.doneMandatory  ?? []).map(m => ({ ...m, done: true  }))
+  const missMand  = (d.missingMandatory ?? []).map(m => ({ ...m, done: false }))
+  const doneOpt   = (d.doneOptional   ?? []).map(m => ({ ...m, done: true  }))
+  const missOpt   = (d.missingOptional ?? []).map(m => ({ ...m, done: false }))
+  const hasAny = doneMand.length + missMand.length + doneOpt.length + missOpt.length > 0
+  if (!hasAny) return null
+
+  const green = 'var(--green, #22c55e)'
+  const red   = 'var(--red)'
+  const muted = 'var(--muted)'
+
+  return (
+    <div style={{ background: 'var(--surface-raised)', borderLeft: '3px solid var(--border)', margin: '0 0 1px 0', padding: '8px 14px 10px 16px' }}>
+      <div style={{ display: 'flex', gap: 16, marginBottom: 6, flexWrap: 'wrap' }}>
+        {doneMand.length > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: green }}>✓ {doneMand.length} obrig.</span>}
+        {missMand.length > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: red  }}>✗ {missMand.length} obrig. faltando</span>}
+        {doneOpt.length  > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: green, opacity: 0.8 }}>✓ {doneOpt.length} aux.</span>}
+        {missOpt.length  > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: muted }}>✗ {missOpt.length} aux. faltando</span>}
       </div>
       <table className="gr-table" style={{ fontSize: 11 }}>
         <thead>
@@ -480,18 +507,10 @@ function MandatoryDetailPanel({ d }: { d: PdvDetail }) {
           </tr>
         </thead>
         <tbody>
-          {all.map(m => (
-            <tr key={m.code} className="gr-row" style={{ opacity: m.done ? 1 : 0.85 }}>
-              <td style={{ textAlign: 'center', fontSize: 12 }}>
-                {m.done
-                  ? <span style={{ color: 'var(--green, #22c55e)' }}>✓</span>
-                  : <span style={{ color: 'var(--red)' }}>✗</span>
-                }
-              </td>
-              <td style={{ fontFamily: 'Space Grotesk, monospace', color: m.done ? 'var(--text)' : 'var(--red)', whiteSpace: 'nowrap' }}>{m.code}</td>
-              <td style={{ color: 'var(--text)' }}>{m.description ?? <span style={{ color: 'var(--muted)' }}>—</span>}</td>
-            </tr>
-          ))}
+          <ItemSection label="Obrigatórios comprados" items={doneMand} accent={green} />
+          <ItemSection label="Obrigatórios faltando"  items={missMand} accent={red}   />
+          <ItemSection label="Auxiliares comprados"   items={doneOpt}  accent={green} />
+          <ItemSection label="Auxiliares faltando"    items={missOpt}  accent={muted} />
         </tbody>
       </table>
     </div>
@@ -500,7 +519,7 @@ function MandatoryDetailPanel({ d }: { d: PdvDetail }) {
 
 function PdvRow({ d, goal, colSpan }: { d: PdvDetail; goal?: ApurationGoal; colSpan: number }) {
   const [open, setOpen] = useState(false)
-  const canExpand = !!(d.missingMandatory?.length || d.doneMandatory?.length)
+  const canExpand = !!(d.missingMandatory?.length || d.doneMandatory?.length || d.doneOptional?.length || d.missingOptional?.length)
   return (
     <>
       <tr

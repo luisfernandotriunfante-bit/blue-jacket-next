@@ -168,6 +168,10 @@ export interface PdvDetail {
   doneMandatory?: { code: string; description?: string }[]
   /** Obrigatórios que este PDV ainda não comprou (só para mix_skus) */
   missingMandatory?: { code: string; description?: string }[]
+  /** Auxiliares (optionalCodes) que este PDV já comprou no período (só para mix_skus) */
+  doneOptional?: { code: string; description?: string }[]
+  /** Auxiliares (optionalCodes) que este PDV ainda não comprou (só para mix_skus) */
+  missingOptional?: { code: string; description?: string }[]
 }
 
 export interface ApurationDiagnostic {
@@ -415,6 +419,12 @@ function apurateMixSkus(
       const doneMandatory = mandatorySet.size > 0
         ? [...mandatorySet].filter(c => entry.codes.has(c)).map(c => ({ code: c, description: codeToDesc.get(c) }))
         : []
+      const doneOptional = optionalSet.size > 0
+        ? [...optionalSet].filter(c => entry.codes.has(c)).map(c => ({ code: c, description: codeToDesc.get(c) }))
+        : []
+      const missingOptional = optionalSet.size > 0
+        ? [...optionalSet].filter(c => !entry.codes.has(c)).map(c => ({ code: c, description: codeToDesc.get(c) }))
+        : []
 
       if (qualified) qualifiedPdvs++
       details.push({
@@ -423,6 +433,8 @@ function apurateMixSkus(
         reason: qualified ? undefined : !hasMandatory ? 'Mandatórios faltando' : `${totalSkus}/${cfg.minSkus} SKUs`,
         doneMandatory: doneMandatory.length > 0 ? doneMandatory : undefined,
         missingMandatory: missingMandatory.length > 0 ? missingMandatory : undefined,
+        doneOptional: doneOptional.length > 0 ? doneOptional : undefined,
+        missingOptional: missingOptional.length > 0 ? missingOptional : undefined,
       })
     }
 
