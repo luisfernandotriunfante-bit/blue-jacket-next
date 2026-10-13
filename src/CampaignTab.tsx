@@ -411,50 +411,36 @@ function ProgressBar({ pct, goal, height = 8 }: { pct: number; goal?: ApurationG
 function CampaignPodium({ sellers, goal }: { sellers: SellerResult[]; goal?: ApurationGoal }) {
   if (sellers.length === 0) return null
   const top = sellers.slice(0, 3)
-  const order = top.length === 1 ? [0] : top.length === 2 ? [1, 0] : [1, 0, 2]
-  const heights = [80, 110, 60]
+  const visualOrder = top.length === 1 ? [0] : top.length === 2 ? [1, 0] : [1, 0, 2]
   const medals = ['🥇', '🥈', '🥉']
-  const labels = ['1º', '2º', '3º']
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 8, marginTop: 20, marginBottom: 4 }}>
-      {order.map(idx => {
-        const s = top[idx]
-        if (!s) return null
+    <div className="gr-podium" style={{ marginTop: 16, marginBottom: 4 }}>
+      {visualOrder.map(rank => {
+        const s = top[rank]
+        if (!s) return <div key={rank} className={`gr-podium-card gr-podium-card-${rank + 1}`} />
         const pct = Math.min(100, Math.round((s.bestPdvProgress ?? 0) * 100))
-        const hasWon = s.qualifiedPdvs > 0
-        const h = heights[idx]
+        const isFirst = rank === 0
         return (
-          <div key={s.sellerCode} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, maxWidth: 160 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, textAlign: 'center', marginBottom: 4, color: 'var(--text)' }}>
-              {s.sellerName.split(' ')[0]}
+          <div key={s.sellerCode} className={`gr-podium-card gr-podium-card-${rank + 1}`}>
+            <div className="gr-podium-medal">{medals[rank]}</div>
+            <div className="gr-podium-name" title={s.sellerName}>
+              {s.sellerName.split(' ').slice(0, 2).join(' ')}
             </div>
             {goal && (
-              <div style={{ width: '90%', marginBottom: 4 }}>
-                <ProgressBar pct={pct} goal={goal} height={6} />
+              <div style={{ width: '90%', margin: '4px 0 2px' }}>
+                <ProgressBar pct={pct} goal={goal} height={5} />
               </div>
             )}
-            {hasWon && (
-              <div style={{ fontSize: 10, color: 'var(--blue)', fontWeight: 700, marginBottom: 2 }}>
+            <div className="gr-podium-pct" style={{ color: isFirst ? 'var(--blue)' : 'var(--text)' }}>
+              {pct}%
+            </div>
+            {s.qualifiedPdvs > 0 && (
+              <div className="gr-podium-fat">
                 {s.qualifiedPdvs} PDV{s.qualifiedPdvs > 1 ? 's' : ''} · {kpiCurrency(s.prizeVendedor)}
               </div>
             )}
-            <div style={{
-              width: '100%', height: h,
-              background: hasWon ? 'var(--blue)' : idx === 0 ? 'var(--red)' : 'var(--border)',
-              borderRadius: '4px 4px 0 0',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 24,
-            }}>
-              {medals[idx]}
-            </div>
-            <div style={{
-              width: '100%', textAlign: 'center', fontSize: 10, fontWeight: 700,
-              background: 'var(--border)', borderRadius: '0 0 4px 4px', padding: '2px 0',
-              color: 'var(--muted)',
-            }}>
-              {labels[idx]}
-            </div>
+            <div className="gr-podium-fat">{kpiCurrency(s.totalValue ?? 0)}</div>
           </div>
         )
       })}
@@ -463,24 +449,46 @@ function CampaignPodium({ sellers, goal }: { sellers: SellerResult[]; goal?: Apu
 }
 
 /* ── PDV detail sub-table ────────────────────────────────── */
-function MissingMandatoryPanel({ d }: { d: PdvDetail }) {
-  if (!d.missingMandatory?.length) return null
+function MandatoryDetailPanel({ d }: { d: PdvDetail }) {
+  const done = d.doneMandatory ?? []
+  const missing = d.missingMandatory ?? []
+  if (done.length === 0 && missing.length === 0) return null
+  const all = [
+    ...done.map(m => ({ ...m, done: true })),
+    ...missing.map(m => ({ ...m, done: false })),
+  ]
   return (
-    <div style={{ background: 'var(--surface-raised)', borderLeft: '3px solid var(--red)', margin: '0 0 1px 0', padding: '10px 14px 10px 16px' }}>
-      <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--red)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
-        Obrigatórios faltando — {d.missingMandatory.length}
+    <div style={{ background: 'var(--surface-raised)', borderLeft: '3px solid var(--border)', margin: '0 0 1px 0', padding: '10px 14px 10px 16px' }}>
+      <div style={{ display: 'flex', gap: 16, marginBottom: 8 }}>
+        {done.length > 0 && (
+          <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--green, #22c55e)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+            ✓ {done.length} comprado{done.length > 1 ? 's' : ''}
+          </span>
+        )}
+        {missing.length > 0 && (
+          <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--red)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+            ✗ {missing.length} faltando
+          </span>
+        )}
       </div>
       <table className="gr-table" style={{ fontSize: 11 }}>
         <thead>
           <tr>
+            <th style={{ width: 24 }}></th>
             <th style={{ width: 110 }}>Código</th>
             <th>Produto</th>
           </tr>
         </thead>
         <tbody>
-          {d.missingMandatory.map(m => (
-            <tr key={m.code} className="gr-row">
-              <td style={{ fontFamily: 'Space Grotesk, monospace', color: 'var(--red)', whiteSpace: 'nowrap' }}>{m.code}</td>
+          {all.map(m => (
+            <tr key={m.code} className="gr-row" style={{ opacity: m.done ? 1 : 0.85 }}>
+              <td style={{ textAlign: 'center', fontSize: 12 }}>
+                {m.done
+                  ? <span style={{ color: 'var(--green, #22c55e)' }}>✓</span>
+                  : <span style={{ color: 'var(--red)' }}>✗</span>
+                }
+              </td>
+              <td style={{ fontFamily: 'Space Grotesk, monospace', color: m.done ? 'var(--text)' : 'var(--red)', whiteSpace: 'nowrap' }}>{m.code}</td>
               <td style={{ color: 'var(--text)' }}>{m.description ?? <span style={{ color: 'var(--muted)' }}>—</span>}</td>
             </tr>
           ))}
@@ -492,7 +500,7 @@ function MissingMandatoryPanel({ d }: { d: PdvDetail }) {
 
 function PdvRow({ d, goal, colSpan }: { d: PdvDetail; goal?: ApurationGoal; colSpan: number }) {
   const [open, setOpen] = useState(false)
-  const canExpand = !!d.missingMandatory?.length
+  const canExpand = !!(d.missingMandatory?.length || d.doneMandatory?.length)
   return (
     <>
       <tr
@@ -524,7 +532,7 @@ function PdvRow({ d, goal, colSpan }: { d: PdvDetail; goal?: ApurationGoal; colS
       {open && canExpand && (
         <tr>
           <td colSpan={colSpan} style={{ padding: 0 }}>
-            <MissingMandatoryPanel d={d} />
+            <MandatoryDetailPanel d={d} />
           </td>
         </tr>
       )}
