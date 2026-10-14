@@ -240,6 +240,22 @@ function CampaignPanel({ movementBase, productBase, clientBase, rcas, campaignsO
                     </span>
                   </span>
                 </div>
+                {(diag.pdvsWithAllCodes !== undefined || diag.pdvsWithValue !== undefined) && (
+                  <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                    {diag.pdvsWithAllCodes !== undefined && (
+                      <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-raised)', color: 'var(--text)' }}>
+                        <span style={{ color: diag.pdvsWithAllCodes > 0 ? 'var(--green, #22c55e)' : 'var(--red)', fontWeight: 700 }}>{diag.pdvsWithAllCodes}</span>
+                        <span style={{ color: 'var(--muted)' }}> PDVs com todos os códigos</span>
+                      </span>
+                    )}
+                    {diag.pdvsWithValue !== undefined && (
+                      <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-raised)', color: 'var(--text)' }}>
+                        <span style={{ color: diag.pdvsWithValue > 0 ? 'var(--green, #22c55e)' : 'var(--red)', fontWeight: 700 }}>{diag.pdvsWithValue}</span>
+                        <span style={{ color: 'var(--muted)' }}> PDVs com valor ≥ mínimo</span>
+                      </span>
+                    )}
+                  </div>
+                )}
                 {diag.unmatchedCodesSample && diag.unmatchedCodesSample.length > 0 && (
                   <div style={{ marginTop: 6, padding: '6px 10px', background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 8 }}>
                     <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--muted)', marginBottom: 4 }}>

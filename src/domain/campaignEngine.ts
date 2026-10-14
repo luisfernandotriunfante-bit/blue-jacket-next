@@ -190,6 +190,10 @@ export interface ApurationDiagnostic {
   windowEnd?: string
   /** Códigos que apareceram nos movimentos do período mas NÃO bateram nos códigos da campanha (formato "codigo(qtd)") */
   unmatchedCodesSample?: string[]
+  /** PDVs que têm todos os códigos exigidos (independente do valor) */
+  pdvsWithAllCodes?: number
+  /** PDVs que atingem o valor mínimo (independente dos códigos) */
+  pdvsWithValue?: number
   /** Estatísticas de CNPJs quando a campanha tem restrição de clientes */
   cnpjStats?: {
     total: number      // CNPJs cadastrados na campanha
@@ -566,6 +570,9 @@ function apurateValorEans(
     .slice(0, 20)
     .map(([c, n]) => `${c}(${n})`)
 
+  let totalPdvsWithAllCodes = 0
+  let totalPdvsWithValue = 0
+
   const sellers: SellerResult[] = []
   for (const [sellerCode, custMap] of bySellerCustomer) {
     const rca = rcaMap.get(sellerCode)
@@ -578,8 +585,12 @@ function apurateValorEans(
         return [...variants].some(v => entry.codes.has(v))
       }
       const hasAllCodes = !cfg.requireAllCodes || cfg.productCodes.every(codeFound)
-      const qualified = hasAllCodes && entry.value >= cfg.minValue
+      const meetsValue = entry.value >= cfg.minValue
+      const qualified = hasAllCodes && meetsValue
       const progressPct = cfg.minValue > 0 ? Math.round((entry.value / cfg.minValue) * 100) : (qualified ? 100 : 0)
+
+      if (hasAllCodes) totalPdvsWithAllCodes++
+      if (meetsValue) totalPdvsWithValue++
 
       const doneMandatory = cfg.productCodes.filter(codeFound).map(c => ({ code: c }))
       const missingMandatory = cfg.productCodes.filter(c => !codeFound(c)).map(c => ({ code: c }))
@@ -623,6 +634,8 @@ function apurateValorEans(
       campaignCodesSample: [...codeSet].slice(0, 15),
       movementCodesSample: [...new Set(filtered.map(m => m.productCode).filter(Boolean))].slice(0, 15) as string[],
       unmatchedCodesSample,
+      pdvsWithAllCodes: totalPdvsWithAllCodes,
+      pdvsWithValue: totalPdvsWithValue,
       windowStart,
       windowEnd,
     },
