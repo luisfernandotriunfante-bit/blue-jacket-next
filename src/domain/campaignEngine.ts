@@ -543,7 +543,6 @@ function apurateValorEans(
   const byCustomer = new Map<string, PdvEntry>()
   let movementsMatched = 0
   const unmatchedCodes = new Map<string, number>()
-  // per matched code: set of customer codes that bought it
   const codeToCustomers = new Map<string, Set<string>>()
 
   for (const m of filtered) {
