@@ -266,6 +266,21 @@ function CampaignPanel({ movementBase, productBase, clientBase, rcas, campaignsO
                     </div>
                   </div>
                 )}
+                {diag.perCodeCustomers && diag.perCodeCustomers.length > 0 && (
+                  <div style={{ marginTop: 6, padding: '6px 10px', background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 8 }}>
+                    <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--muted)', marginBottom: 4 }}>
+                      Clientes únicos por código da campanha:
+                    </div>
+                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                      {diag.perCodeCustomers.map(({ code, customerCount }) => (
+                        <span key={code} style={{ fontSize: 11, fontFamily: 'Space Grotesk, monospace', color: customerCount === 0 ? 'var(--red)' : 'var(--text)', fontWeight: customerCount === 0 ? 700 : 400 }}>
+                          {code}: <strong>{customerCount}</strong> cliente{customerCount !== 1 ? 's' : ''}
+                          {customerCount === 0 && ' ⚠ nenhum'}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })()}

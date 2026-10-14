@@ -194,6 +194,8 @@ export interface ApurationDiagnostic {
   pdvsWithAllCodes?: number
   /** PDVs que atingem o valor mínimo (independente dos códigos) */
   pdvsWithValue?: number
+  /** Por código da campanha: quantos clientes únicos compraram aquele código no período */
+  perCodeCustomers?: { code: string; customerCount: number }[]
   /** Estatísticas de CNPJs quando a campanha tem restrição de clientes */
   cnpjStats?: {
     total: number      // CNPJs cadastrados na campanha
@@ -541,6 +543,7 @@ function apurateValorEans(
   const byCustomer = new Map<string, PdvEntry>()
   let movementsMatched = 0
   const unmatchedCodes = new Map<string, number>()
+  const codeToCustomers = new Map<string, Set<string>>()
 
   for (const m of filtered) {
     const matchedCode = matchMovementCode(m.productCode, m.manufacturerCode, codeSet, eanMap)
@@ -562,7 +565,11 @@ function apurateValorEans(
     if (!byCustomer.has(cust)) byCustomer.set(cust, { name: m.customerName ?? cust, value: 0, codes: new Set(), lastSeller: seller, lastDate: movDate })
     const e = byCustomer.get(cust)!
     e.value += m.value ?? 0
-    if (m.movementType !== 'devolucao') e.codes.add(matchedCode)
+    if (m.movementType !== 'devolucao') {
+      e.codes.add(matchedCode)
+      if (!codeToCustomers.has(matchedCode)) codeToCustomers.set(matchedCode, new Set())
+      codeToCustomers.get(matchedCode)!.add(cust)
+    }
     // keep track of the seller of the most recent movement
     if (movDate >= e.lastDate) { e.lastDate = movDate; e.lastSeller = seller }
   }
@@ -647,6 +654,14 @@ function apurateValorEans(
       pdvsWithValue: totalPdvsWithValue,
       windowStart,
       windowEnd,
+      perCodeCustomers: cfg.productCodes.map(rawCode => {
+        const variants = resolveProductCodes([rawCode], eanMap)
+        let count = 0
+        for (const [mc, custSet] of codeToCustomers) {
+          if (variants.has(mc)) count += custSet.size
+        }
+        return { code: rawCode, customerCount: count }
+      }),
     },
   }
 }
