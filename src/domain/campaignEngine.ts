@@ -184,6 +184,10 @@ export interface ApurationDiagnostic {
   movementCodesSample?: string[]
   /** true quando os códigos da campanha parecem EAN (13 dígitos) mas a base de produtos não foi importada */
   eanWithoutProductBase?: boolean
+  /** Data de início da janela calculada */
+  windowStart?: string
+  /** Data de fim da janela calculada */
+  windowEnd?: string
   /** Estatísticas de CNPJs quando a campanha tem restrição de clientes */
   cnpjStats?: {
     total: number      // CNPJs cadastrados na campanha
@@ -524,14 +528,22 @@ function apurateValorEans(
     let qualifiedPdvs = 0
 
     for (const [custCode, entry] of custMap) {
-      const hasAllCodes = !cfg.requireAllCodes || [...codeSet].every(c => entry.codes.has(c))
+      const codeFound = (rawCode: string) => {
+        const variants = resolveProductCodes([rawCode], eanMap)
+        return [...variants].some(v => entry.codes.has(v))
+      }
+      const hasAllCodes = !cfg.requireAllCodes || cfg.productCodes.every(codeFound)
       const qualified = hasAllCodes && entry.value >= cfg.minValue
       const progressPct = cfg.minValue > 0 ? Math.round((entry.value / cfg.minValue) * 100) : (qualified ? 100 : 0)
+
+      const doneMandatory = cfg.productCodes.filter(codeFound).map(c => ({ code: c }))
+      const missingMandatory = cfg.productCodes.filter(c => !codeFound(c)).map(c => ({ code: c }))
 
       if (qualified) qualifiedPdvs++
       details.push({
         customerCode: custCode, customerName: entry.name, value: entry.value, qualified, progressPct,
         reason: qualified ? undefined : !hasAllCodes ? 'EANs faltando' : `R$${entry.value.toFixed(0)} < R$${cfg.minValue}`,
+        doneMandatory, missingMandatory,
       })
     }
 
@@ -559,6 +571,15 @@ function apurateValorEans(
     totalPdvs: sellers.reduce((s, r) => s + r.qualifiedPdvs, 0),
     totalPrize: sellers.reduce((s, r) => s + r.prizeVendedor, 0), sellers,
     goal: { metric: 'value', target: cfg.minValue },
+    diagnostic: {
+      movementsInWindow: filtered.length,
+      movementsMatched: filtered.length,
+      pdvsFound: [...bySellerCustomer.values()].reduce((s, m) => s + m.size, 0),
+      campaignCodesSample: [...codeSet].slice(0, 15),
+      movementCodesSample: [...new Set(filtered.map(m => m.productCode).filter(Boolean))].slice(0, 15) as string[],
+      windowStart,
+      windowEnd,
+    },
   }
 }
 
