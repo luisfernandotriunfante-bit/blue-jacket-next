@@ -537,7 +537,7 @@ function apurateValorEans(
   // Group by customer only (not seller+customer) so codes accumulate across
   // the full period regardless of which seller served each movement.
   // sellerValues tracks per-seller value to attribute the PDV to the top seller.
-  type PdvEntry = { name: string; value: number; codes: Set<string>; sellerValues: Map<string, number> }
+  type PdvEntry = { name: string; value: number; codes: Set<string>; lastSeller: string; lastDate: string }
   const byCustomer = new Map<string, PdvEntry>()
   let movementsMatched = 0
   const unmatchedCodes = new Map<string, number>()
@@ -557,14 +557,14 @@ function apurateValorEans(
     }
     movementsMatched++
 
-    if (!byCustomer.has(cust)) byCustomer.set(cust, { name: m.customerName ?? cust, value: 0, codes: new Set(), sellerValues: new Map() })
-    const e = byCustomer.get(cust)!
-    const v = m.value ?? 0
-    e.value += v
-    if (m.movementType !== 'devolucao') e.codes.add(matchedCode)
-    // track how much each seller contributed to this customer
     const seller = m.sellerCode ?? '?'
-    e.sellerValues.set(seller, (e.sellerValues.get(seller) ?? 0) + v)
+    const movDate = m.movementDate?.slice(0, 10) ?? ''
+    if (!byCustomer.has(cust)) byCustomer.set(cust, { name: m.customerName ?? cust, value: 0, codes: new Set(), lastSeller: seller, lastDate: movDate })
+    const e = byCustomer.get(cust)!
+    e.value += m.value ?? 0
+    if (m.movementType !== 'devolucao') e.codes.add(matchedCode)
+    // keep track of the seller of the most recent movement
+    if (movDate >= e.lastDate) { e.lastDate = movDate; e.lastSeller = seller }
   }
 
   const unmatchedCodesSample = [...unmatchedCodes.entries()]
@@ -595,12 +595,8 @@ function apurateValorEans(
     const doneMandatory = cfg.productCodes.filter(codeFound).map(c => ({ code: c }))
     const missingMandatory = cfg.productCodes.filter(c => !codeFound(c)).map(c => ({ code: c }))
 
-    // attribute to the seller with the highest value for this customer
-    let topSeller = '?'
-    let topValue = -1
-    for (const [s, v] of entry.sellerValues) {
-      if (v > topValue) { topValue = v; topSeller = s }
-    }
+    // attribute to the seller of the most recent movement for this customer
+    const topSeller = entry.lastSeller
 
     if (!sellerBuckets.has(topSeller)) sellerBuckets.set(topSeller, { details: [], qualifiedPdvs: 0 })
     const bucket = sellerBuckets.get(topSeller)!
