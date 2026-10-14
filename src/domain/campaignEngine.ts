@@ -423,7 +423,7 @@ function apurateMixSkus(
     if (allCodes.size > 0 && !resolvedCode) continue
     const effectiveCode = resolvedCode ?? m.productCode?.toUpperCase() ?? ''
     if (!effectiveCode) continue
-    const cust = (m.customerCode ?? '').replace(/^0+/, '') || (m.customerCode ?? ''); if (!cust) continue
+    const cust = fmtCnpj(m.customerDocument ?? '') || (m.customerCode ?? '').replace(/^0+/, '') || (m.customerCode ?? ''); if (!cust) continue
     if (validCnpjs.size > 0) {
       const doc = fmtCnpj(m.customerDocument ?? '')
       const docPadded = doc.padStart(14, '0')
@@ -552,7 +552,7 @@ function apurateValorEans(
       if (rawCode) unmatchedCodes.set(rawCode, (unmatchedCodes.get(rawCode) ?? 0) + 1)
       continue
     }
-    const cust = (m.customerCode ?? '').replace(/^0+/, '') || (m.customerCode ?? ''); if (!cust) continue
+    const cust = fmtCnpj(m.customerDocument ?? '') || (m.customerCode ?? '').replace(/^0+/, '') || (m.customerCode ?? ''); if (!cust) continue
     if (validCnpjs.size > 0) {
       const doc = fmtCnpj(m.customerDocument ?? '')
       const docPadded = doc.padStart(14, '0')
@@ -758,7 +758,7 @@ function apurateVizinhancaQtd(
   const bySellerCustomer = new Map<string, Map<string, PdvEntry>>()
 
   for (const m of filtered) {
-    const cust = (m.customerCode ?? '').replace(/^0+/, '') || (m.customerCode ?? ''); if (!cust) continue
+    const cust = fmtCnpj(m.customerDocument ?? '') || (m.customerCode ?? '').replace(/^0+/, '') || (m.customerCode ?? ''); if (!cust) continue
     const cli = clientMap.get(cust)
     if (!cli) continue
     if (faixaSet.size > 0 && !faixaSet.has(cli.faixa)) continue
@@ -834,7 +834,7 @@ function apurateVizinhancaFamilias(
   const bySellerCustomer = new Map<string, Map<string, PdvEntry>>()
 
   for (const m of filtered) {
-    const cust = (m.customerCode ?? '').replace(/^0+/, '') || (m.customerCode ?? ''); if (!cust) continue
+    const cust = fmtCnpj(m.customerDocument ?? '') || (m.customerCode ?? '').replace(/^0+/, '') || (m.customerCode ?? ''); if (!cust) continue
     const cli = clientMap.get(cust)
     if (!cli) continue
     if (faixaSet.size > 0 && !faixaSet.has(cli.faixa)) continue
@@ -920,7 +920,7 @@ function apurateVizinhancaHair(
   for (const m of filtered) {
     const code = m.productCode?.toUpperCase()
     if (!code || !hairCodes.has(code)) continue
-    const cust = (m.customerCode ?? '').replace(/^0+/, '') || (m.customerCode ?? ''); if (!cust) continue
+    const cust = fmtCnpj(m.customerDocument ?? '') || (m.customerCode ?? '').replace(/^0+/, '') || (m.customerCode ?? ''); if (!cust) continue
     const cli = clientMap.get(cust)
     if (!cli) continue
     if (faixaSet.size > 0 && !faixaSet.has(cli.faixa)) continue
@@ -992,7 +992,7 @@ function apurateMetaCnpj(
   for (const m of filtered) {
     const code = m.productCode?.toUpperCase()
     if (!code || !codeSet.has(code)) continue
-    const cust = (m.customerCode ?? '').replace(/^0+/, '') || (m.customerCode ?? ''); if (!cust) continue
+    const cust = fmtCnpj(m.customerDocument ?? '') || (m.customerCode ?? '').replace(/^0+/, '') || (m.customerCode ?? ''); if (!cust) continue
     const cli = clientMap.get(cust)
     const cnpj = cli?.cnpj ?? fmtCnpj(m.customerCode ?? '')
 
@@ -1143,7 +1143,7 @@ function apurateCustom(
   const filtered = getWindowedMovements(movements, windowStart, windowEnd)
   for (const m of filtered) {
     const code = m.productCode?.toUpperCase()
-    const cust = (m.customerCode ?? '').replace(/^0+/, '') || (m.customerCode ?? ''); if (!cust) continue
+    const cust = fmtCnpj(m.customerDocument ?? '') || (m.customerCode ?? '').replace(/^0+/, '') || (m.customerCode ?? ''); if (!cust) continue
     if (productSet.size > 0 && (!code || !productSet.has(code))) continue
 
     if (cnpjSet.size > 0) {
