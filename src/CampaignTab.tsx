@@ -4,6 +4,7 @@ import { apurateCampaign, CAMPAIGN_TYPE_LABEL, type CampaignRecord, type Apurati
 import type { CanonicalMovement } from './domain/movementMotor'
 import type { CanonicalProduct } from './domain/productMotor'
 import type { CanonicalClient } from './domain/clientMotor'
+import type { CanonicalHistory } from './domain/historyMotor'
 import type { RcaRecord } from './RcaManager'
 
 /* ── helpers ─────────────────────────────────────────────── */
@@ -30,9 +31,27 @@ function periodProgress(startDate: string, endDate: string): number {
   return Math.round(((now - start) / (end - start)) * 100)
 }
 
+/* ── legacy → movement conversion ───────────────────────── */
+function historyToMovements(history: CanonicalHistory[]): CanonicalMovement[] {
+  return history.map(h => ({
+    id: h.id,
+    movementDate: h.date,
+    movementType: 'venda_faturada' as const,
+    customerCode: h.customerCode,
+    customerDocument: h.customerCode, // legacy customerCode is CNPJ
+    productCode: h.winthorCode ?? h.productCode,
+    manufacturerCode: undefined,
+    value: h.netValue,
+    quantity: h.quantity,
+    sellerCode: h.sellerCode,
+    sources: h.sources,
+  }))
+}
+
 /* ── CampaignPanel ───────────────────────────────────────── */
 interface PanelProps {
   movementBase: CanonicalMovement[]
+  historyBase: CanonicalHistory[]
   productBase: CanonicalProduct[]
   clientBase: CanonicalClient[]
   rcas: RcaRecord[]
@@ -40,7 +59,7 @@ interface PanelProps {
   readOnly?: boolean
 }
 
-function CampaignPanel({ movementBase, productBase, clientBase, rcas, campaignsOverride, readOnly }: PanelProps) {
+function CampaignPanel({ movementBase, historyBase, productBase, clientBase, rcas, campaignsOverride, readOnly }: PanelProps) {
   const [liveCampaigns, setLiveCampaigns] = useState<CampaignRecord[]>(readCampaigns)
   const campaigns = campaignsOverride ?? liveCampaigns
   const [selected, setSelected] = useState<string | null>(null)
@@ -60,6 +79,8 @@ function CampaignPanel({ movementBase, productBase, clientBase, rcas, campaignsO
 
   const hasMotors = movementBase.length > 0 || productBase.length > 0
 
+  const legacyMovements = useMemo(() => historyToMovements(historyBase), [historyBase])
+
   // Run apuration for all active campaigns
   const results = useMemo(() => {
     if (!hasMotors) return new Map<string, ApurationResult>()
@@ -67,13 +88,18 @@ function CampaignPanel({ movementBase, productBase, clientBase, rcas, campaignsO
     for (const c of activeCampaigns) {
       if (!c.startDate || !c.endDate || !c.config) continue
       try {
-        map.set(c.id, apurateCampaign(c, movementBase, productBase, clientBase, rcas))
+        // Include legacy movements that fall within the campaign window
+        const windowStart = c.startDate
+        const windowEnd = c.endDate
+        const legacyInWindow = legacyMovements.filter(m => m.movementDate && m.movementDate >= windowStart && m.movementDate <= windowEnd)
+        const allMovements = legacyInWindow.length > 0 ? [...movementBase, ...legacyInWindow] : movementBase
+        map.set(c.id, apurateCampaign(c, allMovements, productBase, clientBase, rcas))
       } catch {
         // apuration error — skip
       }
     }
     return map
-  }, [activeCampaigns, movementBase, productBase, clientBase, rcas, hasMotors])
+  }, [activeCampaigns, movementBase, legacyMovements, productBase, clientBase, rcas, hasMotors])
 
   if (activeCampaigns.length === 0) {
     return (
@@ -659,6 +685,7 @@ function SellerPdvDetail({ seller, goal }: { seller: SellerResult; goal?: Apurat
 /* ── CampaignTab (entry point exported to App) ───────────── */
 interface CampaignTabProps {
   movementBase: CanonicalMovement[]
+  historyBase?: CanonicalHistory[]
   productBase: CanonicalProduct[]
   clientBase: CanonicalClient[]
   rcas: RcaRecord[]
@@ -666,7 +693,7 @@ interface CampaignTabProps {
   readOnly?: boolean
 }
 
-export function CampaignTab({ movementBase, productBase, clientBase, rcas, campaignsOverride, readOnly }: CampaignTabProps) {
+export function CampaignTab({ movementBase, historyBase = [], productBase, clientBase, rcas, campaignsOverride, readOnly }: CampaignTabProps) {
   const [subTab, setSubTab] = useState<'painel' | 'cadastro'>('painel')
 
   return (
@@ -689,7 +716,7 @@ export function CampaignTab({ movementBase, productBase, clientBase, rcas, campa
 
       <section className="content">
         {subTab === 'painel'
-          ? <CampaignPanel movementBase={movementBase} productBase={productBase} clientBase={clientBase} rcas={rcas} campaignsOverride={campaignsOverride} readOnly={readOnly} />
+          ? <CampaignPanel movementBase={movementBase} historyBase={historyBase} productBase={productBase} clientBase={clientBase} rcas={rcas} campaignsOverride={campaignsOverride} readOnly={readOnly} />
           : readOnly ? <p style={{ color: 'var(--muted)', padding: 24, fontSize: 13 }}>Cadastro indisponível em modo somente leitura.</p> : <CampaignManager />}
       </section>
     </>

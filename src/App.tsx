@@ -326,6 +326,7 @@ export function App() {
   const effectiveReceipts = snap ? snap.receipts : receiptBase
   const effectiveRcas = snap ? snap.rcas : rcas
   const effectiveCampaigns = snap ? snap.campaigns : undefined
+  const effectiveHistory = snap ? snap.history : historyBase
 
   function downloadClientBase() { const url = URL.createObjectURL(new Blob([JSON.stringify(clientBase, null, 2)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = 'base-canonica-clientes.json'; link.click(); URL.revokeObjectURL(url) }
   function downloadClientExcel() {
@@ -455,7 +456,7 @@ export function App() {
       </>) : section === 'estoque' ? <>
         <StockTab productBase={effectiveProducts} receiptBase={effectiveReceipts} movementBase={effectiveMovements} productIndicators={snap ? null : productIndicators} activeComp={displayComp} />
       </> : section === 'campanhas' ? <>
-        <CampaignTab movementBase={effectiveMovements} productBase={effectiveProducts} clientBase={effectiveClients} rcas={effectiveRcas} campaignsOverride={effectiveCampaigns} readOnly={!!viewingComp} />
+        <CampaignTab movementBase={effectiveMovements} historyBase={effectiveHistory} productBase={effectiveProducts} clientBase={effectiveClients} rcas={effectiveRcas} campaignsOverride={effectiveCampaigns} readOnly={!!viewingComp} />
       </> : <>
       <header className="topbar stock-topbar" aria-label="Administração">
         <button type="button" className={`stock-nav-btn${tab === 'uploads' ? ' on' : ''}`} onClick={() => { setTab('uploads'); setActiveNotice(null) }}>Uploads</button>
