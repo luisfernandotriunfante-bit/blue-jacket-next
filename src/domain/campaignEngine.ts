@@ -263,6 +263,36 @@ function normalizeCode(raw: string): string {
   return raw.replace(/\s/g, '').replace(/\.0$/, '').replace(/^0+(?=\d)/, '').toUpperCase()
 }
 
+/**
+ * Resolve which campaign code a movement matches, if any.
+ *
+ * Checks in order:
+ *  1. productCode directly in codeSet
+ *  2. manufacturerCode resolved via eanMap → current Winthor code → in codeSet
+ *     (handles historical periods when the product had a different internalCode
+ *      but the same manufacturerCode — the "de-para" automático)
+ *  3. manufacturerCode directly in codeSet (legacy: user entered mfr code)
+ *
+ * Returns the matched codeSet member, or null if no match.
+ */
+function matchMovementCode(
+  productCode: string | undefined,
+  manufacturerCode: string | undefined,
+  codeSet: Set<string>,
+  eanMap: Map<string, string>
+): string | null {
+  const code = productCode?.toUpperCase()
+  if (code && codeSet.has(code)) return code
+
+  const mfr = manufacturerCode?.toUpperCase()
+  if (mfr) {
+    const resolved = eanMap.get(mfr)
+    if (resolved && codeSet.has(resolved)) return resolved
+    if (codeSet.has(mfr)) return mfr
+  }
+  return null
+}
+
 /** Expand a list of codes: each entry is kept as-is AND normalized AND resolved via EAN/manufacturer → Winthor */
 function resolveProductCodes(codes: string[], eanMap: Map<string, string>): Set<string> {
   const result = new Set<string>()
@@ -383,10 +413,10 @@ function apurateMixSkus(
   const foundCnpjs = new Set<string>()
 
   for (const m of filtered) {
-    const code = m.productCode?.toUpperCase()
-    if (!code) continue
-    const mfr = m.manufacturerCode?.toUpperCase()
-    if (allCodes.size > 0 && !allCodes.has(code) && !(mfr && allCodes.has(mfr))) continue
+    const resolvedCode = matchMovementCode(m.productCode, m.manufacturerCode, allCodes, eanMap)
+    if (allCodes.size > 0 && !resolvedCode) continue
+    const effectiveCode = resolvedCode ?? m.productCode?.toUpperCase() ?? ''
+    if (!effectiveCode) continue
     const cust = m.customerCode ?? ''; if (!cust) continue
     if (validCnpjs.size > 0) {
       const doc = fmtCnpj(m.customerDocument ?? '')
@@ -401,7 +431,7 @@ function apurateMixSkus(
     const custMap = bySellerCustomer.get(seller)!
     if (!custMap.has(cust)) custMap.set(cust, { name: m.customerName ?? cust, codes: new Set(), value: 0, sellerCode: seller })
     const e = custMap.get(cust)!
-    e.codes.add(code)
+    e.codes.add(effectiveCode)
     e.value += m.value ?? 0
   }
 
@@ -507,11 +537,10 @@ function apurateValorEans(
   const unmatchedCodes = new Map<string, number>() // code → count
 
   for (const m of filtered) {
-    const code = m.productCode?.toUpperCase()
-    const mfr = m.manufacturerCode?.toUpperCase()
-    const matchedCode = code && codeSet.has(code) ? code : (mfr && codeSet.has(mfr) ? mfr : null)
+    const matchedCode = matchMovementCode(m.productCode, m.manufacturerCode, codeSet, eanMap)
     if (!matchedCode) {
-      if (code) unmatchedCodes.set(code, (unmatchedCodes.get(code) ?? 0) + 1)
+      const rawCode = m.productCode?.toUpperCase()
+      if (rawCode) unmatchedCodes.set(rawCode, (unmatchedCodes.get(rawCode) ?? 0) + 1)
       continue
     }
     const cust = m.customerCode ?? ''; if (!cust) continue
