@@ -224,20 +224,35 @@ function CampaignPanel({ movementBase, productBase, clientBase, rcas, campaignsO
           })()}
 
           {/* Window & movement stats — só aparece quando há diagnostic com windowStart */}
-          {selectedResult.diagnostic?.windowStart && (
-            <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-              <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--muted)' }}>Janela:</span>
-              <span style={{ fontSize: 11, fontFamily: 'Space Grotesk, monospace', color: 'var(--text)', background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 6, padding: '2px 8px' }}>
-                {selectedResult.diagnostic.windowStart} → {selectedResult.diagnostic.windowEnd}
-              </span>
-              <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 4 }}>
-                {selectedResult.diagnostic.movementsInWindow} mov. no período ·{' '}
-                <span style={{ color: selectedResult.diagnostic.movementsMatched > 0 ? 'var(--text)' : 'var(--red)', fontWeight: 700 }}>
-                  {selectedResult.diagnostic.movementsMatched} com código da campanha
-                </span>
-              </span>
-            </div>
-          )}
+          {selectedResult.diagnostic?.windowStart && (() => {
+            const diag = selectedResult.diagnostic!
+            return (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--muted)' }}>Janela:</span>
+                  <span style={{ fontSize: 11, fontFamily: 'Space Grotesk, monospace', color: 'var(--text)', background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 6, padding: '2px 8px' }}>
+                    {diag.windowStart} → {diag.windowEnd}
+                  </span>
+                  <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 4 }}>
+                    {diag.movementsInWindow} mov. no período ·{' '}
+                    <span style={{ color: (diag.movementsMatched ?? 0) > 0 ? 'var(--text)' : 'var(--red)', fontWeight: 700 }}>
+                      {diag.movementsMatched ?? 0} com código da campanha
+                    </span>
+                  </span>
+                </div>
+                {diag.unmatchedCodesSample && diag.unmatchedCodesSample.length > 0 && (
+                  <div style={{ marginTop: 6, padding: '6px 10px', background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 8 }}>
+                    <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--muted)', marginBottom: 4 }}>
+                      Códigos no período que não estão na campanha (possíveis códigos antigos):
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'Space Grotesk, monospace', color: 'var(--text)', lineHeight: 1.7 }}>
+                      {diag.unmatchedCodesSample.join(' · ')}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           {selectedResult.sellers.length === 0 ? (
             <DiagnosticHint d={selectedResult.diagnostic} cfg={selectedCampaign.config} />
