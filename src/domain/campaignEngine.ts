@@ -188,6 +188,8 @@ export interface ApurationDiagnostic {
   windowStart?: string
   /** Data de fim da janela calculada */
   windowEnd?: string
+  /** Códigos que apareceram nos movimentos do período mas NÃO bateram nos códigos da campanha (formato "codigo(qtd)") */
+  unmatchedCodesSample?: string[]
   /** Estatísticas de CNPJs quando a campanha tem restrição de clientes */
   cnpjStats?: {
     total: number      // CNPJs cadastrados na campanha
@@ -501,12 +503,17 @@ function apurateValorEans(
   type PdvEntry = { name: string; value: number; codes: Set<string>; sellerCode: string }
   const bySellerCustomer = new Map<string, Map<string, PdvEntry>>()
   let movementsMatched = 0
+  // track unmatched codes to help diagnose old/different product codes
+  const unmatchedCodes = new Map<string, number>() // code → count
 
   for (const m of filtered) {
     const code = m.productCode?.toUpperCase()
     const mfr = m.manufacturerCode?.toUpperCase()
     const matchedCode = code && codeSet.has(code) ? code : (mfr && codeSet.has(mfr) ? mfr : null)
-    if (!matchedCode) continue
+    if (!matchedCode) {
+      if (code) unmatchedCodes.set(code, (unmatchedCodes.get(code) ?? 0) + 1)
+      continue
+    }
     const cust = m.customerCode ?? ''; if (!cust) continue
     if (validCnpjs.size > 0) {
       const doc = fmtCnpj(m.customerDocument ?? '')
@@ -523,6 +530,12 @@ function apurateValorEans(
     e.value += m.value ?? 0
     if (m.movementType !== 'devolucao') e.codes.add(matchedCode)
   }
+
+  // top unmatched codes by frequency (helps identify old/renamed product codes)
+  const unmatchedCodesSample = [...unmatchedCodes.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20)
+    .map(([c, n]) => `${c}(${n})`)
 
   const sellers: SellerResult[] = []
   for (const [sellerCode, custMap] of bySellerCustomer) {
@@ -580,6 +593,7 @@ function apurateValorEans(
       pdvsFound: [...bySellerCustomer.values()].reduce((s, m) => s + m.size, 0),
       campaignCodesSample: [...codeSet].slice(0, 15),
       movementCodesSample: [...new Set(filtered.map(m => m.productCode).filter(Boolean))].slice(0, 15) as string[],
+      unmatchedCodesSample,
       windowStart,
       windowEnd,
     },
