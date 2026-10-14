@@ -534,11 +534,13 @@ function apurateValorEans(
 
   const filtered = getWindowedMovements(movements, windowStart, windowEnd, ['venda_faturada', 'a_faturar', 'devolucao'])
 
-  type PdvEntry = { name: string; value: number; codes: Set<string>; sellerCode: string }
-  const bySellerCustomer = new Map<string, Map<string, PdvEntry>>()
+  // Group by customer only (not seller+customer) so codes accumulate across
+  // the full period regardless of which seller served each movement.
+  // sellerValues tracks per-seller value to attribute the PDV to the top seller.
+  type PdvEntry = { name: string; value: number; codes: Set<string>; lastSeller: string; lastDate: string }
+  const byCustomer = new Map<string, PdvEntry>()
   let movementsMatched = 0
-  // track unmatched codes to help diagnose old/different product codes
-  const unmatchedCodes = new Map<string, number>() // code → count
+  const unmatchedCodes = new Map<string, number>()
 
   for (const m of filtered) {
     const matchedCode = matchMovementCode(m.productCode, m.manufacturerCode, codeSet, eanMap)
@@ -556,15 +558,15 @@ function apurateValorEans(
     movementsMatched++
 
     const seller = m.sellerCode ?? '?'
-    if (!bySellerCustomer.has(seller)) bySellerCustomer.set(seller, new Map())
-    const custMap = bySellerCustomer.get(seller)!
-    if (!custMap.has(cust)) custMap.set(cust, { name: m.customerName ?? cust, value: 0, codes: new Set(), sellerCode: seller })
-    const e = custMap.get(cust)!
+    const movDate = m.movementDate?.slice(0, 10) ?? ''
+    if (!byCustomer.has(cust)) byCustomer.set(cust, { name: m.customerName ?? cust, value: 0, codes: new Set(), lastSeller: seller, lastDate: movDate })
+    const e = byCustomer.get(cust)!
     e.value += m.value ?? 0
     if (m.movementType !== 'devolucao') e.codes.add(matchedCode)
+    // keep track of the seller of the most recent movement
+    if (movDate >= e.lastDate) { e.lastDate = movDate; e.lastSeller = seller }
   }
 
-  // top unmatched codes by frequency (helps identify old/renamed product codes)
   const unmatchedCodesSample = [...unmatchedCodes.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, 20)
@@ -573,36 +575,43 @@ function apurateValorEans(
   let totalPdvsWithAllCodes = 0
   let totalPdvsWithValue = 0
 
-  const sellers: SellerResult[] = []
-  for (const [sellerCode, custMap] of bySellerCustomer) {
-    const rca = rcaMap.get(sellerCode)
-    const details: PdvDetail[] = []
-    let qualifiedPdvs = 0
+  // Build per-seller results: attribute each PDV to its last seller
+  type SellerBucket = { details: PdvDetail[]; qualifiedPdvs: number }
+  const sellerBuckets = new Map<string, SellerBucket>()
 
-    for (const [custCode, entry] of custMap) {
-      const codeFound = (rawCode: string) => {
-        const variants = resolveProductCodes([rawCode], eanMap)
-        return [...variants].some(v => entry.codes.has(v))
-      }
-      const hasAllCodes = !cfg.requireAllCodes || cfg.productCodes.every(codeFound)
-      const meetsValue = entry.value >= cfg.minValue
-      const qualified = hasAllCodes && meetsValue
-      const progressPct = cfg.minValue > 0 ? Math.round((entry.value / cfg.minValue) * 100) : (qualified ? 100 : 0)
-
-      if (hasAllCodes) totalPdvsWithAllCodes++
-      if (meetsValue) totalPdvsWithValue++
-
-      const doneMandatory = cfg.productCodes.filter(codeFound).map(c => ({ code: c }))
-      const missingMandatory = cfg.productCodes.filter(c => !codeFound(c)).map(c => ({ code: c }))
-
-      if (qualified) qualifiedPdvs++
-      details.push({
-        customerCode: custCode, customerName: entry.name, value: entry.value, qualified, progressPct,
-        reason: qualified ? undefined : !hasAllCodes ? 'EANs faltando' : `R$${entry.value.toFixed(0)} < R$${cfg.minValue}`,
-        doneMandatory, missingMandatory,
-      })
+  for (const [custCode, entry] of byCustomer) {
+    const codeFound = (rawCode: string) => {
+      const variants = resolveProductCodes([rawCode], eanMap)
+      return [...variants].some(v => entry.codes.has(v))
     }
+    const hasAllCodes = !cfg.requireAllCodes || cfg.productCodes.every(codeFound)
+    const meetsValue = entry.value >= cfg.minValue
+    const qualified = hasAllCodes && meetsValue
+    const progressPct = cfg.minValue > 0 ? Math.round((entry.value / cfg.minValue) * 100) : (qualified ? 100 : 0)
 
+    if (hasAllCodes) totalPdvsWithAllCodes++
+    if (meetsValue) totalPdvsWithValue++
+
+    const doneMandatory = cfg.productCodes.filter(codeFound).map(c => ({ code: c }))
+    const missingMandatory = cfg.productCodes.filter(c => !codeFound(c)).map(c => ({ code: c }))
+
+    // attribute to the seller of the most recent movement for this customer
+    const topSeller = entry.lastSeller
+
+    if (!sellerBuckets.has(topSeller)) sellerBuckets.set(topSeller, { details: [], qualifiedPdvs: 0 })
+    const bucket = sellerBuckets.get(topSeller)!
+    if (qualified) bucket.qualifiedPdvs++
+    bucket.details.push({
+      customerCode: custCode, customerName: entry.name, value: entry.value, qualified, progressPct,
+      reason: qualified ? undefined : !hasAllCodes ? 'EANs faltando' : `R$${entry.value.toFixed(0)} < R$${cfg.minValue}`,
+      doneMandatory, missingMandatory,
+    })
+  }
+
+  const sellers: SellerResult[] = []
+  for (const [sellerCode, bucket] of sellerBuckets) {
+    const rca = rcaMap.get(sellerCode)
+    const { details, qualifiedPdvs } = bucket
     details.sort((a, b) => (b.progressPct ?? 0) - (a.progressPct ?? 0))
     const bestPdvProgress = details.length > 0 ? ((details[0].progressPct ?? 0) / 100) : 0
     const totalValue = details.reduce((s, d) => s + (d.value ?? 0), 0)
@@ -630,7 +639,7 @@ function apurateValorEans(
     diagnostic: {
       movementsInWindow: filtered.length,
       movementsMatched,
-      pdvsFound: [...bySellerCustomer.values()].reduce((s, m) => s + m.size, 0),
+      pdvsFound: byCustomer.size,
       campaignCodesSample: [...codeSet].slice(0, 15),
       movementCodesSample: [...new Set(filtered.map(m => m.productCode).filter(Boolean))].slice(0, 15) as string[],
       unmatchedCodesSample,
