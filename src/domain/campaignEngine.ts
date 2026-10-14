@@ -218,7 +218,8 @@ function parseDate(iso: string) {
 
 function isInWindow(movDate: string | undefined, startDate: string, endDate: string) {
   if (!movDate) return false
-  return movDate >= startDate && movDate <= endDate
+  const d = movDate.slice(0, 10)
+  return d >= startDate && d <= endDate
 }
 
 /** Expand window backwards by N months (ISO dates) */
@@ -499,6 +500,7 @@ function apurateValorEans(
 
   type PdvEntry = { name: string; value: number; codes: Set<string>; sellerCode: string }
   const bySellerCustomer = new Map<string, Map<string, PdvEntry>>()
+  let movementsMatched = 0
 
   for (const m of filtered) {
     const code = m.productCode?.toUpperCase()
@@ -511,6 +513,7 @@ function apurateValorEans(
       const docPadded = doc.padStart(14, '0')
       if (!validCnpjs.has(doc) && !validCnpjs.has(docPadded)) continue
     }
+    movementsMatched++
 
     const seller = m.sellerCode ?? '?'
     if (!bySellerCustomer.has(seller)) bySellerCustomer.set(seller, new Map())
@@ -573,7 +576,7 @@ function apurateValorEans(
     goal: { metric: 'value', target: cfg.minValue },
     diagnostic: {
       movementsInWindow: filtered.length,
-      movementsMatched: filtered.length,
+      movementsMatched,
       pdvsFound: [...bySellerCustomer.values()].reduce((s, m) => s + m.size, 0),
       campaignCodesSample: [...codeSet].slice(0, 15),
       movementCodesSample: [...new Set(filtered.map(m => m.productCode).filter(Boolean))].slice(0, 15) as string[],
