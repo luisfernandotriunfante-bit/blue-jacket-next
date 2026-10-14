@@ -82,9 +82,11 @@ function CampaignPanel({ movementBase, historyBase, productBase, clientBase, rca
   const legacyMovements = useMemo(() => historyToMovements(historyBase), [historyBase])
 
   // Run apuration for all active campaigns
+  const legacyCounts = useMemo(() => new Map<string, number>(), [activeCampaigns, legacyMovements]) // reset on deps change
   const results = useMemo(() => {
     if (!hasMotors) return new Map<string, ApurationResult>()
     const map = new Map<string, ApurationResult>()
+    legacyCounts.clear()
     for (const c of activeCampaigns) {
       if (!c.startDate || !c.endDate || !c.config) continue
       try {
@@ -92,6 +94,7 @@ function CampaignPanel({ movementBase, historyBase, productBase, clientBase, rca
         const windowStart = c.startDate
         const windowEnd = c.endDate
         const legacyInWindow = legacyMovements.filter(m => m.movementDate && m.movementDate >= windowStart && m.movementDate <= windowEnd)
+        legacyCounts.set(c.id, legacyInWindow.length)
         const allMovements = legacyInWindow.length > 0 ? [...movementBase, ...legacyInWindow] : movementBase
         map.set(c.id, apurateCampaign(c, allMovements, productBase, clientBase, rcas))
       } catch {
@@ -99,7 +102,7 @@ function CampaignPanel({ movementBase, historyBase, productBase, clientBase, rca
       }
     }
     return map
-  }, [activeCampaigns, movementBase, legacyMovements, productBase, clientBase, rcas, hasMotors])
+  }, [activeCampaigns, movementBase, legacyMovements, productBase, clientBase, rcas, hasMotors, legacyCounts])
 
   if (activeCampaigns.length === 0) {
     return (
@@ -263,6 +266,10 @@ function CampaignPanel({ movementBase, historyBase, productBase, clientBase, rca
                     {diag.movementsInWindow} mov. no período ·{' '}
                     <span style={{ color: (diag.movementsMatched ?? 0) > 0 ? 'var(--text)' : 'var(--red)', fontWeight: 700 }}>
                       {diag.movementsMatched ?? 0} com código da campanha
+                    </span>
+                    {' · '}
+                    <span style={{ color: (legacyCounts.get(selected!) ?? 0) > 0 ? 'var(--blue)' : 'var(--red)', fontWeight: 700 }}>
+                      {legacyCounts.get(selected!) ?? 0} mov. legado
                     </span>
                   </span>
                 </div>
