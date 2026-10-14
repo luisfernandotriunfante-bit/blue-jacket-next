@@ -534,11 +534,13 @@ function apurateValorEans(
 
   const filtered = getWindowedMovements(movements, windowStart, windowEnd, ['venda_faturada', 'a_faturar', 'devolucao'])
 
-  type PdvEntry = { name: string; value: number; codes: Set<string>; sellerCode: string }
-  const bySellerCustomer = new Map<string, Map<string, PdvEntry>>()
+  // Group by customer only (not seller+customer) so codes accumulate across
+  // the full period regardless of which seller served each movement.
+  // sellerValues tracks per-seller value to attribute the PDV to the top seller.
+  type PdvEntry = { name: string; value: number; codes: Set<string>; sellerValues: Map<string, number> }
+  const byCustomer = new Map<string, PdvEntry>()
   let movementsMatched = 0
-  // track unmatched codes to help diagnose old/different product codes
-  const unmatchedCodes = new Map<string, number>() // code → count
+  const unmatchedCodes = new Map<string, number>()
 
   for (const m of filtered) {
     const matchedCode = matchMovementCode(m.productCode, m.manufacturerCode, codeSet, eanMap)
@@ -555,16 +557,16 @@ function apurateValorEans(
     }
     movementsMatched++
 
-    const seller = m.sellerCode ?? '?'
-    if (!bySellerCustomer.has(seller)) bySellerCustomer.set(seller, new Map())
-    const custMap = bySellerCustomer.get(seller)!
-    if (!custMap.has(cust)) custMap.set(cust, { name: m.customerName ?? cust, value: 0, codes: new Set(), sellerCode: seller })
-    const e = custMap.get(cust)!
-    e.value += m.value ?? 0
+    if (!byCustomer.has(cust)) byCustomer.set(cust, { name: m.customerName ?? cust, value: 0, codes: new Set(), sellerValues: new Map() })
+    const e = byCustomer.get(cust)!
+    const v = m.value ?? 0
+    e.value += v
     if (m.movementType !== 'devolucao') e.codes.add(matchedCode)
+    // track how much each seller contributed to this customer
+    const seller = m.sellerCode ?? '?'
+    e.sellerValues.set(seller, (e.sellerValues.get(seller) ?? 0) + v)
   }
 
-  // top unmatched codes by frequency (helps identify old/renamed product codes)
   const unmatchedCodesSample = [...unmatchedCodes.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, 20)
@@ -573,36 +575,47 @@ function apurateValorEans(
   let totalPdvsWithAllCodes = 0
   let totalPdvsWithValue = 0
 
-  const sellers: SellerResult[] = []
-  for (const [sellerCode, custMap] of bySellerCustomer) {
-    const rca = rcaMap.get(sellerCode)
-    const details: PdvDetail[] = []
-    let qualifiedPdvs = 0
+  // Build per-seller results: attribute each PDV to its top-value seller
+  type SellerBucket = { details: PdvDetail[]; qualifiedPdvs: number }
+  const sellerBuckets = new Map<string, SellerBucket>()
 
-    for (const [custCode, entry] of custMap) {
-      const codeFound = (rawCode: string) => {
-        const variants = resolveProductCodes([rawCode], eanMap)
-        return [...variants].some(v => entry.codes.has(v))
-      }
-      const hasAllCodes = !cfg.requireAllCodes || cfg.productCodes.every(codeFound)
-      const meetsValue = entry.value >= cfg.minValue
-      const qualified = hasAllCodes && meetsValue
-      const progressPct = cfg.minValue > 0 ? Math.round((entry.value / cfg.minValue) * 100) : (qualified ? 100 : 0)
+  for (const [custCode, entry] of byCustomer) {
+    const codeFound = (rawCode: string) => {
+      const variants = resolveProductCodes([rawCode], eanMap)
+      return [...variants].some(v => entry.codes.has(v))
+    }
+    const hasAllCodes = !cfg.requireAllCodes || cfg.productCodes.every(codeFound)
+    const meetsValue = entry.value >= cfg.minValue
+    const qualified = hasAllCodes && meetsValue
+    const progressPct = cfg.minValue > 0 ? Math.round((entry.value / cfg.minValue) * 100) : (qualified ? 100 : 0)
 
-      if (hasAllCodes) totalPdvsWithAllCodes++
-      if (meetsValue) totalPdvsWithValue++
+    if (hasAllCodes) totalPdvsWithAllCodes++
+    if (meetsValue) totalPdvsWithValue++
 
-      const doneMandatory = cfg.productCodes.filter(codeFound).map(c => ({ code: c }))
-      const missingMandatory = cfg.productCodes.filter(c => !codeFound(c)).map(c => ({ code: c }))
+    const doneMandatory = cfg.productCodes.filter(codeFound).map(c => ({ code: c }))
+    const missingMandatory = cfg.productCodes.filter(c => !codeFound(c)).map(c => ({ code: c }))
 
-      if (qualified) qualifiedPdvs++
-      details.push({
-        customerCode: custCode, customerName: entry.name, value: entry.value, qualified, progressPct,
-        reason: qualified ? undefined : !hasAllCodes ? 'EANs faltando' : `R$${entry.value.toFixed(0)} < R$${cfg.minValue}`,
-        doneMandatory, missingMandatory,
-      })
+    // attribute to the seller with the highest value for this customer
+    let topSeller = '?'
+    let topValue = -1
+    for (const [s, v] of entry.sellerValues) {
+      if (v > topValue) { topValue = v; topSeller = s }
     }
 
+    if (!sellerBuckets.has(topSeller)) sellerBuckets.set(topSeller, { details: [], qualifiedPdvs: 0 })
+    const bucket = sellerBuckets.get(topSeller)!
+    if (qualified) bucket.qualifiedPdvs++
+    bucket.details.push({
+      customerCode: custCode, customerName: entry.name, value: entry.value, qualified, progressPct,
+      reason: qualified ? undefined : !hasAllCodes ? 'EANs faltando' : `R$${entry.value.toFixed(0)} < R$${cfg.minValue}`,
+      doneMandatory, missingMandatory,
+    })
+  }
+
+  const sellers: SellerResult[] = []
+  for (const [sellerCode, bucket] of sellerBuckets) {
+    const rca = rcaMap.get(sellerCode)
+    const { details, qualifiedPdvs } = bucket
     details.sort((a, b) => (b.progressPct ?? 0) - (a.progressPct ?? 0))
     const bestPdvProgress = details.length > 0 ? ((details[0].progressPct ?? 0) / 100) : 0
     const totalValue = details.reduce((s, d) => s + (d.value ?? 0), 0)
@@ -630,7 +643,7 @@ function apurateValorEans(
     diagnostic: {
       movementsInWindow: filtered.length,
       movementsMatched,
-      pdvsFound: [...bySellerCustomer.values()].reduce((s, m) => s + m.size, 0),
+      pdvsFound: byCustomer.size,
       campaignCodesSample: [...codeSet].slice(0, 15),
       movementCodesSample: [...new Set(filtered.map(m => m.productCode).filter(Boolean))].slice(0, 15) as string[],
       unmatchedCodesSample,
