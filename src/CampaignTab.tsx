@@ -223,6 +223,22 @@ function CampaignPanel({ movementBase, productBase, clientBase, rcas, campaignsO
             )
           })()}
 
+          {/* Window & movement stats — só aparece quando há diagnostic com windowStart */}
+          {selectedResult.diagnostic?.windowStart && (
+            <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--muted)' }}>Janela:</span>
+              <span style={{ fontSize: 11, fontFamily: 'Space Grotesk, monospace', color: 'var(--text)', background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 6, padding: '2px 8px' }}>
+                {selectedResult.diagnostic.windowStart} → {selectedResult.diagnostic.windowEnd}
+              </span>
+              <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 4 }}>
+                {selectedResult.diagnostic.movementsInWindow} mov. no período ·{' '}
+                <span style={{ color: selectedResult.diagnostic.movementsMatched > 0 ? 'var(--text)' : 'var(--red)', fontWeight: 700 }}>
+                  {selectedResult.diagnostic.movementsMatched} com código da campanha
+                </span>
+              </span>
+            </div>
+          )}
+
           {selectedResult.sellers.length === 0 ? (
             <DiagnosticHint d={selectedResult.diagnostic} cfg={selectedCampaign.config} />
           ) : (
