@@ -575,7 +575,7 @@ function apurateValorEans(
   let totalPdvsWithAllCodes = 0
   let totalPdvsWithValue = 0
 
-  // Build per-seller results: attribute each PDV to its top-value seller
+  // Build per-seller results: attribute each PDV to its last seller
   type SellerBucket = { details: PdvDetail[]; qualifiedPdvs: number }
   const sellerBuckets = new Map<string, SellerBucket>()
 
