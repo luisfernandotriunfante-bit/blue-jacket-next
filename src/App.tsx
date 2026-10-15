@@ -17,6 +17,7 @@ import { ClientesTab } from './ClientesTab'
 import { RcaManager, readRcas, type RcaRecord } from './RcaManager'
 import { CampaignTab } from './CampaignTab'
 import { saveCompetenciaSnap, loadCompetenciaSnap, listClosedCompetencias, fmtCompetencia, getActiveComp, setActiveComp, type CompetenciaSnapshot } from './domain/competenciaEngine'
+import { exportBundle, importBundle, downloadBundle, validateBundle } from './domain/syncEngine'
 
 const motors: Array<{ id: Exclude<SourceArea, 'diario'>; name: string }> = [
   { id: 'produtos', name: 'Produtos' },
@@ -701,7 +702,94 @@ function ConfigTab({ activeComp, onChangeComp, onFecha }: { activeComp: string; 
           </button>
         </div>
       </div>
+      <SyncSection />
     </div>
+  )
+}
+
+function SyncSection() {
+  const [exporting, setExporting] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [status, setStatus] = useState<string | null>(null)
+  const importRef = useRef<HTMLInputElement>(null)
+
+  async function handleExport() {
+    setExporting(true)
+    setStatus(null)
+    try {
+      const bundle = await exportBundle()
+      downloadBundle(bundle)
+      const keys = Object.keys(bundle.localStorage).length + Object.keys(bundle.indexedDB).length
+      setStatus(`Exportado com sucesso — ${keys} registros`)
+    } catch {
+      setStatus('Erro ao exportar dados')
+    }
+    setExporting(false)
+  }
+
+  async function handleImport(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImporting(true)
+    setStatus(null)
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text)
+      if (!validateBundle(data)) {
+        setStatus('Arquivo inválido — não é um backup do Blue Jacket')
+        setImporting(false)
+        return
+      }
+      const result = await importBundle(data)
+      setStatus(`Importado com sucesso — ${result.lsKeys} configs + ${result.idbKeys} bases. Recarregue a página para ver os dados.`)
+    } catch {
+      setStatus('Erro ao importar. Verifique se o arquivo é um JSON válido.')
+    }
+    setImporting(false)
+    if (importRef.current) importRef.current.value = ''
+  }
+
+  return (
+    <>
+      <h2>SINCRONIZAÇÃO</h2>
+      <div className="config-group">
+        <label className="config-label">Transferir dados entre dispositivos</label>
+        <p className="config-help">
+          Exporte todos os dados (bases, configurações, competências) para um arquivo JSON.
+          Envie o arquivo para outro dispositivo (WhatsApp, e-mail) e importe lá.
+        </p>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
+          <button
+            className="process-button"
+            style={{ margin: 0 }}
+            type="button"
+            disabled={exporting}
+            onClick={handleExport}
+          >
+            {exporting ? 'Exportando…' : 'Exportar dados'}
+          </button>
+          <label
+            className="process-button"
+            style={{ margin: 0, cursor: importing ? 'wait' : 'pointer', opacity: importing ? 0.6 : 1, display: 'inline-flex', alignItems: 'center' }}
+          >
+            {importing ? 'Importando…' : 'Importar dados'}
+            <input
+              ref={importRef}
+              type="file"
+              accept=".json"
+              style={{ display: 'none' }}
+              onChange={handleImport}
+              disabled={importing}
+            />
+          </label>
+        </div>
+        {status ? (
+          <p className="config-help" style={{ marginTop: 10, fontWeight: 600, color: status.startsWith('Erro') || status.startsWith('Arquivo') ? 'var(--red)' : 'var(--green, #10b981)' }}>
+            {status}
+          </p>
+        ) : null}
+      </div>
+    </>
   )
 }
 
