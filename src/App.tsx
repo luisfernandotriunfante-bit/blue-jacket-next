@@ -16,7 +16,6 @@ import { GerencialTab } from './GerencialTab'
 import { ClientesTab } from './ClientesTab'
 import { RcaManager, readRcas, type RcaRecord } from './RcaManager'
 import { CampaignTab } from './CampaignTab'
-import { readCampaigns } from './CampaignManager'
 import { saveCompetenciaSnap, loadCompetenciaSnap, listClosedCompetencias, fmtCompetencia, getActiveComp, setActiveComp, type CompetenciaSnapshot } from './domain/competenciaEngine'
 
 const motors: Array<{ id: Exclude<SourceArea, 'diario'>; name: string }> = [
@@ -309,7 +308,6 @@ export function App() {
       history: historyBase,
       receipts: receiptBase,
       rcas,
-      campaigns: readCampaigns(),
       markupPct,
       covDays,
       selloutMeta,
@@ -325,9 +323,6 @@ export function App() {
   const effectiveClients = snap ? snap.clients : clientBase
   const effectiveReceipts = snap ? snap.receipts : receiptBase
   const effectiveRcas = snap ? snap.rcas : rcas
-  const effectiveCampaigns = snap ? snap.campaigns : undefined
-  const effectiveHistory = snap ? snap.history : historyBase
-
   function downloadClientBase() { const url = URL.createObjectURL(new Blob([JSON.stringify(clientBase, null, 2)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = 'base-canonica-clientes.json'; link.click(); URL.revokeObjectURL(url) }
   function downloadClientExcel() {
     const rows = clientBase.map(client => ({
@@ -456,7 +451,7 @@ export function App() {
       </>) : section === 'estoque' ? <>
         <StockTab productBase={effectiveProducts} receiptBase={effectiveReceipts} movementBase={effectiveMovements} productIndicators={snap ? null : productIndicators} activeComp={displayComp} />
       </> : section === 'campanhas' ? <>
-        <CampaignTab movementBase={effectiveMovements} historyBase={effectiveHistory} productBase={effectiveProducts} clientBase={effectiveClients} rcas={effectiveRcas} campaignsOverride={effectiveCampaigns} readOnly={!!viewingComp} />
+        <CampaignTab />
       </> : <>
       <header className="topbar stock-topbar" aria-label="Administração">
         <button type="button" className={`stock-nav-btn${tab === 'uploads' ? ' on' : ''}`} onClick={() => { setTab('uploads'); setActiveNotice(null) }}>Uploads</button>

@@ -4,7 +4,6 @@ import type { CanonicalClient } from './clientMotor'
 import type { CanonicalHistory } from './historyMotor'
 import type { CanonicalReceipt } from './receiptMotor'
 import type { RcaRecord } from '../RcaManager'
-import type { CampaignRecord } from './campaignEngine'
 
 export interface CompetenciaSnapshot {
   competencia: string
@@ -15,7 +14,6 @@ export interface CompetenciaSnapshot {
   history: CanonicalHistory[]
   receipts: CanonicalReceipt[]
   rcas: RcaRecord[]
-  campaigns: CampaignRecord[]
   markupPct: string
   covDays: string
   selloutMeta: string
