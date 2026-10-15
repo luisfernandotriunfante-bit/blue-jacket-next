@@ -130,7 +130,7 @@ export function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
   const [section, setSection] = useState<'sellout' | 'estoque' | 'campanhas' | 'administracao'>('sellout')
   const [selloutTab, setSelloutTab] = useState<'dashboard' | 'gerencial' | 'clientes'>('dashboard')
-  const [tab, setTab] = useState<'uploads' | 'auditoria' | 'config' | 'rcas'>('uploads')
+  const [tab, setTab] = useState<'uploads' | 'auditoria' | 'config' | 'rcas' | 'dados'>('uploads')
 
   const monthLabel = useMemo(() => fmtCompetencia(viewingComp ?? activeComp).toUpperCase(), [viewingComp, activeComp])
   const displayComp = viewingComp ?? activeComp
@@ -508,6 +508,7 @@ export function App() {
         <button type="button" className={`stock-nav-btn${tab === 'auditoria' ? ' on' : ''}`} onClick={() => { setTab('auditoria'); setActiveNotice(null) }}>Auditoria</button>
         <button type="button" className={`stock-nav-btn${tab === 'config' ? ' on' : ''}`} onClick={() => { setTab('config'); setActiveNotice(null) }}>Configurações</button>
         <button type="button" className={`stock-nav-btn${tab === 'rcas' ? ' on' : ''}`} onClick={() => { setTab('rcas'); setActiveNotice(null) }}>Vendedores</button>
+        <button type="button" className={`stock-nav-btn${tab === 'dados' ? ' on' : ''}`} onClick={() => { setTab('dados'); setActiveNotice(null) }}>Dados</button>
       </header>
       {tab === 'uploads' ? <section className="content">
         <h2>ARQUIVOS DIÁRIOS</h2>
@@ -522,6 +523,49 @@ export function App() {
         <div className="notice-list">{audit.map(item => <button className={`notice ${item.level}`} key={item.id} type="button" onClick={() => setActiveNotice(item)}><span>{item.title}</span><small>{item.instruction}</small></button>)}</div>
       </section> : tab === 'config' ? <section className="content">
         <ConfigTab activeComp={activeComp} onChangeComp={changeActiveComp} onFecha={fechaCompetencia} />
+      </section> : tab === 'dados' ? <section className="content">
+        <h2>DIAGNÓSTICO DE DADOS</h2>
+        {([
+          { name: 'Produtos', base: productBase, slots: productSlots, indicators: productIndicators, fields: ['internalCode', 'description', 'ean', 'sellerPrice', 'availableStock', 'totalStock'] },
+          { name: 'Clientes', base: clientBase, slots: clientSlots, indicators: clientIndicators, fields: ['document', 'legalName', 'tradeName', 'city', 'rcaCode'] },
+          { name: 'Histórico', base: historyBase, slots: historySlots, indicators: historyIndicators, fields: ['competencia', 'clientDocument', 'productCode'] },
+          { name: 'Movimentações', base: movementBase, slots: movementSlots, indicators: movementIndicators, fields: ['clientDocument', 'productCode', 'quantity', 'totalValue'] },
+          { name: 'Recebimentos', base: receiptBase, slots: receiptSlots, indicators: receiptIndicators, fields: ['productCode', 'quantity', 'invoiceNumber'] },
+        ] as { name: string; base: unknown[]; slots: Record<string, unknown>; indicators: unknown; fields: string[] }[]).map(motor => {
+          const slotEntries = Object.entries(motor.slots).filter(([, v]) => v != null)
+          const fileList: { name: string; size: number; receivedAt: string }[] = []
+          for (const [, val] of slotEntries) {
+            if (Array.isArray(val)) {
+              for (const f of val) if (f && typeof f === 'object' && 'name' in f) fileList.push(f as { name: string; size: number; receivedAt: string })
+            } else if (val && typeof val === 'object' && 'name' in val) {
+              fileList.push(val as { name: string; size: number; receivedAt: string })
+            }
+          }
+          const fieldCounts: Record<string, number> = {}
+          for (const field of motor.fields) {
+            fieldCounts[field] = (motor.base as Record<string, unknown>[]).filter(item => item[field] != null && item[field] !== '').length
+          }
+          return <article className="motor-card" key={motor.name}>
+            <h3>{motor.name}</h3>
+            <div style={{fontSize: '13px', lineHeight: '1.6'}}>
+              <div><strong>Registros na base:</strong> {motor.base.length.toLocaleString('pt-BR')}</div>
+              <div><strong>Indicadores:</strong> {motor.indicators ? 'Sim' : 'Não processado'}</div>
+              {motor.base.length > 0 && <>
+                <div style={{marginTop: '8px'}}><strong>Preenchimento dos campos:</strong></div>
+                {Object.entries(fieldCounts).map(([field, count]) => <div key={field} style={{paddingLeft: '12px'}}>
+                  {field}: {count.toLocaleString('pt-BR')} / {motor.base.length.toLocaleString('pt-BR')} ({Math.round(count / motor.base.length * 100)}%)
+                </div>)}
+              </>}
+              {fileList.length > 0 && <>
+                <div style={{marginTop: '8px'}}><strong>Arquivos carregados ({fileList.length}):</strong></div>
+                {fileList.map((f, i) => <div key={i} style={{paddingLeft: '12px', fontSize: '12px'}}>
+                  {f.name} — {(f.size / 1024).toFixed(0)}KB — {f.receivedAt}
+                </div>)}
+              </>}
+              {fileList.length === 0 && <div style={{marginTop: '4px', color: 'var(--red)'}}><strong>Nenhum arquivo nos slots</strong></div>}
+            </div>
+          </article>
+        })}
       </section> : <section className="content">
         <RcaManager />
       </section>}
