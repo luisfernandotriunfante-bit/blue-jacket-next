@@ -18,7 +18,7 @@ import { RcaManager, readRcas, type RcaRecord } from './RcaManager'
 import { CampaignTab } from './CampaignTab'
 import { saveCompetenciaSnap, loadCompetenciaSnap, listClosedCompetencias, fmtCompetencia, getActiveComp, setActiveComp, type CompetenciaSnapshot } from './domain/competenciaEngine'
 import { exportBundle, importBundle, downloadBundle, validateBundle } from './domain/syncEngine'
-import { pushToCloud, pullFromCloud, listenForChanges, schedulePush, onSyncStatus } from './domain/cloudSync'
+import { pushToCloud, pullFromCloud, listenForChanges, schedulePush, onSyncStatus, getSyncDetail } from './domain/cloudSync'
 import { isFirebaseConfigured } from './firebaseConfig'
 
 const motors: Array<{ id: Exclude<SourceArea, 'diario'>; name: string }> = [
@@ -422,7 +422,7 @@ export function App() {
       )}
       <div className="sidebar-bottom">
         {isFirebaseConfigured() && (
-          <div className="cloud-status" title={cloudStatus === 'synced' ? 'Dados sincronizados com a nuvem' : cloudStatus === 'syncing' ? 'Sincronizando…' : cloudStatus === 'error' ? 'Erro de sincronização' : 'Nuvem desconectada'}>
+          <div className="cloud-status" title={getSyncDetail()} onClick={() => alert(getSyncDetail())} style={{ cursor: 'pointer' }}>
             <span className={`cloud-dot cloud-dot-${cloudStatus}`} />
             <span className="nav-label">{cloudStatus === 'synced' ? 'Sincronizado' : cloudStatus === 'syncing' ? 'Sincronizando…' : cloudStatus === 'error' ? 'Erro' : 'Offline'}</span>
           </div>
