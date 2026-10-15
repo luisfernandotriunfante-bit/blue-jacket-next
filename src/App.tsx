@@ -18,7 +18,7 @@ import { RcaManager, readRcas, type RcaRecord } from './RcaManager'
 import { CampaignTab } from './CampaignTab'
 import { saveCompetenciaSnap, loadCompetenciaSnap, listClosedCompetencias, fmtCompetencia, getActiveComp, setActiveComp, type CompetenciaSnapshot } from './domain/competenciaEngine'
 import { exportBundle, importBundle, downloadBundle, validateBundle } from './domain/syncEngine'
-import { pushToCloud, listenForChanges, schedulePush, onSyncStatus, initialPullAndReload } from './domain/cloudSync'
+import { pushToCloud, listenForChanges, schedulePush, onSyncStatus, initialPullAndReload, safeReload } from './domain/cloudSync'
 import { isFirebaseConfigured } from './firebaseConfig'
 
 const motors: Array<{ id: Exclude<SourceArea, 'diario'>; name: string }> = [
@@ -73,7 +73,7 @@ export function App() {
     lsEvents.forEach(e => window.addEventListener(e, schedulePush))
 
     initialPullAndReload()
-    const stopListen = listenForChanges(() => window.location.reload())
+    const stopListen = listenForChanges(() => safeReload())
     return () => {
       unsub(); stopListen(); setOnSaveHook(null)
       lsEvents.forEach(e => window.removeEventListener(e, schedulePush))

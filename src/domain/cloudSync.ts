@@ -4,7 +4,7 @@ import { loadPersisted, savePersisted } from './persistence'
 
 const LS_PREFIX = 'rj-'
 const CLOUD_ROOT = 'blue-jacket'
-const PULLED_FLAG = 'rj-cloud-pulled'
+const RELOAD_TS_KEY = 'rj-cloud-reload-ts'
 
 const IDB_KEYS = [
   'products', 'clients', 'movements', 'history', 'receipts',
@@ -20,6 +20,7 @@ type StatusListener = (s: SyncStatus) => void
 let currentStatus: SyncStatus = 'off'
 const statusListeners = new Set<StatusListener>()
 let lastPushAt = ''
+let _pulling = false
 
 function setStatus(s: SyncStatus) {
   currentStatus = s
@@ -77,6 +78,7 @@ export async function pullFromCloud(): Promise<boolean> {
   if (!db) return false
 
   setStatus('syncing')
+  _pulling = true
   try {
     const snap = await get(ref(db, CLOUD_ROOT))
     if (!snap.exists()) { setStatus('synced'); return false }
@@ -103,21 +105,27 @@ export async function pullFromCloud(): Promise<boolean> {
   } catch {
     setStatus('error')
     return false
+  } finally {
+    _pulling = false
   }
+}
+
+export function safeReload(): void {
+  try {
+    const last = parseInt(sessionStorage.getItem(RELOAD_TS_KEY) ?? '0')
+    if (Date.now() - last < 8000) return
+    sessionStorage.setItem(RELOAD_TS_KEY, String(Date.now()))
+  } catch { return }
+  window.location.reload()
 }
 
 export function initialPullAndReload(): void {
   const db = getDb()
   if (!db) return
 
-  try {
-    if (sessionStorage.getItem(PULLED_FLAG)) return
-  } catch { return }
-
   void pullFromCloud().then(pulled => {
     if (!pulled) return
-    try { sessionStorage.setItem(PULLED_FLAG, '1') } catch { /* ignore */ }
-    window.location.reload()
+    safeReload()
   })
 }
 
@@ -144,7 +152,7 @@ export function listenForChanges(onUpdate: () => void): () => void {
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 export function schedulePush(): void {
-  if (!isFirebaseConfigured()) return
+  if (!isFirebaseConfigured() || _pulling) return
   if (debounceTimer) clearTimeout(debounceTimer)
   debounceTimer = setTimeout(() => void pushToCloud(), 2000)
 }
