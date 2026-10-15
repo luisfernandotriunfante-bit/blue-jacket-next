@@ -4,6 +4,7 @@ import { loadPersisted, savePersisted } from './persistence'
 
 const LS_PREFIX = 'rj-'
 const CLOUD_ROOT = 'blue-jacket'
+const PULLED_FLAG = 'rj-cloud-pulled'
 
 const IDB_KEYS = [
   'products', 'clients', 'movements', 'history', 'receipts',
@@ -18,6 +19,7 @@ type StatusListener = (s: SyncStatus) => void
 
 let currentStatus: SyncStatus = 'off'
 const statusListeners = new Set<StatusListener>()
+let lastPushAt = ''
 
 function setStatus(s: SyncStatus) {
   currentStatus = s
@@ -57,8 +59,10 @@ export async function pushToCloud(): Promise<void> {
     }
     await set(ref(db, `${CLOUD_ROOT}/indexedDB`), idbData)
 
+    const now = new Date().toISOString()
+    lastPushAt = now
     await set(ref(db, `${CLOUD_ROOT}/meta`), {
-      updatedAt: new Date().toISOString(),
+      updatedAt: now,
       device: navigator.userAgent.slice(0, 80),
     })
 
@@ -102,6 +106,21 @@ export async function pullFromCloud(): Promise<boolean> {
   }
 }
 
+export function initialPullAndReload(): void {
+  const db = getDb()
+  if (!db) return
+
+  try {
+    if (sessionStorage.getItem(PULLED_FLAG)) return
+  } catch { return }
+
+  void pullFromCloud().then(pulled => {
+    if (!pulled) return
+    try { sessionStorage.setItem(PULLED_FLAG, '1') } catch { /* ignore */ }
+    window.location.reload()
+  })
+}
+
 let unsubscribe: Unsubscribe | null = null
 
 export function listenForChanges(onUpdate: () => void): () => void {
@@ -111,8 +130,10 @@ export function listenForChanges(onUpdate: () => void): () => void {
   if (unsubscribe) unsubscribe()
 
   let firstCall = true
-  unsubscribe = onValue(ref(db, `${CLOUD_ROOT}/meta`), async () => {
+  unsubscribe = onValue(ref(db, `${CLOUD_ROOT}/meta`), async (_snap) => {
     if (firstCall) { firstCall = false; return }
+    const meta = _snap.val() as { updatedAt?: string } | null
+    if (meta?.updatedAt && meta.updatedAt === lastPushAt) return
     await pullFromCloud()
     onUpdate()
   })
