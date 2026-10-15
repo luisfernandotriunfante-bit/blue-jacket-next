@@ -32,10 +32,6 @@ export function onSyncStatus(fn: StatusListener): () => void {
   return () => statusListeners.delete(fn)
 }
 
-function cleanForFirebase(obj: unknown): unknown {
-  return JSON.parse(JSON.stringify(obj))
-}
-
 function collectLocalStorage(): Record<string, string> {
   const data: Record<string, string> = {}
   for (let i = 0; i < localStorage.length; i++) {
@@ -60,8 +56,8 @@ export async function pushToCloud(): Promise<void> {
       setStatus('syncing', `Enviando ${key}…`)
       try {
         const val = await loadPersisted(key)
-        const clean = val !== null ? cleanForFirebase(val) : null
-        await set(ref(db, `${CLOUD_ROOT}/indexedDB/${key}`), clean)
+        const packed = val !== null ? JSON.stringify(val) : null
+        await set(ref(db, `${CLOUD_ROOT}/indexedDB/${key}`), packed)
         if (val !== null) idbCount++
       } catch (err) {
         setStatus('syncing', `Aviso: ${key} falhou (${err instanceof Error ? err.message : String(err)})`)
@@ -104,7 +100,9 @@ export async function pullFromCloud(): Promise<boolean> {
       try {
         const snap = await get(ref(db, `${CLOUD_ROOT}/indexedDB/${key}`))
         if (snap.exists()) {
-          await savePersisted(key, snap.val())
+          const raw = snap.val()
+          const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+          await savePersisted(key, parsed)
           idbCount++
           pulledKeys.push(key)
         }
