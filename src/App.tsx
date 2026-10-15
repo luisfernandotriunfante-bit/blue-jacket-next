@@ -18,7 +18,7 @@ import { RcaManager, readRcas, type RcaRecord } from './RcaManager'
 import { CampaignTab } from './CampaignTab'
 import { saveCompetenciaSnap, loadCompetenciaSnap, listClosedCompetencias, fmtCompetencia, getActiveComp, setActiveComp, type CompetenciaSnapshot } from './domain/competenciaEngine'
 import { exportBundle, importBundle, downloadBundle, validateBundle } from './domain/syncEngine'
-import { pullFromCloud, pushToCloud, listenForChanges, schedulePush, onSyncStatus } from './domain/cloudSync'
+import { pushToCloud, listenForChanges, schedulePush, onSyncStatus, initialPullAndReload } from './domain/cloudSync'
 import { isFirebaseConfigured } from './firebaseConfig'
 
 const motors: Array<{ id: Exclude<SourceArea, 'diario'>; name: string }> = [
@@ -72,9 +72,7 @@ export function App() {
     const lsEvents = ['rj-competencias-changed', 'rj-active-comp-changed', 'rj-markup-changed', 'rj-covdays-changed', 'rj-sellout-meta-changed', 'rj-positiv-meta-changed', 'rj-rcas-changed']
     lsEvents.forEach(e => window.addEventListener(e, schedulePush))
 
-    void pullFromCloud().then(pulled => {
-      if (pulled) window.location.reload()
-    })
+    initialPullAndReload()
     const stopListen = listenForChanges(() => window.location.reload())
     return () => {
       unsub(); stopListen(); setOnSaveHook(null)
