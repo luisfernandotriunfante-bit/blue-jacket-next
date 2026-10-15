@@ -13,14 +13,18 @@ type SyncStatus = 'off' | 'syncing' | 'synced' | 'error'
 type StatusListener = (s: SyncStatus) => void
 
 let currentStatus: SyncStatus = 'off'
+let currentDetail = ''
 const statusListeners = new Set<StatusListener>()
 let lastPushAt = ''
 let _pulling = false
 
-function setStatus(s: SyncStatus) {
+function setStatus(s: SyncStatus, detail?: string) {
   currentStatus = s
+  if (detail !== undefined) currentDetail = detail
   statusListeners.forEach(fn => fn(s))
 }
+
+export function getSyncDetail(): string { return currentDetail }
 
 export function onSyncStatus(fn: StatusListener): () => void {
   statusListeners.add(fn)
@@ -39,11 +43,12 @@ function collectLocalStorage(): Record<string, string> {
 
 export async function pushToCloud(): Promise<void> {
   const db = getDb()
-  if (!db) return
+  if (!db) { setStatus('error', 'DB não inicializado'); return }
 
-  setStatus('syncing')
+  setStatus('syncing', 'Enviando…')
   try {
     const lsData = collectLocalStorage()
+    const lsCount = Object.keys(lsData).length
     await set(ref(db, `${CLOUD_ROOT}/localStorage`), lsData)
 
     const idbData: Record<string, unknown> = {}
@@ -53,6 +58,7 @@ export async function pushToCloud(): Promise<void> {
         if (val !== null) idbData[key] = val
       } catch { /* skip */ }
     }
+    const idbCount = Object.keys(idbData).length
     await set(ref(db, `${CLOUD_ROOT}/indexedDB`), idbData)
 
     const now = new Date().toISOString()
@@ -62,43 +68,50 @@ export async function pushToCloud(): Promise<void> {
       device: navigator.userAgent.slice(0, 80),
     })
 
-    setStatus('synced')
-  } catch {
-    setStatus('error')
+    setStatus('synced', `Enviado: ${lsCount} configs + ${idbCount} bases`)
+  } catch (err) {
+    setStatus('error', `Erro push: ${err instanceof Error ? err.message : String(err)}`)
   }
 }
 
 export async function pullFromCloud(): Promise<boolean> {
   const db = getDb()
-  if (!db) return false
+  if (!db) { setStatus('error', 'DB não inicializado'); return false }
 
-  setStatus('syncing')
+  setStatus('syncing', 'Puxando da nuvem…')
   _pulling = true
   try {
     const snap = await get(ref(db, CLOUD_ROOT))
-    if (!snap.exists()) { setStatus('synced'); return false }
+    if (!snap.exists()) { setStatus('synced', 'Nuvem vazia'); return false }
 
     const data = snap.val() as {
       localStorage?: Record<string, string>
       indexedDB?: Record<string, unknown>
+      meta?: { updatedAt?: string; device?: string }
     }
 
+    let lsCount = 0
     if (data.localStorage) {
       for (const [key, value] of Object.entries(data.localStorage)) {
-        if (key.startsWith(LS_PREFIX)) localStorage.setItem(key, value)
+        if (key.startsWith(LS_PREFIX)) { localStorage.setItem(key, value); lsCount++ }
       }
     }
 
+    let idbCount = 0
+    const idbKeys: string[] = []
     if (data.indexedDB) {
       for (const [key, value] of Object.entries(data.indexedDB)) {
         await savePersisted(key, value)
+        idbCount++
+        idbKeys.push(key)
       }
     }
 
-    setStatus('synced')
-    return true
-  } catch {
-    setStatus('error')
+    const device = data.meta?.device?.slice(0, 30) ?? '?'
+    setStatus('synced', `Recebido: ${lsCount} configs + ${idbCount} bases [${idbKeys.join(',')}] de ${device}`)
+    return lsCount > 0 || idbCount > 0
+  } catch (err) {
+    setStatus('error', `Erro pull: ${err instanceof Error ? err.message : String(err)}`)
     return false
   } finally {
     _pulling = false
