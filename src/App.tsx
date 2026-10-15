@@ -84,7 +84,16 @@ export function App() {
     }
 
     void pullFromCloud().then(pulled => {
-      if (pulled) bumpSync()
+      if (pulled) {
+        const reloaded = sessionStorage.getItem('rj-pull-reloaded')
+        if (!reloaded) {
+          sessionStorage.setItem('rj-pull-reloaded', '1')
+          window.location.reload()
+          return
+        }
+        sessionStorage.removeItem('rj-pull-reloaded')
+        bumpSync()
+      }
     })
     const stopListen = listenForChanges(bumpSync)
     window.addEventListener('rj-cloud-pull-done', bumpSync)
@@ -821,8 +830,8 @@ function SyncSection() {
     try {
       const pulled = await pullFromCloud()
       if (pulled) {
-        setStatus('Dados recebidos da nuvem com sucesso!')
-        window.dispatchEvent(new Event('rj-cloud-pull-done'))
+        window.location.reload()
+        return
       } else {
         setStatus('Nuvem vazia ou sem dados novos')
       }
