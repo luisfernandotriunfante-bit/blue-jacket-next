@@ -119,7 +119,9 @@ export async function pullFromCloud(): Promise<boolean> {
           const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
           await savePersisted(key, parsed)
           idbCount++
-          pulledKeys.push(key)
+          const size = typeof raw === 'string' ? Math.round(raw.length / 1024) : 0
+          const baseLen = parsed?.base?.length ?? '?'
+          pulledKeys.push(`${key}(${size}kb,${baseLen})`)
         } else {
           emptyKeys.push(key)
         }
