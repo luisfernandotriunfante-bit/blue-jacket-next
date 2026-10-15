@@ -52,15 +52,20 @@ export async function pushToCloud(): Promise<void> {
     await set(ref(db, `${CLOUD_ROOT}/localStorage`), lsData)
 
     let idbCount = 0
+    const sentKeys: string[] = []
+    const skippedKeys: string[] = []
+    const failedKeys: string[] = []
     for (const key of IDB_KEYS) {
       setStatus('syncing', `Enviando ${key}…`)
       try {
         const val = await loadPersisted(key)
-        const packed = val !== null ? JSON.stringify(val) : null
+        if (val === null) { skippedKeys.push(key); continue }
+        const packed = JSON.stringify(val)
         await set(ref(db, `${CLOUD_ROOT}/indexedDB/${key}`), packed)
-        if (val !== null) idbCount++
+        idbCount++
+        sentKeys.push(`${key}(${Math.round(packed.length / 1024)}kb)`)
       } catch (err) {
-        setStatus('syncing', `Aviso: ${key} falhou (${err instanceof Error ? err.message : String(err)})`)
+        failedKeys.push(`${key}: ${err instanceof Error ? err.message : String(err)}`)
       }
     }
 
@@ -71,7 +76,10 @@ export async function pushToCloud(): Promise<void> {
       device: navigator.userAgent.slice(0, 80),
     })
 
-    setStatus('synced', `Enviado: ${lsCount} configs + ${idbCount} bases`)
+    let detail = `Enviado: ${lsCount} configs + ${idbCount} bases [${sentKeys.join(', ')}]`
+    if (skippedKeys.length) detail += ` | Vazios: ${skippedKeys.join(',')}`
+    if (failedKeys.length) detail += ` | Falhas: ${failedKeys.join('; ')}`
+    setStatus('synced', detail)
   } catch (err) {
     setStatus('error', `Erro push: ${err instanceof Error ? err.message : String(err)}`)
   }
