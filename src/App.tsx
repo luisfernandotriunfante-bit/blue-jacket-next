@@ -18,7 +18,7 @@ import { RcaManager, readRcas, type RcaRecord } from './RcaManager'
 import { CampaignTab } from './CampaignTab'
 import { saveCompetenciaSnap, loadCompetenciaSnap, listClosedCompetencias, fmtCompetencia, getActiveComp, setActiveComp, type CompetenciaSnapshot } from './domain/competenciaEngine'
 import { exportBundle, importBundle, downloadBundle, validateBundle } from './domain/syncEngine'
-import { pushToCloud, listenForChanges, schedulePush, onSyncStatus, initialPullAndReload, safeReload } from './domain/cloudSync'
+import { pushToCloud, pullFromCloud, listenForChanges, schedulePush, onSyncStatus } from './domain/cloudSync'
 import { isFirebaseConfigured } from './firebaseConfig'
 
 const motors: Array<{ id: Exclude<SourceArea, 'diario'>; name: string }> = [
@@ -57,6 +57,7 @@ const dedupeList = (files: UploadedFile[] | undefined) => (files ?? []).filter((
 export function App() {
   const [rcas, setRcas] = useState<RcaRecord[]>(readRcas)
   const [cloudStatus, setCloudStatus] = useState<'off' | 'syncing' | 'synced' | 'error'>('off')
+  const [syncKey, setSyncKey] = useState(0)
 
   useEffect(() => {
     const onUpdate = () => setRcas(readRcas())
@@ -72,8 +73,10 @@ export function App() {
     const lsEvents = ['rj-competencias-changed', 'rj-active-comp-changed', 'rj-markup-changed', 'rj-covdays-changed', 'rj-sellout-meta-changed', 'rj-positiv-meta-changed', 'rj-rcas-changed']
     lsEvents.forEach(e => window.addEventListener(e, schedulePush))
 
-    initialPullAndReload()
-    const stopListen = listenForChanges(() => safeReload())
+    void pullFromCloud().then(pulled => {
+      if (pulled) setSyncKey(k => k + 1)
+    })
+    const stopListen = listenForChanges(() => setSyncKey(k => k + 1))
     return () => {
       unsub(); stopListen(); setOnSaveHook(null)
       lsEvents.forEach(e => window.removeEventListener(e, schedulePush))
@@ -150,18 +153,18 @@ export function App() {
       setClientBase(saved.base); setClientAudit(saved.audit); setClientIndicators(saved.indicators); setClientSlots(saved.slots)
     }).finally(() => { if (active) setClientStateLoaded(true) })
     return () => { active = false }
-  }, [])
+  }, [syncKey])
   useEffect(() => {
     if (!clientStateLoaded) return
     void savePersisted<SavedClientMotor>('clientes', { base: clientBase, audit: clientAudit, indicators: clientIndicators, slots: clientSlots })
   }, [clientStateLoaded, clientBase, clientAudit, clientIndicators, clientSlots])
-  useEffect(() => { let active = true; void loadPersisted<SavedProductMotor>('produtos').then(saved => { if (!active || !saved) return; const base = saved.base.map(product => { const grouping = classifyProduct(product); return { ...product, groupCode: grouping.group?.code, groupName: grouping.group?.name, groupFamily: grouping.group?.family, groupStatus: grouping.status } }); setProductBase(base); setProductAudit(saved.audit); setProductIndicators(saved.indicators); setProductSlots(saved.slots) }).finally(() => { if (active) setProductStateLoaded(true) }); return () => { active = false } }, [])
+  useEffect(() => { let active = true; void loadPersisted<SavedProductMotor>('produtos').then(saved => { if (!active || !saved) return; const base = saved.base.map(product => { const grouping = classifyProduct(product); return { ...product, groupCode: grouping.group?.code, groupName: grouping.group?.name, groupFamily: grouping.group?.family, groupStatus: grouping.status } }); setProductBase(base); setProductAudit(saved.audit); setProductIndicators(saved.indicators); setProductSlots(saved.slots) }).finally(() => { if (active) setProductStateLoaded(true) }); return () => { active = false } }, [syncKey])
   useEffect(() => { if (productStateLoaded) void savePersisted<SavedProductMotor>('produtos', { base: productBase, audit: productAudit, indicators: productIndicators, slots: productSlots }) }, [productStateLoaded, productBase, productAudit, productIndicators, productSlots])
-  useEffect(() => { let active = true; void loadPersisted<SavedHistoryMotor>('historico').then(saved => { if (!active || !saved) return; setHistoryBase(saved.base); setHistoryAudit(saved.audit); setHistoryIndicators(saved.indicators); setHistorySlots(Object.fromEntries(Object.entries(saved.slots).map(([k, v]) => [k, dedupeList(v as UploadedFile[])])) as typeof saved.slots) }).finally(() => { if (active) setHistoryStateLoaded(true) }); return () => { active = false } }, [])
+  useEffect(() => { let active = true; void loadPersisted<SavedHistoryMotor>('historico').then(saved => { if (!active || !saved) return; setHistoryBase(saved.base); setHistoryAudit(saved.audit); setHistoryIndicators(saved.indicators); setHistorySlots(Object.fromEntries(Object.entries(saved.slots).map(([k, v]) => [k, dedupeList(v as UploadedFile[])])) as typeof saved.slots) }).finally(() => { if (active) setHistoryStateLoaded(true) }); return () => { active = false } }, [syncKey])
   useEffect(() => { if (historyStateLoaded) void savePersisted<SavedHistoryMotor>('historico', { base: historyBase, audit: historyAudit, indicators: historyIndicators, slots: historySlots }) }, [historyStateLoaded, historyBase, historyAudit, historyIndicators, historySlots])
-  useEffect(() => { let active = true; void loadPersisted<SavedMovementMotor>('movimentacoes').then(saved => { if (!active || !saved) return; setMovementBase(saved.base); setMovementAudit(saved.audit); setMovementIndicators(saved.indicators); setMovementSlots(Object.fromEntries(Object.entries(saved.slots).map(([k, v]) => [k, dedupeList(v as UploadedFile[])])) as typeof saved.slots) }).finally(() => { if (active) setMovementStateLoaded(true) }); return () => { active = false } }, [])
+  useEffect(() => { let active = true; void loadPersisted<SavedMovementMotor>('movimentacoes').then(saved => { if (!active || !saved) return; setMovementBase(saved.base); setMovementAudit(saved.audit); setMovementIndicators(saved.indicators); setMovementSlots(Object.fromEntries(Object.entries(saved.slots).map(([k, v]) => [k, dedupeList(v as UploadedFile[])])) as typeof saved.slots) }).finally(() => { if (active) setMovementStateLoaded(true) }); return () => { active = false } }, [syncKey])
   useEffect(() => { if (movementStateLoaded) void savePersisted<SavedMovementMotor>('movimentacoes', { base: movementBase, audit: movementAudit, indicators: movementIndicators, slots: movementSlots }) }, [movementStateLoaded, movementBase, movementAudit, movementIndicators, movementSlots])
-  useEffect(()=>{let active=true;void loadPersisted<SavedReceiptMotor>('recebimentos').then(saved=>{if(!active||!saved)return;setReceiptBase(saved.base);setReceiptAudit(saved.audit);setReceiptIndicators(saved.indicators);setReceiptSlots(Object.fromEntries(Object.entries(saved.slots).map(([k,v])=>[k,dedupeList(v as UploadedFile[])])) as typeof saved.slots)}).finally(()=>{if(active)setReceiptStateLoaded(true)});return()=>{active=false}},[])
+  useEffect(()=>{let active=true;void loadPersisted<SavedReceiptMotor>('recebimentos').then(saved=>{if(!active||!saved)return;setReceiptBase(saved.base);setReceiptAudit(saved.audit);setReceiptIndicators(saved.indicators);setReceiptSlots(Object.fromEntries(Object.entries(saved.slots).map(([k,v])=>[k,dedupeList(v as UploadedFile[])])) as typeof saved.slots)}).finally(()=>{if(active)setReceiptStateLoaded(true)});return()=>{active=false}},[syncKey])
   useEffect(()=>{if(receiptStateLoaded)void savePersisted<SavedReceiptMotor>('recebimentos',{base:receiptBase,audit:receiptAudit,indicators:receiptIndicators,slots:receiptSlots})},[receiptStateLoaded,receiptBase,receiptAudit,receiptIndicators,receiptSlots])
 
   const findInSlot = (list: UploadedFile[] | undefined, file: File) => (list ?? []).find(e => e.name === file.name && e.size === file.size)
