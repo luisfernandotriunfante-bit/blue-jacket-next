@@ -32,6 +32,17 @@ export function onSyncStatus(fn: StatusListener): () => void {
   return () => statusListeners.delete(fn)
 }
 
+function stripUndefined(obj: unknown): unknown {
+  if (obj === undefined) return null
+  if (obj === null || typeof obj !== 'object') return obj
+  if (Array.isArray(obj)) return obj.map(stripUndefined)
+  const clean: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+    clean[k] = v === undefined ? null : stripUndefined(v)
+  }
+  return clean
+}
+
 function collectLocalStorage(): Record<string, string> {
   const data: Record<string, string> = {}
   for (let i = 0; i < localStorage.length; i++) {
@@ -55,7 +66,7 @@ export async function pushToCloud(): Promise<void> {
     for (const key of IDB_KEYS) {
       try {
         const val = await loadPersisted(key)
-        if (val !== null) idbData[key] = val
+        if (val !== null) idbData[key] = stripUndefined(val)
       } catch { /* skip */ }
     }
     const idbCount = Object.keys(idbData).length
