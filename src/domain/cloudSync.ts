@@ -69,6 +69,11 @@ export async function pushToCloud(): Promise<void> {
       }
     }
 
+    if (idbCount === 0 && lsCount === 0) {
+      setStatus('synced', 'Nenhum dado local para enviar')
+      return
+    }
+
     const now = new Date().toISOString()
     lastPushAt = now
     await set(ref(db, `${CLOUD_ROOT}/meta`), {
@@ -103,6 +108,8 @@ export async function pullFromCloud(): Promise<boolean> {
 
     let idbCount = 0
     const pulledKeys: string[] = []
+    const emptyKeys: string[] = []
+    const failedKeys: string[] = []
     for (const key of IDB_KEYS) {
       setStatus('syncing', `Puxando ${key}…`)
       try {
@@ -113,14 +120,21 @@ export async function pullFromCloud(): Promise<boolean> {
           await savePersisted(key, parsed)
           idbCount++
           pulledKeys.push(key)
+        } else {
+          emptyKeys.push(key)
         }
-      } catch { /* skip */ }
+      } catch (err) {
+        failedKeys.push(`${key}: ${err instanceof Error ? err.message : String(err)}`)
+      }
     }
 
     const metaSnap = await get(ref(db, `${CLOUD_ROOT}/meta`))
     const meta = metaSnap.exists() ? metaSnap.val() as { device?: string } : null
     const device = meta?.device?.slice(0, 30) ?? '?'
-    setStatus('synced', `Recebido: ${lsCount} configs + ${idbCount} bases [${pulledKeys.join(',')}] de ${device}`)
+    let detail = `Recebido: ${lsCount} configs + ${idbCount} bases [${pulledKeys.join(',')}] de ${device}`
+    if (emptyKeys.length) detail += ` | Vazios na nuvem: ${emptyKeys.join(',')}`
+    if (failedKeys.length) detail += ` | Falhas: ${failedKeys.join('; ')}`
+    setStatus('synced', detail)
     return lsCount > 0 || idbCount > 0
   } catch (err) {
     setStatus('error', `Erro pull: ${err instanceof Error ? err.message : String(err)}`)
@@ -155,5 +169,8 @@ let debounceTimer: ReturnType<typeof setTimeout> | null = null
 export function schedulePush(): void {
   if (!isFirebaseConfigured() || _pulling) return
   if (debounceTimer) clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(() => void pushToCloud(), 2000)
+  debounceTimer = setTimeout(() => {
+    if (_pulling) return
+    void pushToCloud()
+  }, 2000)
 }
