@@ -4,7 +4,6 @@ import { loadPersisted, savePersisted } from './persistence'
 
 const LS_PREFIX = 'rj-'
 const CLOUD_ROOT = 'blue-jacket'
-const RELOAD_TS_KEY = 'rj-cloud-reload-ts'
 
 const IDB_KEYS = [
   'produtos', 'clientes', 'historico', 'movimentacoes', 'recebimentos',
@@ -104,25 +103,6 @@ export async function pullFromCloud(): Promise<boolean> {
   } finally {
     _pulling = false
   }
-}
-
-export function safeReload(): void {
-  try {
-    const last = parseInt(sessionStorage.getItem(RELOAD_TS_KEY) ?? '0')
-    if (Date.now() - last < 8000) return
-    sessionStorage.setItem(RELOAD_TS_KEY, String(Date.now()))
-  } catch { return }
-  window.location.reload()
-}
-
-export function initialPullAndReload(): void {
-  const db = getDb()
-  if (!db) return
-
-  void pullFromCloud().then(pulled => {
-    if (!pulled) return
-    safeReload()
-  })
 }
 
 let unsubscribe: Unsubscribe | null = null
