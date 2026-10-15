@@ -81,7 +81,12 @@ export async function pushToCloud(): Promise<void> {
         const packed = JSON.stringify(cleaned)
         await set(ref(db, `${CLOUD_ROOT}/indexedDB/${key}`), packed)
         idbCount++
-        sentKeys.push(`${key}(${Math.round(packed.length / 1024)}kb)`)
+        const rec = cleaned as Record<string, unknown> | null
+        const baseVal = rec?.base
+        const baseInfo = baseVal
+          ? Array.isArray(baseVal) ? (baseVal as unknown[]).length : `obj:${typeof baseVal}`
+          : `?:${typeof baseVal}`
+        sentKeys.push(`${key}(${Math.round(packed.length / 1024)}kb,${baseInfo})`)
       } catch (err) {
         failedKeys.push(`${key}: ${err instanceof Error ? err.message : String(err)}`)
       }
@@ -134,7 +139,9 @@ export async function pullFromCloud(): Promise<boolean> {
         const snap = await get(ref(db, `${CLOUD_ROOT}/indexedDB/${key}`))
         if (snap.exists()) {
           const raw = snap.val()
-          let parsed = typeof raw === 'string' ? JSON.parse(raw) : fbToArray(raw)
+          const rawType = typeof raw === 'string' ? 's' : 'o'
+          let parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+          parsed = fbToArray(parsed)
           if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
             const rec = parsed as Record<string, unknown>
             for (const field of Object.keys(rec)) {
@@ -146,10 +153,13 @@ export async function pullFromCloud(): Promise<boolean> {
           await savePersisted(key, parsed)
           idbCount++
           const size = typeof raw === 'string' ? Math.round(raw.length / 1024) : Math.round(JSON.stringify(raw).length / 1024)
-          const baseLen = (parsed as Record<string, unknown>)?.base
-            ? Array.isArray((parsed as Record<string, unknown>).base) ? ((parsed as Record<string, unknown>).base as unknown[]).length : 'obj'
-            : '?'
-          pulledKeys.push(`${key}(${size}kb,${baseLen})`)
+          const rec = parsed as Record<string, unknown> | null
+          const keys = rec ? Object.keys(rec).slice(0, 5).join('/') : 'null'
+          const baseVal = rec?.base
+          const baseLen = baseVal
+            ? Array.isArray(baseVal) ? (baseVal as unknown[]).length : `obj:${typeof baseVal}`
+            : `?:${typeof baseVal}`
+          pulledKeys.push(`${key}(${size}kb,${rawType},${keys},${baseLen})`)
         } else {
           emptyKeys.push(key)
         }
