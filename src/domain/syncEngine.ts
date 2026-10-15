@@ -11,11 +11,7 @@ export interface SyncBundle {
 const LS_PREFIX = 'rj-'
 
 const IDB_KEYS = [
-  'products', 'clients', 'movements', 'history', 'receipts',
-  'product-indicators', 'client-indicators', 'movement-indicators',
-  'history-indicators', 'receipt-indicators',
-  'product-slots', 'client-slots', 'movement-slots', 'history-slots', 'receipt-slots',
-  'raw-files', 'uploaded-files',
+  'produtos', 'clientes', 'historico', 'movimentacoes', 'recebimentos',
 ]
 
 export async function exportBundle(): Promise<SyncBundle> {

@@ -7,11 +7,7 @@ const CLOUD_ROOT = 'blue-jacket'
 const RELOAD_TS_KEY = 'rj-cloud-reload-ts'
 
 const IDB_KEYS = [
-  'products', 'clients', 'movements', 'history', 'receipts',
-  'product-indicators', 'client-indicators', 'movement-indicators',
-  'history-indicators', 'receipt-indicators',
-  'product-slots', 'client-slots', 'movement-slots', 'history-slots', 'receipt-slots',
-  'uploaded-files',
+  'produtos', 'clientes', 'historico', 'movimentacoes', 'recebimentos',
 ]
 
 type SyncStatus = 'off' | 'syncing' | 'synced' | 'error'
