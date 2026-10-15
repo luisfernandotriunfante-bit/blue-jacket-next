@@ -2,7 +2,7 @@
 
 :root { font-family: Manrope, Arial, sans-serif; color: var(--text); background: var(--background); }
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; }
+body { margin: 0; min-width: 320px; overflow-x: hidden; }
 button, input { font: inherit; }
 button { cursor: pointer; }
 .theme-dark { --background: #090909; --surface: #121212; --surface-raised: #1a1a1a; --text: #f6f6f6; --muted: #a7a7a7; --border: #303030; --red: #ed1c24; --blue: #3b82f6; --white: #e2e8f0; }
@@ -31,11 +31,12 @@ button { cursor: pointer; }
 @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 .theme-toggle { border: 1px solid var(--border); color: var(--text); }
 .main { margin-left: 52px; width: calc(100% - 52px); padding: 42px clamp(24px, 5vw, 72px) 72px; }
-.topbar { border-bottom: 1px solid var(--border); }
+.topbar { border-bottom: 1px solid var(--border); overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.topbar::-webkit-scrollbar { display: none; }
 h1, h2, h3 { color: var(--red); font-family: 'Space Grotesk', sans-serif; letter-spacing: .025em; margin: 0; }
 h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 .content { padding-top: 34px; max-width: 1200px; margin: 0 auto; }
-.stock-topbar { display: flex; justify-content: center; align-items: stretch; padding: 0; }
+.stock-topbar { display: flex; justify-content: center; align-items: stretch; padding: 0; white-space: nowrap; }
 .stock-nav-btn { padding: 14px 32px; border: 0; background: transparent; color: var(--muted); font-size: 14px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; font-family: 'Space Grotesk', sans-serif; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; }
 .stock-nav-btn.on { color: var(--red); border-bottom-color: var(--red); }
 .stock-nav-btn:hover:not(.on) { color: var(--text); }
@@ -57,7 +58,7 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 
 @media (max-width: 720px) {
   .sidebar { display: none; }
-  .main { width: 100%; margin-left: 0; padding: 24px 16px 90px; }
+  .main { width: 100%; margin-left: 0; padding: 24px 16px 90px; overflow-x: hidden; }
   .motor-grid { grid-template-columns: 1fr; }
   .audit-heading { align-items: flex-start; flex-direction: column; }
   h1 { font-size: 22px; }
@@ -77,6 +78,10 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
   .bn-item.active { color: var(--red); }
   .bn-item.bn-theme { color: var(--muted); }
   .bn-item:active { background: var(--surface-raised); }
+
+  /* Topbar mobile: tabs scrolláveis */
+  .topbar { overflow-x: auto; white-space: nowrap; }
+  .stock-nav-btn { padding: 14px 18px; font-size: 12px; flex-shrink: 0; }
 }
 
 /* ── Aba Estoque ──────────────────────────────────────────────────────── */
