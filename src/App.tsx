@@ -740,8 +740,20 @@ function SyncSection() {
   const [importing, setImporting] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const [pushing, setPushing] = useState(false)
+  const [pulling, setPulling] = useState(false)
+  const [syncStatus, setSyncStatus] = useState<'off' | 'syncing' | 'synced' | 'error'>('off')
+  const [syncDetail, setSyncDetail] = useState('')
   const importRef = useRef<HTMLInputElement>(null)
   const configured = isFirebaseConfigured()
+
+  useEffect(() => {
+    if (!configured) return
+    const unsub = onSyncStatus((s) => {
+      setSyncStatus(s)
+      setSyncDetail(getSyncDetail())
+    })
+    return unsub
+  }, [configured])
 
   async function handleExport() {
     setExporting(true)
@@ -791,6 +803,28 @@ function SyncSection() {
     setPushing(false)
   }
 
+  async function handleForcePull() {
+    setPulling(true)
+    setStatus(null)
+    try {
+      const pulled = await pullFromCloud()
+      if (pulled) {
+        setStatus('Dados recebidos da nuvem com sucesso. Recarregue a página para ver.')
+        window.dispatchEvent(new Event('rj-competencias-changed'))
+        window.dispatchEvent(new Event('rj-active-comp-changed'))
+        window.dispatchEvent(new Event('rj-markup-changed'))
+        window.dispatchEvent(new Event('rj-covdays-changed'))
+        window.dispatchEvent(new Event('rj-sellout-meta-changed'))
+        window.dispatchEvent(new Event('rj-positiv-meta-changed'))
+      } else {
+        setStatus('Nuvem vazia ou sem dados novos')
+      }
+    } catch {
+      setStatus('Erro ao puxar dados da nuvem')
+    }
+    setPulling(false)
+  }
+
   return (
     <>
       <h2>SINCRONIZAÇÃO NA NUVEM</h2>
@@ -801,9 +835,23 @@ function SyncSection() {
             Todos os dados são sincronizados automaticamente com a nuvem.
             Qualquer dispositivo que abrir o sistema verá a versão mais recente.
           </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '8px 0' }}>
+            <span className={`cloud-dot cloud-dot-${syncStatus}`} />
+            <span style={{ fontSize: 13 }}>
+              {syncStatus === 'synced' ? 'Sincronizado' : syncStatus === 'syncing' ? 'Sincronizando…' : syncStatus === 'error' ? 'Erro' : 'Offline'}
+            </span>
+          </div>
+          {syncDetail && (
+            <p className="config-help" style={{ fontSize: 12, fontFamily: 'monospace', wordBreak: 'break-all' }}>
+              {syncDetail}
+            </p>
+          )}
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
             <button className="process-button" style={{ margin: 0 }} type="button" disabled={pushing} onClick={handleForceSync}>
-              {pushing ? 'Enviando…' : 'Forçar envio agora'}
+              {pushing ? 'Enviando…' : 'Forçar envio'}
+            </button>
+            <button className="process-button" style={{ margin: 0 }} type="button" disabled={pulling} onClick={handleForcePull}>
+              {pulling ? 'Puxando…' : 'Forçar pull'}
             </button>
           </div>
         </div>
