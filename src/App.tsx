@@ -73,13 +73,25 @@ export function App() {
     const lsEvents = ['rj-competencias-changed', 'rj-active-comp-changed', 'rj-markup-changed', 'rj-covdays-changed', 'rj-sellout-meta-changed', 'rj-positiv-meta-changed', 'rj-rcas-changed']
     lsEvents.forEach(e => window.addEventListener(e, schedulePush))
 
+    const bumpSync = () => {
+      setSyncKey(k => k + 1)
+      window.dispatchEvent(new Event('rj-competencias-changed'))
+      window.dispatchEvent(new Event('rj-active-comp-changed'))
+      window.dispatchEvent(new Event('rj-markup-changed'))
+      window.dispatchEvent(new Event('rj-covdays-changed'))
+      window.dispatchEvent(new Event('rj-sellout-meta-changed'))
+      window.dispatchEvent(new Event('rj-positiv-meta-changed'))
+    }
+
     void pullFromCloud().then(pulled => {
-      if (pulled) setSyncKey(k => k + 1)
+      if (pulled) bumpSync()
     })
-    const stopListen = listenForChanges(() => setSyncKey(k => k + 1))
+    const stopListen = listenForChanges(bumpSync)
+    window.addEventListener('rj-cloud-pull-done', bumpSync)
     return () => {
       unsub(); stopListen(); setOnSaveHook(null)
       lsEvents.forEach(e => window.removeEventListener(e, schedulePush))
+      window.removeEventListener('rj-cloud-pull-done', bumpSync)
     }
   }, [])
 
@@ -809,13 +821,8 @@ function SyncSection() {
     try {
       const pulled = await pullFromCloud()
       if (pulled) {
-        setStatus('Dados recebidos da nuvem com sucesso. Recarregue a página para ver.')
-        window.dispatchEvent(new Event('rj-competencias-changed'))
-        window.dispatchEvent(new Event('rj-active-comp-changed'))
-        window.dispatchEvent(new Event('rj-markup-changed'))
-        window.dispatchEvent(new Event('rj-covdays-changed'))
-        window.dispatchEvent(new Event('rj-sellout-meta-changed'))
-        window.dispatchEvent(new Event('rj-positiv-meta-changed'))
+        setStatus('Dados recebidos da nuvem com sucesso!')
+        window.dispatchEvent(new Event('rj-cloud-pull-done'))
       } else {
         setStatus('Nuvem vazia ou sem dados novos')
       }
