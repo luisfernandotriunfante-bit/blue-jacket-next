@@ -77,7 +77,8 @@ export async function pushToCloud(): Promise<void> {
       try {
         const val = await loadPersisted(key)
         if (val === null) { skippedKeys.push(key); continue }
-        const packed = JSON.stringify(val)
+        const cleaned = fbToArray(val)
+        const packed = JSON.stringify(cleaned)
         await set(ref(db, `${CLOUD_ROOT}/indexedDB/${key}`), packed)
         idbCount++
         sentKeys.push(`${key}(${Math.round(packed.length / 1024)}kb)`)
