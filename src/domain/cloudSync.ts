@@ -17,6 +17,23 @@ let currentDetail = ''
 const statusListeners = new Set<StatusListener>()
 let lastPushAt = ''
 let _pulling = false
+let _pullCooldown = false
+
+function fbToArray(obj: unknown): unknown {
+  if (obj === null || obj === undefined || typeof obj !== 'object') return obj
+  if (Array.isArray(obj)) return obj.map(fbToArray)
+  const record = obj as Record<string, unknown>
+  const keys = Object.keys(record)
+  const allNumeric = keys.length > 0 && keys.every(k => /^\d+$/.test(k))
+  if (allNumeric) {
+    const arr: unknown[] = []
+    for (const k of keys) arr[Number(k)] = fbToArray(record[k])
+    return arr
+  }
+  const result: Record<string, unknown> = {}
+  for (const k of keys) result[k] = fbToArray(record[k])
+  return result
+}
 
 function setStatus(s: SyncStatus, detail?: string) {
   currentStatus = s
@@ -116,11 +133,21 @@ export async function pullFromCloud(): Promise<boolean> {
         const snap = await get(ref(db, `${CLOUD_ROOT}/indexedDB/${key}`))
         if (snap.exists()) {
           const raw = snap.val()
-          const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+          let parsed = typeof raw === 'string' ? JSON.parse(raw) : fbToArray(raw)
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            const rec = parsed as Record<string, unknown>
+            for (const field of Object.keys(rec)) {
+              if (rec[field] && typeof rec[field] === 'object' && !Array.isArray(rec[field])) {
+                rec[field] = fbToArray(rec[field])
+              }
+            }
+          }
           await savePersisted(key, parsed)
           idbCount++
-          const size = typeof raw === 'string' ? Math.round(raw.length / 1024) : 0
-          const baseLen = parsed?.base?.length ?? '?'
+          const size = typeof raw === 'string' ? Math.round(raw.length / 1024) : Math.round(JSON.stringify(raw).length / 1024)
+          const baseLen = (parsed as Record<string, unknown>)?.base
+            ? Array.isArray((parsed as Record<string, unknown>).base) ? ((parsed as Record<string, unknown>).base as unknown[]).length : 'obj'
+            : '?'
           pulledKeys.push(`${key}(${size}kb,${baseLen})`)
         } else {
           emptyKeys.push(key)
@@ -143,6 +170,8 @@ export async function pullFromCloud(): Promise<boolean> {
     return false
   } finally {
     _pulling = false
+    _pullCooldown = true
+    setTimeout(() => { _pullCooldown = false }, 5000)
   }
 }
 
@@ -169,10 +198,10 @@ export function listenForChanges(onUpdate: () => void): () => void {
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 export function schedulePush(): void {
-  if (!isFirebaseConfigured() || _pulling) return
+  if (!isFirebaseConfigured() || _pulling || _pullCooldown) return
   if (debounceTimer) clearTimeout(debounceTimer)
   debounceTimer = setTimeout(() => {
-    if (_pulling) return
+    if (_pulling || _pullCooldown) return
     void pushToCloud()
   }, 2000)
 }
