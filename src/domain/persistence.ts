@@ -19,11 +19,14 @@ export async function loadPersisted<T>(key: string): Promise<T | null> {
   })
 }
 
+let onSaveHook: (() => void) | null = null
+export function setOnSaveHook(fn: (() => void) | null): void { onSaveHook = fn }
+
 export async function savePersisted<T>(key: string, value: T): Promise<void> {
   const db = await openDatabase()
   return new Promise((resolve, reject) => {
     const request = db.transaction(storeName, 'readwrite').objectStore(storeName).put(value, key)
-    request.onsuccess = () => resolve()
+    request.onsuccess = () => { resolve(); onSaveHook?.() }
     request.onerror = () => reject(request.error)
   })
 }

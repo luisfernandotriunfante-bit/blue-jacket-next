@@ -22,6 +22,13 @@ button { cursor: pointer; }
 .nav-label { overflow: hidden; }
 .nav-item.active { color: var(--text); background: var(--surface-raised); }
 .sidebar-bottom { margin-top: auto; }
+.cloud-status { display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 11px; color: var(--muted); }
+.cloud-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.cloud-dot-synced { background: #10b981; }
+.cloud-dot-syncing { background: #f59e0b; animation: pulse-dot 1s infinite; }
+.cloud-dot-error { background: var(--red); }
+.cloud-dot-off { background: var(--muted); opacity: 0.4; }
+@keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 .theme-toggle { border: 1px solid var(--border); color: var(--text); }
 .main { margin-left: 52px; width: calc(100% - 52px); padding: 42px clamp(24px, 5vw, 72px) 72px; }
 .topbar { border-bottom: 1px solid var(--border); }

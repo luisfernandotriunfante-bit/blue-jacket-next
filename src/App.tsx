@@ -8,7 +8,7 @@ import { processHistoryMotor, type CanonicalHistory, type HistoryIndicators } fr
 import { processMovementMotor, type CanonicalMovement, type MovementIndicators } from './domain/movementMotor'
 import { processReceiptMotor, type CanonicalReceipt, type ReceiptIndicators } from './domain/receiptMotor'
 import { classifyProduct } from './domain/productGrouping'
-import { loadPersisted, savePersisted } from './domain/persistence'
+import { loadPersisted, savePersisted, setOnSaveHook } from './domain/persistence'
 import { detectFile } from './domain/fileDetector'
 import { StockTab } from './StockTab'
 import { SellOutTab } from './SellOutTab'
@@ -18,6 +18,8 @@ import { RcaManager, readRcas, type RcaRecord } from './RcaManager'
 import { CampaignTab } from './CampaignTab'
 import { saveCompetenciaSnap, loadCompetenciaSnap, listClosedCompetencias, fmtCompetencia, getActiveComp, setActiveComp, type CompetenciaSnapshot } from './domain/competenciaEngine'
 import { exportBundle, importBundle, downloadBundle, validateBundle } from './domain/syncEngine'
+import { pullFromCloud, pushToCloud, listenForChanges, schedulePush, onSyncStatus } from './domain/cloudSync'
+import { isFirebaseConfigured } from './firebaseConfig'
 
 const motors: Array<{ id: Exclude<SourceArea, 'diario'>; name: string }> = [
   { id: 'produtos', name: 'Produtos' },
@@ -54,11 +56,30 @@ const dedupeList = (files: UploadedFile[] | undefined) => (files ?? []).filter((
 
 export function App() {
   const [rcas, setRcas] = useState<RcaRecord[]>(readRcas)
+  const [cloudStatus, setCloudStatus] = useState<'off' | 'syncing' | 'synced' | 'error'>('off')
 
   useEffect(() => {
     const onUpdate = () => setRcas(readRcas())
     window.addEventListener('rj-rcas-changed', onUpdate)
     return () => window.removeEventListener('rj-rcas-changed', onUpdate)
+  }, [])
+
+  useEffect(() => {
+    if (!isFirebaseConfigured()) return
+    const unsub = onSyncStatus(setCloudStatus)
+    setOnSaveHook(schedulePush)
+
+    const lsEvents = ['rj-competencias-changed', 'rj-active-comp-changed', 'rj-markup-changed', 'rj-covdays-changed', 'rj-sellout-meta-changed', 'rj-positiv-meta-changed', 'rj-rcas-changed']
+    lsEvents.forEach(e => window.addEventListener(e, schedulePush))
+
+    void pullFromCloud().then(pulled => {
+      if (pulled) window.location.reload()
+    })
+    const stopListen = listenForChanges(() => window.location.reload())
+    return () => {
+      unsub(); stopListen(); setOnSaveHook(null)
+      lsEvents.forEach(e => window.removeEventListener(e, schedulePush))
+    }
   }, [])
 
   const [activeComp, setActiveCompState] = useState<string>(getActiveComp)
@@ -399,6 +420,12 @@ export function App() {
         </div>
       )}
       <div className="sidebar-bottom">
+        {isFirebaseConfigured() && (
+          <div className="cloud-status" title={cloudStatus === 'synced' ? 'Dados sincronizados com a nuvem' : cloudStatus === 'syncing' ? 'Sincronizando…' : cloudStatus === 'error' ? 'Erro de sincronização' : 'Nuvem desconectada'}>
+            <span className={`cloud-dot cloud-dot-${cloudStatus}`} />
+            <span className="nav-label">{cloudStatus === 'synced' ? 'Sincronizado' : cloudStatus === 'syncing' ? 'Sincronizando…' : cloudStatus === 'error' ? 'Erro' : 'Offline'}</span>
+          </div>
+        )}
         <button className="theme-toggle" type="button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
           <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" /></svg>
           <span className="nav-label">{theme === 'dark' ? 'Tema claro' : 'Tema escuro'}</span>
@@ -711,7 +738,9 @@ function SyncSection() {
   const [exporting, setExporting] = useState(false)
   const [importing, setImporting] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
+  const [pushing, setPushing] = useState(false)
   const importRef = useRef<HTMLInputElement>(null)
+  const configured = isFirebaseConfigured()
 
   async function handleExport() {
     setExporting(true)
@@ -749,38 +778,58 @@ function SyncSection() {
     if (importRef.current) importRef.current.value = ''
   }
 
+  async function handleForceSync() {
+    setPushing(true)
+    setStatus(null)
+    try {
+      await pushToCloud()
+      setStatus('Dados enviados para a nuvem com sucesso')
+    } catch {
+      setStatus('Erro ao enviar dados para a nuvem')
+    }
+    setPushing(false)
+  }
+
   return (
     <>
-      <h2>SINCRONIZAÇÃO</h2>
+      <h2>SINCRONIZAÇÃO NA NUVEM</h2>
+      {configured ? (
+        <div className="config-group">
+          <label className="config-label">Sincronização automática ativa</label>
+          <p className="config-help">
+            Todos os dados são sincronizados automaticamente com a nuvem.
+            Qualquer dispositivo que abrir o sistema verá a versão mais recente.
+          </p>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
+            <button className="process-button" style={{ margin: 0 }} type="button" disabled={pushing} onClick={handleForceSync}>
+              {pushing ? 'Enviando…' : 'Forçar envio agora'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="config-group">
+          <label className="config-label">Nuvem não configurada</label>
+          <p className="config-help">
+            Para que os dados fiquem sincronizados automaticamente entre todos os dispositivos,
+            é preciso configurar o Firebase. Crie um projeto gratuito em{' '}
+            <a href="https://console.firebase.google.com/" target="_blank" rel="noreferrer" style={{ color: 'var(--blue)' }}>console.firebase.google.com</a>,
+            ative o <strong>Realtime Database</strong>, e adicione as variáveis de ambiente no deploy (VITE_FB_API_KEY, VITE_FB_DATABASE_URL, etc).
+          </p>
+        </div>
+      )}
+      <h2>BACKUP MANUAL</h2>
       <div className="config-group">
-        <label className="config-label">Transferir dados entre dispositivos</label>
+        <label className="config-label">Exportar / importar arquivo</label>
         <p className="config-help">
-          Exporte todos os dados (bases, configurações, competências) para um arquivo JSON.
-          Envie o arquivo para outro dispositivo (WhatsApp, e-mail) e importe lá.
+          Alternativa manual: exporte os dados para um arquivo JSON e envie para outro dispositivo (WhatsApp, e-mail).
         </p>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
-          <button
-            className="process-button"
-            style={{ margin: 0 }}
-            type="button"
-            disabled={exporting}
-            onClick={handleExport}
-          >
+          <button className="process-button" style={{ margin: 0 }} type="button" disabled={exporting} onClick={handleExport}>
             {exporting ? 'Exportando…' : 'Exportar dados'}
           </button>
-          <label
-            className="process-button"
-            style={{ margin: 0, cursor: importing ? 'wait' : 'pointer', opacity: importing ? 0.6 : 1, display: 'inline-flex', alignItems: 'center' }}
-          >
+          <label className="process-button" style={{ margin: 0, cursor: importing ? 'wait' : 'pointer', opacity: importing ? 0.6 : 1, display: 'inline-flex', alignItems: 'center' }}>
             {importing ? 'Importando…' : 'Importar dados'}
-            <input
-              ref={importRef}
-              type="file"
-              accept=".json"
-              style={{ display: 'none' }}
-              onChange={handleImport}
-              disabled={importing}
-            />
+            <input ref={importRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} disabled={importing} />
           </label>
         </div>
         {status ? (
