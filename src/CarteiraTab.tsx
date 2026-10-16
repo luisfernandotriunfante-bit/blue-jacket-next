@@ -30,14 +30,10 @@ function matchCity(rawCity: string): string | null {
   return null
 }
 
-const RAMP = ['#d4a5a0', '#c4706a', '#a33b34', '#6e1a14']
+const RAMP = ['var(--crt-d0)', 'var(--crt-d1)', 'var(--crt-d2)', 'var(--crt-d3)', 'var(--crt-d4)']
 function bin(v: number, max: number): number {
-  if (max <= 0) return 0
-  const r = v / max
-  if (r <= 0.25) return 0
-  if (r <= 0.5) return 1
-  if (r <= 0.75) return 2
-  return 3
+  if (max <= 1) return 2
+  return Math.min(4, Math.floor((v - 1) / max * 5))
 }
 
 type Mode = 'rot' | 'nao' | 'sem'
@@ -67,19 +63,6 @@ interface ClientRow {
   rcaCode: string
   rcaName: string
   hasCadastro: boolean
-}
-
-/* ── KpiCard ──────────────────────────────────────────── */
-function KpiCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div className="kpi-card">
-      <div className="kpi-card-body">
-        <div className="kpi-label">{label}</div>
-        <div className="kpi-val">{value}</div>
-        {sub && <div className="kpi-ring-row"><span className="kpi-pct">{sub}</span></div>}
-      </div>
-    </div>
-  )
 }
 
 /* ── Component ────────────────────────────────────────── */
@@ -162,7 +145,6 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
     })
   }, [clientBase, movsByCustomer, monthStart, monthEnd])
 
-  /* sellers — only from registered RCAs */
   const sellers = useMemo<SellerData[]>(() => {
     const map = new Map<string, SellerData>()
     for (const c of allClients) {
@@ -277,6 +259,17 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
     return colors
   }, [mode, sel, sellers, naoByCity, semByCity])
 
+  const maxLegend = useMemo(() => {
+    if (mode === 'rot') {
+      if (sel) return Math.max(...Object.values(sel.cities).map(c => c.clients), 1)
+      const byC: Record<string, number> = {}
+      for (const s of sellers) for (const ck of Object.keys(s.cities)) byC[ck] = (byC[ck] ?? 0) + 1
+      return Math.max(...Object.values(byC), 1)
+    }
+    const data = mode === 'nao' ? naoByCity : semByCity
+    return Math.max(...Object.values(data).map(l => l.length), 1)
+  }, [mode, sel, sellers, naoByCity, semByCity])
+
   /* tooltip */
   const showTip = useCallback((e: React.MouseEvent, ck: string) => {
     const tip = tipRef.current
@@ -291,7 +284,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
         if (v) html += `<br>${v.clients} clientes · ${brlFull(v.fat)}`
       } else {
         const sl = sellersByCity[ck] ?? []
-        html += `<br>${sl.length ? sl.length + ' vendedor' + (sl.length > 1 ? 'es' : '') + ': ' + sl.map(s => s.name.split(' ')[0]).join(', ') : 'Sem vendedor'}`
+        html += `<br>${sl.length ? sl.length + ' vendedor' + (sl.length > 1 ? 'es' : '') + ': ' + sl.map(s => s.name.split(' ')[0]).join(', ') : 'Sem vendedor no roteiro'}`
       }
     } else {
       const d = activeData[ck] ?? []
@@ -299,9 +292,9 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
     }
     tip.innerHTML = html
     tip.style.display = 'block'
-    let x = e.clientX - r.left + 14
-    let yy = e.clientY - r.top + 14
-    if (x > r.width - 250) x -= 260
+    let x = e.clientX - r.left + 12
+    let yy = e.clientY - r.top + 12
+    if (x > r.width - 270) x -= 280
     if (yy > r.height - 60) yy -= 70
     tip.style.left = x + 'px'
     tip.style.top = yy + 'px'
@@ -335,207 +328,265 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
 
   const MOV_LABEL: Record<string, string> = { venda_faturada: 'Faturado', a_faturar: 'A faturar', devolucao: 'Devolução', bonificacao: 'Bonificação', corte: 'Corte', entrada: 'Entrada' }
 
+  /* division table data */
+  const divisionTable = useMemo(() => {
+    const divs = new Map<string, { total: number; rot: number; nao: number; sem: number }>()
+    for (const c of allClients) {
+      const div = c.channel || 'Outros'
+      if (!divs.has(div)) divs.set(div, { total: 0, rot: 0, nao: 0, sem: 0 })
+      const d = divs.get(div)!
+      d.total++
+      if (c.routed && rcaMap.has(c.rcaCode)) d.rot++
+      else if (c.hasCadastro) d.nao++
+      else d.sem++
+    }
+    return [...divs.entries()].sort((a, b) => b[1].total - a[1].total)
+  }, [allClients, rcaMap])
+
   /* side panel */
   const renderSide = () => {
     if (mode === 'rot') {
       if (sel) {
         const ckList = Object.keys(sel.cities).sort((a, b) => sel.cities[b].clients - sel.cities[a].clients)
+        const maxC = Math.max(...ckList.map(ck => sel.cities[ck].clients), 1)
         return (
-          <div className="carteira-side">
-            <h2 style={{ fontSize: 18, margin: '0 0 8px' }}>{sel.name}</h2>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px', color: 'var(--muted)', fontSize: 12, marginBottom: 8 }}>
+          <div className="crt-side">
+            <h2 className="crt-side-h2">{sel.name}</h2>
+            <div className="crt-meta">
               <span>Cód. {sel.code}</span>
               {sel.supervisor && <span>Sup. {sel.supervisor}</span>}
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px', fontSize: 12, marginBottom: 12 }}>
-              <span><strong>{sel.totalClients}</strong> clientes</span>
-              <span><strong>{ckList.length}</strong> cidades</span>
-              <span><strong>{kpiCurrency(Object.values(sel.cities).reduce((s, c) => s + c.fat, 0))}</strong> faturado</span>
+            <div className="crt-meta">
+              <span><b>{sel.totalClients}</b> clientes</span>
+              <span><b>{ckList.length}</b> cidades</span>
+              <span><b>{kpiCurrency(Object.values(sel.cities).reduce((s, c) => s + c.fat, 0))}</b> faturado</span>
             </div>
-            {ckList.map(ck => {
-              const city = sel.cities[ck]
-              const clients = sel.clientList[ck] ?? []
-              const isOpen = expandedClient === ck
-              return (
-                <details key={ck} open={isOpen} onToggle={e => { if ((e.target as HTMLDetailsElement).open) setExpandedClient(ck); else if (expandedClient === ck) setExpandedClient(null) }}>
-                  <summary className="carteira-summary">
-                    <span>{msGeo[ck]?.n ?? ck}</span>
-                    <span style={{ fontSize: 12, fontFamily: 'monospace', opacity: 0.7 }}>{city.clients} cli · {kpiCurrency(city.fat)}</span>
-                  </summary>
-                  <ul style={{ margin: '2px 0 8px', padding: 0, listStyle: 'none', maxHeight: 300, overflow: 'auto', borderLeft: '2px solid var(--red)' }}>
-                    {clients.map(c => (
-                      <li key={c.document} style={{ padding: '4px 8px', fontSize: 12, display: 'grid', gridTemplateColumns: '1fr auto', gap: '0 8px' }}>
-                        <span>{c.name}<br /><small style={{ color: 'var(--muted)', fontFamily: 'monospace', fontSize: 11 }}>{c.document}</small></span>
-                        <span style={{ fontFamily: 'monospace', fontSize: 11, textAlign: 'right', whiteSpace: 'nowrap', color: 'var(--muted)' }}>{c.fat > 0 ? kpiCurrency(c.fat) : '—'}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )
-            })}
+            <div className="crt-rows">
+              {ckList.map(ck => {
+                const city = sel.cities[ck]
+                const clients = sel.clientList[ck] ?? []
+                const isOpen = expandedClient === ck
+                return (
+                  <details key={ck} className="crt-det" open={isOpen} onToggle={e => { if ((e.target as HTMLDetailsElement).open) setExpandedClient(ck); else if (expandedClient === ck) setExpandedClient(null) }}>
+                    <summary>
+                      <span>{msGeo[ck]?.n ?? ck}</span>
+                      <span>{city.clients} cli · {kpiCurrency(city.fat)}</span>
+                      <div className="crt-bar"><i style={{ width: `${city.clients / maxC * 100}%` }} /></div>
+                    </summary>
+                    <ul className="crt-cli">
+                      {clients.map(c => (
+                        <li key={c.document}>
+                          <span>{c.name}<br /><small>{c.document}</small></span>
+                          <span className="crt-v">{c.fat > 0 ? kpiCurrency(c.fat) : '—'}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )
+              })}
+            </div>
           </div>
         )
       }
-      /* selected city in overview */
       if (selectedCity && sellersByCity[selectedCity]) {
         const sl = sellersByCity[selectedCity]
         return (
-          <div className="carteira-side">
-            <h2 style={{ fontSize: 18, margin: '0 0 8px' }}>{msGeo[selectedCity]?.n ?? selectedCity}</h2>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}><strong>{sl.length}</strong> vendedor{sl.length > 1 ? 'es' : ''} na cidade</div>
+          <div className="crt-side">
+            <h2 className="crt-side-h2">{msGeo[selectedCity]?.n ?? selectedCity}</h2>
+            <div className="crt-meta"><span><b>{sl.length}</b> vendedor{sl.length > 1 ? 'es' : ''} na cidade</span></div>
             {sl.map(s => (
-              <button key={s.code} type="button" onClick={() => { setSelectedSeller(s.code); setSelectedCity(null); setExpandedClient(null) }}
-                style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer', font: 'inherit', marginBottom: 6 }}>
+              <button key={s.code} type="button" onClick={() => { setSelectedSeller(s.code); setSelectedCity(null); setExpandedClient(null) }} className="crt-city-seller">
                 <div style={{ fontWeight: 600 }}>{s.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--muted)' }}>Cód. {s.code} · {s.cities[selectedCity]?.clients ?? 0} clientes</div>
+                <div className="crt-sub">Cód. {s.code} · {s.cities[selectedCity]?.clients ?? 0} clientes</div>
               </button>
             ))}
           </div>
         )
       }
-      /* general overview */
-      const supMap = new Map<string, { total: number; sellers: number; cities: Set<string> }>()
-      for (const s of sellers) {
-        const sup = s.supervisor || 'Sem supervisor'
-        if (!supMap.has(sup)) supMap.set(sup, { total: 0, sellers: 0, cities: new Set() })
-        const d = supMap.get(sup)!
-        d.total += s.totalClients
-        d.sellers++
-        for (const ck of Object.keys(s.cities)) d.cities.add(ck)
-      }
+      /* overview */
+      const topCities = cityKeys.map(ck => ({ ck, n: (sellersByCity[ck] ?? []).length })).filter(x => x.n > 0).sort((a, b) => b.n - a.n).slice(0, 8)
+      const coveredCities = cityKeys.filter(ck => sellersByCity[ck]?.length).length
+      const totDiv = divisionTable.reduce((a, [, d]) => ({ total: a.total + d.total, rot: a.rot + d.rot, nao: a.nao + d.nao, sem: a.sem + d.sem }), { total: 0, rot: 0, nao: 0, sem: 0 })
       return (
-        <div className="carteira-side">
-          <h2 style={{ fontSize: 18, margin: '0 0 8px' }}>Visão geral</h2>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px', fontSize: 12, marginBottom: 12 }}>
-            <span><strong>{sellers.length}</strong> vendedores</span>
-            <span><strong>{allClients.filter(c => c.routed && rcaMap.has(c.rcaCode)).length}</strong> clientes roterizados</span>
+        <div className="crt-side">
+          <h2 className="crt-side-h2">Visão geral</h2>
+          <div className="crt-meta">
+            <span><b>{sellers.length}</b> vendedores</span>
+            <span><b>{coveredCities}</b> cidades atendidas</span>
           </div>
-          <table className="data-table" style={{ fontSize: 12 }}>
-            <thead><tr><th>Supervisor</th><th style={{ textAlign: 'right' }}>Vend.</th><th style={{ textAlign: 'right' }}>Clientes</th><th style={{ textAlign: 'right' }}>Cidades</th></tr></thead>
+          <p className="crt-note">Cidades com mais vendedores no mesmo roteiro:</p>
+          <div className="crt-rows">
+            {topCities.map(({ ck, n }) => (
+              <div key={ck} className="crt-row" onClick={() => { setSelectedCity(ck) }} style={{ cursor: 'pointer' }}>
+                <span>{msGeo[ck].n}</span>
+                <span>{n} vendedor{n > 1 ? 'es' : ''}</span>
+                <div className="crt-bar"><i style={{ width: `${n / topCities[0].n * 100}%` }} /></div>
+              </div>
+            ))}
+          </div>
+          <h3 className="crt-h3">Clientes na carteira</h3>
+          <table className="crt-tb">
+            <thead>
+              <tr><th>Canal</th><th>Total</th><th>Rot.</th><th>Sem rot.</th><th>Sem cad.</th></tr>
+            </thead>
             <tbody>
-              {[...supMap.entries()].sort((a, b) => b[1].total - a[1].total).map(([sup, d]) => (
-                <tr key={sup}><td>{sup}</td><td style={{ textAlign: 'right' }}>{d.sellers}</td><td style={{ textAlign: 'right' }}>{d.total}</td><td style={{ textAlign: 'right' }}>{d.cities.size}</td></tr>
+              {divisionTable.map(([div, d]) => (
+                <tr key={div}><td>{div}</td><td>{d.total}</td><td>{d.rot}</td><td>{d.nao}</td><td>{d.sem}</td></tr>
               ))}
+              <tr className="crt-tb-total"><td><b>Total</b></td><td><b>{totDiv.total}</b></td><td><b>{totDiv.rot}</b></td><td><b>{totDiv.nao}</b></td><td><b>{totDiv.sem}</b></td></tr>
             </tbody>
           </table>
+          <p className="crt-note">Escolha um vendedor para ver onde ele atua e quais clientes atende em cada cidade.</p>
         </div>
       )
     }
     /* nao / sem mode */
     if (selectedCity) {
       const clients = activeData[selectedCity] ?? []
+      const cityVendors = sellersByCity[selectedCity] ?? []
       return (
-        <div className="carteira-side">
-          <h2 style={{ fontSize: 18, margin: '0 0 8px' }}>{msGeo[selectedCity]?.n ?? selectedCity}</h2>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
-            <strong>{clients.length}</strong> {mode === 'nao' ? 'clientes sem roteiro' : 'clientes sem cadastro interno'}
+        <div className="crt-side">
+          <h2 className="crt-side-h2">{msGeo[selectedCity]?.n ?? selectedCity}</h2>
+          <div className="crt-meta">
+            <span><b>{clients.length}</b> {mode === 'nao' ? 'clientes sem roteiro' : 'clientes sem cadastro'}</span>
           </div>
-          {(sellersByCity[selectedCity] ?? []).length > 0 && (
+          {cityVendors.length > 0 && (
             <>
-              <h3 style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--muted)', margin: '8px 0 4px' }}>Vendedores na cidade</h3>
-              {(sellersByCity[selectedCity] ?? []).map(s => (
-                <div key={s.code} style={{ padding: '4px 0', fontSize: 12, borderTop: '1px solid var(--border)' }}>
-                  {s.name} <span style={{ color: 'var(--muted)', fontSize: 11 }}>({s.cities[selectedCity]?.clients ?? 0} cli)</span>
+              <h3 className="crt-h3">Vendedores que podem atender</h3>
+              {cityVendors.map(s => (
+                <div key={s.code} className="crt-vend">
+                  <span>{s.name}</span>
+                  <span>{s.cities[selectedCity]?.clients ?? 0} cli na cidade</span>
+                  <small>Cód. {s.code} · Sup. {s.supervisor}</small>
                 </div>
               ))}
             </>
           )}
-          <h3 style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--muted)', margin: '12px 0 4px' }}>Clientes</h3>
-          {clients.map(c => (
-            <details key={c.document} style={{ borderTop: '1px solid var(--border)' }}>
-              <summary className="carteira-summary">
-                <span>{c.name}</span>
-                <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--muted)' }}>{c.fat > 0 ? kpiCurrency(c.fat) : '—'}</span>
-              </summary>
-              <div style={{ padding: '4px 0 8px 8px', fontSize: 12, borderLeft: '2px solid var(--border)' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '3px 14px', marginBottom: 8 }}>
-                  <span>CNPJ: <strong style={{ fontFamily: 'monospace' }}>{c.document}</strong></span>
-                  {c.channel && <span>Canal: <strong>{c.channel}</strong></span>}
-                  {c.range && <span>Faixa: <strong>{c.range}</strong></span>}
-                  {c.network && <span>Rede: <strong>{c.network}</strong></span>}
-                  {c.cluster && <span>Cluster: <strong>{c.cluster}</strong></span>}
-                  {c.lastDate && <span>Última compra: <strong>{fmtDay(c.lastDate)}</strong></span>}
-                  {c.rcaCode && <span>RCA: <strong>{c.rcaCode}</strong></span>}
+          {!cityVendors.length && (
+            <p className="crt-warn">Nenhum vendedor tem roteiro em {msGeo[selectedCity]?.n ?? selectedCity}.</p>
+          )}
+          <h3 className="crt-h3">Clientes</h3>
+          <div className="crt-rows">
+            {clients.map(c => (
+              <details key={c.document} className="crt-det">
+                <summary>
+                  <span>{c.name}</span>
+                  <span>{c.fat > 0 ? kpiCurrency(c.fat) : '—'}</span>
+                </summary>
+                <div className="crt-detail-body">
+                  <div className="crt-detail-grid">
+                    <span>CNPJ: <b style={{ fontFamily: 'var(--crt-fm)' }}>{c.document}</b></span>
+                    {c.channel && <span>Canal: <b>{c.channel}</b></span>}
+                    {c.range && <span>Faixa: <b>{c.range}</b></span>}
+                    {c.network && <span>Rede: <b>{c.network}</b></span>}
+                    {c.cluster && <span>Cluster: <b>{c.cluster}</b></span>}
+                    {c.lastDate && <span>Última compra: <b>{fmtDay(c.lastDate)}</b></span>}
+                    {c.rcaCode && <span>RCA: <b>{c.rcaCode}</b></span>}
+                  </div>
+                  {(() => {
+                    const hist = clientHistory(c.code, c.document)
+                    if (!hist.length) return <div style={{ color: 'var(--crt-mute)' }}>Sem movimentações</div>
+                    return (
+                      <table className="crt-tb" style={{ fontSize: 11 }}>
+                        <thead><tr><th>Data</th><th>Tipo</th><th>Produto</th><th>Valor</th></tr></thead>
+                        <tbody>
+                          {hist.map((m, i) => (
+                            <tr key={i}><td>{m.movementDate ? fmtDay(m.movementDate) : ''}</td><td>{MOV_LABEL[m.movementType] ?? m.movementType}</td><td>{m.description ?? m.productCode ?? ''}</td><td>{m.value != null ? brlFull(m.value) : ''}</td></tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )
+                  })()}
                 </div>
-                {(() => {
-                  const hist = clientHistory(c.code, c.document)
-                  if (!hist.length) return <div style={{ color: 'var(--muted)' }}>Sem movimentações</div>
-                  return (
-                    <table className="data-table" style={{ fontSize: 11 }}>
-                      <thead><tr><th>Data</th><th>Tipo</th><th>Produto</th><th style={{ textAlign: 'right' }}>Valor</th></tr></thead>
-                      <tbody>
-                        {hist.map((m, i) => (
-                          <tr key={i}><td>{m.movementDate ? fmtDay(m.movementDate) : ''}</td><td>{MOV_LABEL[m.movementType] ?? m.movementType}</td><td>{m.description ?? m.productCode ?? ''}</td><td style={{ textAlign: 'right' }}>{m.value != null ? brlFull(m.value) : ''}</td></tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )
-                })()}
-              </div>
-            </details>
-          ))}
+              </details>
+            ))}
+          </div>
         </div>
       )
     }
-    /* general view */
+    /* general view for nao/sem */
     const data = mode === 'nao' ? naoByCity : semByCity
     const sorted = Object.keys(data).sort((a, b) => data[b].length - data[a].length)
+    const total = sorted.reduce((a, ck) => a + data[ck].length, 0)
+    const byChannel = new Map<string, number>()
+    for (const ck of sorted) for (const c of data[ck]) byChannel.set(c.channel || 'Outros', (byChannel.get(c.channel || 'Outros') ?? 0) + 1)
+    const channelList = [...byChannel.entries()].sort((a, b) => b[1] - a[1])
     return (
-      <div className="carteira-side">
-        <h2 style={{ fontSize: 18, margin: '0 0 8px' }}>{mode === 'nao' ? 'Clientes sem roteiro' : 'Sem cadastro interno'}</h2>
-        <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
-          <strong>{mode === 'nao' ? naoCount : semCount}</strong> clientes em <strong>{sorted.length}</strong> cidades
+      <div className="crt-side">
+        <h2 className="crt-side-h2">{mode === 'nao' ? 'Clientes sem roteiro' : 'Sem cadastro interno'}</h2>
+        <div className="crt-meta">
+          <span><b>{total}</b> clientes</span>
+          <span><b>{sorted.length}</b> cidades</span>
         </div>
-        <table className="data-table" style={{ fontSize: 12 }}>
-          <thead><tr><th>Cidade</th><th style={{ textAlign: 'right' }}>Clientes</th></tr></thead>
-          <tbody>
-            {sorted.slice(0, 30).map(ck => (
-              <tr key={ck} onClick={() => setSelectedCity(ck)} style={{ cursor: 'pointer' }}><td>{msGeo[ck]?.n ?? ck}</td><td style={{ textAlign: 'right' }}>{data[ck].length}</td></tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="crt-meta">
+          {channelList.slice(0, 4).map(([ch, n]) => (
+            <span key={ch}>{ch}: <b>{n}</b></span>
+          ))}
+        </div>
+        <p className="crt-note">{mode === 'nao'
+          ? 'Têm cadastro interno, mas não estão no roteiro de nenhum vendedor. Clique numa cidade para ver os clientes e quem pode atender.'
+          : 'O CNPJ não foi encontrado no cadastro interno. Clique numa cidade para ver os clientes.'
+        }</p>
+        <div className="crt-rows">
+          {sorted.map(ck => (
+            <button key={ck} type="button" className="crt-rowbtn" onClick={() => setSelectedCity(selectedCity === ck ? null : ck)}>
+              <div className="crt-row">
+                <span>{msGeo[ck]?.n ?? ck}</span>
+                <span>{data[ck].length} cli</span>
+                <span className="crt-sub">{(() => {
+                  const sv = sellersByCity[ck] ?? []
+                  return sv.length ? sv.map(s => s.name.split(' ')[0]).join(', ') : 'Sem vendedor com roteiro'
+                })()}</span>
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
     )
   }
 
+  const legendLabel = mode === 'rot'
+    ? (sel ? 'Clientes por cidade:' : 'Nº de vendedores na cidade:')
+    : `Clientes ${mode === 'nao' ? 'sem roteiro' : 'sem cadastro'} por cidade:`
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+    <div className="crt-wrap">
       {/* Modes */}
-      <div style={{ display: 'flex', gap: 0, padding: '0 16px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
-        <button type="button" className={`stock-nav-btn${mode === 'rot' ? ' on' : ''}`} onClick={() => setMode('rot')}>
-          Roterizados <small style={{ opacity: 0.7, fontFamily: 'monospace', marginLeft: 4 }}>{sellers.length}</small>
-        </button>
-        <button type="button" className={`stock-nav-btn${mode === 'nao' ? ' on' : ''}`} onClick={() => setMode('nao')}>
-          Não roterizados <small style={{ opacity: 0.7, fontFamily: 'monospace', marginLeft: 4 }}>{naoCount}</small>
-        </button>
-        <button type="button" className={`stock-nav-btn${mode === 'sem' ? ' on' : ''}`} onClick={() => setMode('sem')}>
-          Sem cadastro <small style={{ opacity: 0.7, fontFamily: 'monospace', marginLeft: 4 }}>{semCount}</small>
-        </button>
+      <div className="crt-modes">
+        {([
+          ['rot', 'Roterizados', `${sellers.length} vendedores`],
+          ['nao', 'Não roterizados', `${naoCount} clientes`],
+          ['sem', 'Sem cadastro interno', `${semCount} clientes`],
+        ] as [Mode, string, string][]).map(([k, label, sub]) => (
+          <button key={k} type="button" className="crt-mode" aria-pressed={mode === k} onClick={() => setMode(k)}>
+            {label} <small>{sub}</small>
+          </button>
+        ))}
       </div>
 
       {/* Grid: rail | map | side */}
-      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '260px minmax(0, 1fr) 320px', gap: 0, overflow: 'hidden' }} className="carteira-grid">
+      <div className="crt-grid">
         {/* Left rail */}
-        <aside style={{ borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <aside className="crt-card crt-rail">
           <input
             type="search"
             placeholder={mode === 'rot' ? 'Buscar vendedor…' : 'Buscar cidade…'}
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="stock-search"
-            style={{ margin: 10, width: 'auto' }}
+            className="crt-q"
           />
           {mode === 'rot' && (
             <button
               type="button"
+              className="crt-all"
+              aria-pressed={!selectedSeller}
               onClick={() => { setSelectedSeller(null); setSelectedCity(null); setExpandedClient(null) }}
-              style={{ margin: '0 10px 6px', padding: '7px 8px', display: 'flex', justifyContent: 'space-between', border: '1px solid var(--border)', borderRadius: 4, background: !selectedSeller ? 'var(--red)' : 'var(--surface)', color: !selectedSeller ? '#fff' : 'var(--text)', cursor: 'pointer', font: 'inherit', fontWeight: 500 }}
             >
               <span>Visão geral</span>
-              <small style={{ fontFamily: 'monospace', opacity: 0.8 }}>{sellers.length}</small>
+              <small>{sellers.length}</small>
             </button>
           )}
-          <div style={{ overflow: 'auto', padding: '0 6px 10px', flex: 1 }}>
+          <div className="crt-list">
             {mode === 'rot' ? (
               (() => {
                 let lastSup = ''
@@ -544,14 +595,15 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
                   lastSup = s.supervisor
                   return (
                     <div key={s.code}>
-                      {showSup && <div style={{ fontSize: 11, fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--muted)', padding: '12px 8px 4px' }}>{s.supervisor || 'Sem supervisor'}</div>}
+                      {showSup && <div className="crt-sup">{s.supervisor || 'Sem supervisor'}</div>}
                       <button
                         type="button"
+                        className="crt-seller"
+                        aria-pressed={selectedSeller === s.code}
                         onClick={() => { setSelectedSeller(s.code); setSelectedCity(null); setExpandedClient(null) }}
-                        style={{ display: 'flex', justifyContent: 'space-between', gap: 8, width: '100%', textAlign: 'left', border: 0, background: selectedSeller === s.code ? 'var(--red)' : 'transparent', color: selectedSeller === s.code ? '#fff' : 'var(--text)', font: 'inherit', padding: '7px 8px', borderRadius: 4, cursor: 'pointer' }}
                       >
                         <span>{s.name}</span>
-                        <small style={{ fontFamily: 'monospace', opacity: 0.8, whiteSpace: 'nowrap' }}>{s.totalClients}</small>
+                        <small>{s.totalClients}</small>
                       </button>
                     </div>
                   )
@@ -562,11 +614,12 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
                 <button
                   key={ck}
                   type="button"
+                  className="crt-cty"
+                  aria-pressed={selectedCity === ck}
                   onClick={() => setSelectedCity(selectedCity === ck ? null : ck)}
-                  style={{ display: 'flex', justifyContent: 'space-between', gap: 8, width: '100%', textAlign: 'left', border: 0, background: selectedCity === ck ? 'var(--red)' : 'transparent', color: selectedCity === ck ? '#fff' : 'var(--text)', font: 'inherit', padding: '7px 8px', borderRadius: 4, cursor: 'pointer' }}
                 >
                   <span>{msGeo[ck].n}</span>
-                  <small style={{ fontFamily: 'monospace', opacity: 0.8, whiteSpace: 'nowrap' }}>{activeData[ck]?.length ?? 0}</small>
+                  <small>{activeData[ck]?.length ?? 0}</small>
                 </button>
               ))
             )}
@@ -574,8 +627,8 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
         </aside>
 
         {/* Map */}
-        <div style={{ position: 'relative', overflow: 'auto', padding: 8 }}>
-          <svg ref={svgRef} viewBox={`0 0 ${MS_W} ${MS_H}`} style={{ display: 'block', width: '100%', height: 'auto', maxHeight: 'calc(100vh - 200px)' }}>
+        <main className="crt-card crt-mapcard">
+          <svg ref={svgRef} viewBox={`0 0 ${MS_W} ${MS_H}`} className="crt-svg" role="img" aria-label="Mapa de Mato Grosso do Sul">
             {cityKeys.map(ck => {
               const geo = msGeo[ck]
               const color = cityColors[ck]
@@ -584,10 +637,10 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
                 <path
                   key={ck}
                   d={geo.d}
-                  fill={color ?? 'var(--surface-raised, #1a1a1a)'}
-                  stroke={isSelected ? '#fff' : 'var(--background, #090909)'}
+                  fill={color ?? 'var(--crt-map-empty)'}
+                  stroke={isSelected ? 'var(--crt-sel)' : 'var(--crt-map-line)'}
                   strokeWidth={isSelected ? 2.5 : 0.8}
-                  style={{ cursor: color ? 'pointer' : 'default', transition: 'fill 0.15s' }}
+                  className={`crt-m${color ? ' on' : ''}${isSelected ? ' pick' : ''}`}
                   onMouseMove={e => showTip(e, ck)}
                   onMouseLeave={hideTip}
                   onClick={() => { if (color) clickCity(ck) }}
@@ -599,53 +652,431 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
                 key={`lbl-${ck}`}
                 x={msGeo[ck].c[0]}
                 y={msGeo[ck].c[1] + 5}
-                textAnchor="middle"
-                style={{ fontSize: 10, fontWeight: 500, fill: '#fff', paintOrder: 'stroke', stroke: 'rgba(0,0,0,0.6)', strokeWidth: 3, pointerEvents: 'none' }}
+                className="crt-lbl"
               >
                 {msGeo[ck].n}
               </text>
             ))}
           </svg>
-          {/* Tooltip */}
-          <div ref={tipRef} className="carteira-tooltip" />
-          {/* Legend */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', alignItems: 'center', padding: '6px 8px 2px', fontSize: 12, color: 'var(--muted)' }}>
+          <div ref={tipRef} className="crt-tip" />
+          <div className="crt-legend">
+            <span>{legendLabel}</span>
             {RAMP.map((r, i) => (
-              <span key={i}><span style={{ display: 'inline-block', width: 14, height: 10, background: r, marginRight: 3, verticalAlign: -1, borderRadius: 2 }} />{i === 0 ? 'menor' : i === 3 ? 'maior' : ''}</span>
+              <span key={i}><i className="crt-sw" style={{ background: r }} />{i === 0 ? '1' : i === 4 ? `${maxLegend}+` : ''}</span>
             ))}
-            <span><span style={{ display: 'inline-block', width: 14, height: 10, background: 'var(--surface-raised)', border: '1px solid var(--border)', marginRight: 3, verticalAlign: -1, borderRadius: 2 }} />sem dados</span>
+            <span><i className="crt-sw" style={{ background: 'var(--crt-map-empty)' }} />nenhum</span>
           </div>
-        </div>
+        </main>
 
         {/* Side panel */}
-        <aside style={{ borderLeft: '1px solid var(--border)', padding: 14, overflow: 'auto', maxHeight: 'calc(100vh - 160px)' }}>
+        <aside className="crt-card crt-side-panel">
           {renderSide()}
         </aside>
       </div>
 
-      {/* KPIs */}
-      <div className="kpi-row" style={{ padding: '8px 16px', borderTop: '1px solid var(--border)' }}>
-        <KpiCard label="Vendedores" value={sellers.length.toString()} />
-        <KpiCard label="Roterizados" value={allClients.filter(c => c.routed && rcaMap.has(c.rcaCode)).length.toLocaleString('pt-BR')} sub={`${allClients.length ? ((allClients.filter(c => c.routed && rcaMap.has(c.rcaCode)).length / allClients.length) * 100).toFixed(1) : 0}%`} />
-        <KpiCard label="Sem roteiro" value={naoCount.toLocaleString('pt-BR')} />
-        <KpiCard label="Sem cadastro" value={semCount.toLocaleString('pt-BR')} />
-        <KpiCard label="Total carteira" value={allClients.length.toLocaleString('pt-BR')} />
-      </div>
-
-      <style>{`
-        .carteira-tooltip { position: absolute; pointer-events: none; background: #1a1a1a; color: #f6f6f6; padding: 8px 11px; border-radius: 6; font-size: 12px; max-width: 280px; display: none; z-index: 10; line-height: 1.5; box-shadow: 0 2px 8px rgba(0,0,0,.4); border: 1px solid #333; }
-        .theme-light .carteira-tooltip { background: #fff; color: #171717; border-color: #d9d9d5; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
-        @media (max-width: 1000px) {
-          .carteira-grid { grid-template-columns: 1fr !important; }
-          .carteira-grid > aside:first-child { max-height: 200px; border-right: none !important; border-bottom: 1px solid var(--border); }
-          .carteira-grid > aside:last-child { max-height: none; border-left: none !important; border-top: 1px solid var(--border); }
-        }
-        .carteira-side details summary::-webkit-details-marker { display: none; }
-        .carteira-side details summary { list-style: none; }
-        .carteira-summary { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-size: 13px; padding: 7px 0; cursor: pointer; border-top: 1px solid var(--border); list-style: none; }
-        .carteira-side details summary > span:first-child::before { content: '+'; display: inline-block; width: 14px; font-weight: 500; color: var(--red); }
-        .carteira-side details[open] summary > span:first-child::before { content: '−'; }
-      `}</style>
+      <style>{CRT_STYLES}</style>
     </div>
   )
 }
+
+const CRT_STYLES = `
+:root {
+  --crt-bg: #f7f3f2;
+  --crt-panel: #fffdfc;
+  --crt-fg: #2a1d1c;
+  --crt-mute: #7a6866;
+  --crt-line: #e6d9d7;
+  --crt-red: #b3211b;
+  --crt-red-soft: #f6dcd8;
+  --crt-map-empty: #ece3e1;
+  --crt-map-line: #fffdfc;
+  --crt-sel: #2a1d1c;
+  --crt-warn-bg: #fbefd5;
+  --crt-warn: #8a5a00;
+  --crt-d0: #f3cfc9;
+  --crt-d1: #e8998f;
+  --crt-d2: #d4574c;
+  --crt-d3: #b3211b;
+  --crt-d4: #7d120e;
+  --crt-fd: system-ui, sans-serif;
+  --crt-fb: system-ui, sans-serif;
+  --crt-fm: ui-monospace, 'SFMono-Regular', monospace;
+}
+.theme-dark {
+  --crt-bg: #171110;
+  --crt-panel: #211918;
+  --crt-fg: #f3e8e6;
+  --crt-mute: #a38f8c;
+  --crt-line: #3a2d2b;
+  --crt-red: #e5544a;
+  --crt-red-soft: #4a211e;
+  --crt-map-empty: #2c2221;
+  --crt-map-line: #211918;
+  --crt-sel: #f3e8e6;
+  --crt-warn-bg: #3d2f12;
+  --crt-warn: #f1c36b;
+  --crt-d0: #4d2420;
+  --crt-d1: #7d312b;
+  --crt-d2: #b0443b;
+  --crt-d3: #e5544a;
+  --crt-d4: #ff9188;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not(.theme-light) {
+    --crt-bg: #171110;
+    --crt-panel: #211918;
+    --crt-fg: #f3e8e6;
+    --crt-mute: #a38f8c;
+    --crt-line: #3a2d2b;
+    --crt-red: #e5544a;
+    --crt-red-soft: #4a211e;
+    --crt-map-empty: #2c2221;
+    --crt-map-line: #211918;
+    --crt-sel: #f3e8e6;
+    --crt-warn-bg: #3d2f12;
+    --crt-warn: #f1c36b;
+    --crt-d0: #4d2420;
+    --crt-d1: #7d312b;
+    --crt-d2: #b0443b;
+    --crt-d3: #e5544a;
+    --crt-d4: #ff9188;
+  }
+}
+.crt-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  gap: 14px;
+  padding: 14px 0;
+}
+.crt-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 16px;
+}
+.crt-mode {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 9px 14px;
+  border: 1px solid var(--crt-line);
+  border-radius: 6px;
+  background: var(--crt-panel);
+  color: var(--crt-fg);
+  font: 500 14px var(--crt-fd);
+}
+.crt-mode small {
+  font: 400 11px var(--crt-fm);
+  color: var(--crt-mute);
+}
+.crt-mode:hover { border-color: var(--crt-red); }
+.crt-mode[aria-pressed="true"] {
+  background: var(--crt-red);
+  border-color: var(--crt-red);
+  color: #fff;
+}
+.crt-mode[aria-pressed="true"] small { color: rgba(255,255,255,.8); }
+.crt-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 270px minmax(0,1fr) 340px;
+  gap: 16px;
+  align-items: start;
+  padding: 0 16px;
+  overflow: hidden;
+}
+.crt-card {
+  background: var(--crt-panel);
+  border: 1px solid var(--crt-line);
+  border-radius: 6px;
+  min-width: 0;
+}
+.crt-rail {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 220px);
+  overflow: hidden;
+}
+.crt-q {
+  margin: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--crt-line);
+  border-radius: 4px;
+  background: var(--crt-bg);
+  color: var(--crt-fg);
+  font: inherit;
+}
+.crt-q:focus { outline: 2px solid var(--crt-red); outline-offset: 2px; }
+.crt-all {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 10px 6px;
+  width: calc(100% - 20px);
+  text-align: left;
+  border: 1px solid var(--crt-line);
+  border-radius: 4px;
+  background: none;
+  color: var(--crt-fg);
+  font: inherit;
+  font-weight: 500;
+  padding: 7px 8px;
+  cursor: pointer;
+}
+.crt-all small { font: 400 11px var(--crt-fm); opacity: .8; white-space: nowrap; align-self: center; }
+.crt-all:hover { background: var(--crt-bg); }
+.crt-all[aria-pressed="true"] { background: var(--crt-red); color: #fff; }
+.crt-list { overflow: auto; padding: 0 6px 10px; flex: 1; }
+.crt-sup {
+  font: 500 11px var(--crt-fm);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--crt-mute);
+  padding: 12px 8px 4px;
+}
+.crt-seller, .crt-cty {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: none;
+  color: var(--crt-fg);
+  font: inherit;
+  padding: 7px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.crt-seller:hover, .crt-cty:hover { background: var(--crt-bg); }
+.crt-seller[aria-pressed="true"], .crt-cty[aria-pressed="true"] { background: var(--crt-red); color: #fff; }
+.crt-seller small, .crt-cty small {
+  font: 400 11px var(--crt-fm);
+  opacity: .8;
+  white-space: nowrap;
+  align-self: center;
+}
+.crt-mapcard { padding: 8px; position: relative; }
+.crt-svg { display: block; width: 100%; height: auto; max-height: calc(100vh - 280px); }
+.crt-m { fill: var(--crt-map-empty); stroke: var(--crt-map-line); stroke-width: .8; transition: fill .15s; }
+.crt-m.on { cursor: pointer; }
+.crt-m.pick { stroke: var(--crt-sel); stroke-width: 2.6; }
+.crt-m:hover { stroke: var(--crt-sel); stroke-width: 1.6; }
+.crt-lbl {
+  font: 500 14px var(--crt-fb);
+  fill: var(--crt-fg);
+  paint-order: stroke;
+  stroke: var(--crt-panel);
+  stroke-width: 4px;
+  pointer-events: none;
+  text-anchor: middle;
+}
+.crt-tip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--crt-fg);
+  color: var(--crt-bg);
+  padding: 6px 9px;
+  border-radius: 4px;
+  font-size: 12px;
+  max-width: 260px;
+  display: none;
+  z-index: 10;
+  line-height: 1.5;
+}
+.crt-tip b { font-weight: 600; }
+.crt-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: center;
+  padding: 6px 8px 2px;
+  font-size: 12px;
+  color: var(--crt-mute);
+}
+.crt-sw {
+  display: inline-block;
+  width: 14px;
+  height: 10px;
+  margin-right: 3px;
+  vertical-align: -1px;
+}
+.crt-side-panel {
+  padding: 14px;
+  max-height: calc(100vh - 220px);
+  overflow: auto;
+}
+.crt-side {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+.crt-side-h2 { font: 700 18px/1.15 var(--crt-fd); margin: 0; color: var(--crt-fg); }
+.crt-h3 {
+  font: 500 11px var(--crt-fm);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--crt-mute);
+  margin: 4px 0 0;
+}
+.crt-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  color: var(--crt-mute);
+  font-size: 12px;
+}
+.crt-meta b { font: 500 15px var(--crt-fm); color: var(--crt-fg); }
+.crt-note { font-size: 12px; color: var(--crt-mute); margin: 0; }
+.crt-warn {
+  font-size: 12px;
+  background: var(--crt-warn-bg);
+  color: var(--crt-warn);
+  padding: 7px 9px;
+  border-radius: 4px;
+  margin: 0;
+}
+.crt-rows { display: grid; gap: 0; }
+.crt-row {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 2px 8px;
+  font-size: 13px;
+  padding: 6px 0;
+  border-top: 1px solid var(--crt-line);
+}
+.crt-row span:last-of-type {
+  font: 400 12px var(--crt-fm);
+  text-align: right;
+  white-space: nowrap;
+}
+.crt-sub {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: var(--crt-mute);
+}
+.crt-bar {
+  grid-column: 1 / -1;
+  height: 4px;
+  background: var(--crt-red-soft);
+  border-radius: 2px;
+}
+.crt-bar i { display: block; height: 100%; background: var(--crt-red); border-radius: 2px; }
+.crt-tb {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.crt-tb th {
+  font: 500 10px var(--crt-fm);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--crt-mute);
+  text-align: right;
+  padding: 4px 4px;
+  border-bottom: 1px solid var(--crt-line);
+}
+.crt-tb th:first-child, .crt-tb td:first-child { text-align: left; }
+.crt-tb td {
+  padding: 5px 4px;
+  border-bottom: 1px solid var(--crt-line);
+  text-align: right;
+  font-family: var(--crt-fm);
+  color: var(--crt-fg);
+}
+.crt-tb td:first-child { font-family: var(--crt-fb); }
+.crt-tb-total td { font-weight: 600; }
+.crt-det { border-top: 1px solid var(--crt-line); }
+.crt-det summary {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 2px 8px;
+  font-size: 13px;
+  padding: 7px 0;
+  cursor: pointer;
+  list-style: none;
+}
+.crt-det summary::-webkit-details-marker { display: none; }
+.crt-det summary > span:first-child::before {
+  content: '+';
+  display: inline-block;
+  width: 14px;
+  font: 500 13px var(--crt-fm);
+  color: var(--crt-red);
+}
+.crt-det[open] summary > span:first-child::before { content: '\\2212'; }
+.crt-det summary span:last-child {
+  font: 400 12px var(--crt-fm);
+  text-align: right;
+  white-space: nowrap;
+}
+.crt-cli {
+  margin: 2px 0 8px;
+  padding: 0;
+  list-style: none;
+  max-height: 340px;
+  overflow: auto;
+  border-left: 2px solid var(--crt-red-soft);
+}
+.crt-cli li {
+  padding: 4px 8px;
+  font-size: 12px;
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 0 8px;
+}
+.crt-cli li small { color: var(--crt-mute); font: 400 11px var(--crt-fm); }
+.crt-v { font: 400 11px var(--crt-fm); color: var(--crt-mute); text-align: right; white-space: nowrap; }
+.crt-detail-body {
+  padding: 4px 0 8px 8px;
+  font-size: 12px;
+  border-left: 2px solid var(--crt-line);
+}
+.crt-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 3px 14px;
+  margin-bottom: 8px;
+}
+.crt-city-seller {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px;
+  border: 1px solid var(--crt-line);
+  border-radius: 6px;
+  background: var(--crt-panel);
+  color: var(--crt-fg);
+  cursor: pointer;
+  font: inherit;
+}
+.crt-city-seller:hover { background: var(--crt-bg); }
+.crt-vend {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 0 8px;
+  padding: 6px 0;
+  border-top: 1px solid var(--crt-line);
+  font-size: 13px;
+}
+.crt-vend small { grid-column: 1/-1; color: var(--crt-mute); font-size: 11px; }
+.crt-vend span:last-child { font: 400 12px var(--crt-fm); white-space: nowrap; }
+.crt-rowbtn {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  width: 100%;
+}
+.crt-rowbtn:hover { background: var(--crt-bg); }
+@media (max-width: 1000px) {
+  .crt-grid { grid-template-columns: 1fr !important; }
+  .crt-rail { max-height: 300px; }
+  .crt-side-panel { max-height: none; }
+}
+@media (prefers-reduced-motion: reduce) { .crt-m { transition: none; } }
+`
