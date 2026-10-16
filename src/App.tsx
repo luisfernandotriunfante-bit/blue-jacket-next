@@ -131,6 +131,7 @@ export function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
   const [section, setSection] = useState<'sellout' | 'estoque' | 'clientes' | 'campanhas' | 'administracao'>('sellout')
   const [selloutTab, setSelloutTab] = useState<'dashboard' | 'gerencial' | 'clientes'>('dashboard')
+  const [clientesTab, setClientesTab] = useState<'carteira'>('carteira')
   const [tab, setTab] = useState<'uploads' | 'auditoria' | 'config' | 'rcas' | 'dados'>('uploads')
 
   const monthLabel = useMemo(() => fmtCompetencia(viewingComp ?? activeComp).toUpperCase(), [viewingComp, activeComp])
@@ -509,9 +510,18 @@ export function App() {
         {selloutTab === 'clientes' && <ClientesTab movementBase={effectiveMovements} clientBase={effectiveClients} monthLabel={monthLabel} activeComp={displayComp} />}
       </>) : section === 'estoque' ? <>
         <StockTab productBase={effectiveProducts} receiptBase={effectiveReceipts} movementBase={effectiveMovements} productIndicators={snap ? null : productIndicators} activeComp={displayComp} />
-      </> : section === 'clientes' ? <>
-        <CarteiraTab clientBase={effectiveClients} movementBase={effectiveMovements} activeComp={displayComp} />
-      </> : section === 'campanhas' ? <>
+      </> : section === 'clientes' ? (<>
+        <header className="topbar" style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'stretch', borderBottom: '1px solid var(--border)' }}>
+          <div />
+          <div style={{ display: 'flex' }}>
+            <button type="button" className={`stock-nav-btn${clientesTab === 'carteira' ? ' on' : ''}`} onClick={() => setClientesTab('carteira')}>Carteira</button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 16 }}>
+            <span className="so-month-label">{monthLabel}</span>
+          </div>
+        </header>
+        {clientesTab === 'carteira' && <CarteiraTab clientBase={effectiveClients} movementBase={effectiveMovements} activeComp={displayComp} />}
+      </>) : section === 'campanhas' ? <>
         <CampaignTab />
       </> : <>
       <header className="topbar stock-topbar" aria-label="Administração">
