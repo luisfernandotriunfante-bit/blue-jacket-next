@@ -16,6 +16,7 @@ import { GerencialTab } from './GerencialTab'
 import { ClientesTab } from './ClientesTab'
 import { RcaManager, readRcas, type RcaRecord } from './RcaManager'
 import { CampaignTab } from './CampaignTab'
+import { CarteiraTab } from './CarteiraTab'
 import { saveCompetenciaSnap, loadCompetenciaSnap, listClosedCompetencias, fmtCompetencia, getActiveComp, setActiveComp, type CompetenciaSnapshot } from './domain/competenciaEngine'
 import { exportBundle, importBundle, downloadBundle, validateBundle } from './domain/syncEngine'
 import { pushToCloud, pullFromCloud, listenForChanges, schedulePush, onSyncStatus, getSyncDetail } from './domain/cloudSync'
@@ -128,7 +129,7 @@ export function App() {
   }, [viewingComp])
 
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
-  const [section, setSection] = useState<'sellout' | 'estoque' | 'campanhas' | 'administracao'>('sellout')
+  const [section, setSection] = useState<'sellout' | 'estoque' | 'clientes' | 'campanhas' | 'administracao'>('sellout')
   const [selloutTab, setSelloutTab] = useState<'dashboard' | 'gerencial' | 'clientes'>('dashboard')
   const [tab, setTab] = useState<'uploads' | 'auditoria' | 'config' | 'rcas' | 'dados'>('uploads')
 
@@ -424,6 +425,10 @@ export function App() {
         <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z" /><path fillRule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
         <span className="nav-label">Estoque</span>
       </button>
+      <button className={`nav-item${section === 'clientes' ? ' active' : ''}`} type="button" onClick={() => setSection('clientes')}>
+        <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" /></svg>
+        <span className="nav-label">Clientes</span>
+      </button>
       <button className={`nav-item${section === 'campanhas' ? ' active' : ''}`} type="button" onClick={() => setSection('campanhas')}>
         <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z" /></svg>
         <span className="nav-label">Campanhas</span>
@@ -463,6 +468,10 @@ export function App() {
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z" /><path fillRule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
         <span>Estoque</span>
       </button>
+      <button className={`bn-item${section === 'clientes' ? ' active' : ''}`} type="button" onClick={() => setSection('clientes')}>
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" /></svg>
+        <span>Clientes</span>
+      </button>
       <button className={`bn-item${section === 'campanhas' ? ' active' : ''}`} type="button" onClick={() => setSection('campanhas')}>
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z" /></svg>
         <span>Camp.</span>
@@ -500,6 +509,8 @@ export function App() {
         {selloutTab === 'clientes' && <ClientesTab movementBase={effectiveMovements} clientBase={effectiveClients} monthLabel={monthLabel} activeComp={displayComp} />}
       </>) : section === 'estoque' ? <>
         <StockTab productBase={effectiveProducts} receiptBase={effectiveReceipts} movementBase={effectiveMovements} productIndicators={snap ? null : productIndicators} activeComp={displayComp} />
+      </> : section === 'clientes' ? <>
+        <CarteiraTab clientBase={effectiveClients} movementBase={effectiveMovements} activeComp={displayComp} />
       </> : section === 'campanhas' ? <>
         <CampaignTab />
       </> : <>
