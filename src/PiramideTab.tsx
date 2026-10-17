@@ -230,7 +230,8 @@ export function PiramideTab({ clientBase, movementBase, activeComp, pexSet, onPe
       <section className="content">
         <div className="so-empty" style={{ padding: '48px 24px' }}>
           <p style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>Nenhum cliente PEX importado</p>
-          <small style={{ color: 'var(--muted)', display: 'block', marginBottom: 16 }}>Importe os CNPJs dos clientes PEX para visualizar a pirâmide.</small>
+          <small style={{ color: 'var(--muted)', display: 'block', marginBottom: 16 }}>Envie o arquivo da Pirâmide ativa no motor de Clientes (aba Administração → Uploads) e processe. Os clientes PEX serão carregados automaticamente.</small>
+          <small style={{ color: 'var(--muted)', display: 'block', marginBottom: 16 }}>Ou importe manualmente os CNPJs abaixo:</small>
           <textarea
             className="cad-upload-textarea"
             placeholder="Cole aqui os CNPJs (um por linha, separados por vírgula ou ponto-e-vírgula)…"

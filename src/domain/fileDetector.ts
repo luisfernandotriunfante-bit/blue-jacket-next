@@ -55,7 +55,7 @@ export async function detectFile(file: File): Promise<FileDetection> {
         return { motor: 'clientes', slot: 'internal' }
       if (headerAt(rows, { 0: 'codigocliente', 1: 'cnpj', 12: 'frequencia', 15: 'representante' }) >= 0)
         return { motor: 'clientes', slot: 'portfolio' }
-      if (headerAt(rows, { 0: 'semestrepremissa', 2: 'codcliente', 15: 'checkpdv' }) >= 0)
+      if (headerAt(rows, { 0: 'semestrepremissa', 2: 'codcliente', 13: 'checkpdv' }) >= 0)
         return { motor: 'clientes', slot: 'premises' }
     }
   } catch { /* arquivo ilegível vai para não reconhecido */ }
