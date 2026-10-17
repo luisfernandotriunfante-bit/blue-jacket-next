@@ -36,7 +36,7 @@ const clientSources = [
   { id: 'internal', label: 'Cadastro de clientes (1203)' },
   { id: 'portfolio', label: 'Carteira de clientes' },
   { id: 'route', label: 'Roteiro geral' },
-  { id: 'premises', label: 'Premissas de clientes' },
+  { id: 'premises', label: 'Pirâmide ativa' },
 ] as const
 const productSources = [
   { id: 'internal', label: 'Cadastro de produtos (286)' }, { id: 'industry', label: 'Lista SAP da indústria' }, { id: 'stock', label: 'Estoque atual (1118)' }, { id: 'price', label: 'Preço de venda (8011)' }, { id: 'subbrands', label: 'Sub-marcas (8013)' }, { id: 'sortiment', label: 'Sortimento SAP' },
@@ -307,7 +307,7 @@ export function App() {
     const selected = Object.values(clientSlots).map(file => file && rawFiles[file.id]).filter((file): file is File => Boolean(file))
     if (!selected.length) return
     setClientProcessing(true); setClientAudit([])
-    try { const result = await processClientMotor(selected); setClientAudit(result.audit); setClientBase(result.canonicalBase); setClientIndicators(result.indicators) }
+    try { const result = await processClientMotor(selected); setClientAudit(result.audit); setClientBase(result.canonicalBase); setClientIndicators(result.indicators); if (result.pyramidDocuments.length > 0) setPexSet(new Set(result.pyramidDocuments)) }
     catch { setClientAudit([{ id: 'client-read-error', level: 'action', title: 'Não foi possível ler os arquivos', instruction: 'Confira os arquivos e tente novamente.', detail: 'A base de clientes não foi alterada.', area: 'clientes' }]); setClientBase([]); setClientIndicators(null) }
     finally { setClientProcessing(false) }
   }

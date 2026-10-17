@@ -38,6 +38,7 @@ export type ClientMotorResult = {
   canonicalBase: CanonicalClient[]
   audit: AuditItem[]
   indicators: { totalClients: number; internal: number; portfolio: number; route: number; premises: number; complete: number }
+  pyramidDocuments: string[]
 }
 
 type Row = unknown[]
@@ -74,12 +75,12 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
   const candidateWorkbooks = await Promise.all(files.map(async file => ({ file, sheets: await readRows(file) })))
 
   for (const { sheets } of candidateWorkbooks) {
-    const hasPdvSheet = sheets.some(({ rows }) => headerAt(rows, { 0: 'semestrepremissa', 2: 'codcliente', 15: 'checkpdv' }) >= 0)
+    const hasPyramidSheet = sheets.some(({ rows }) => headerAt(rows, { 0: 'semestrepremissa', 2: 'codcliente', 13: 'checkpdv' }) >= 0)
     for (const { rows } of sheets) {
       const internalHeader = headerAt(rows, { 0: 'codigo', 5: 'cpfcnpj', 10: 'codrca', 12: 'codsupervisor' })
       const portfolioHeader = headerAt(rows, { 0: 'codigocliente', 1: 'cnpj', 12: 'frequencia', 15: 'representante' })
       const routeHeader = headerAt(rows, { 2: 'codigocliente', 3: 'cnpj', 10: 'recorrencia', 13: 'diadasemana' })
-      const pdvHeader = headerAt(rows, { 0: 'semestrepremissa', 2: 'codcliente', 15: 'checkpdv' })
+      const pyramidHeader = headerAt(rows, { 0: 'semestrepremissa', 2: 'codcliente', 13: 'checkpdv' })
       const fallbackPortfolio = rows.findIndex(row => hasDocument(at(row, 1)) && text(at(row, 12)) && text(at(row, 13)) && text(at(row, 15)))
 
       if (internalHeader >= 0) {
@@ -93,7 +94,7 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
       }
       if (portfolioHeader >= 0 || fallbackPortfolio >= 0) {
         const start = portfolioHeader >= 0 ? portfolioHeader + 1 : fallbackPortfolio
-        if (hasPdvSheet) { audit.push({ id: `portfolio-ignored-${audit.length}`, level: 'ok', title: 'Aba auxiliar ignorada', instruction: 'Nada precisa ser feito.', detail: 'A carteira dentro da Base de Premissas não alterou a base de clientes.', area: 'clientes' }); continue }
+        if (hasPyramidSheet) { audit.push({ id: `portfolio-ignored-${audit.length}`, level: 'ok', title: 'Aba auxiliar ignorada', instruction: 'Nada precisa ser feito.', detail: 'A carteira dentro da Pirâmide não alterou a base de clientes.', area: 'clientes' }); continue }
         let accepted = 0
         for (const row of rows.slice(start)) {
           const key = documentKey(at(row, 1)); if (!hasDocument(key)) continue
@@ -111,22 +112,23 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
         }
         audit.push({ id: `route-ok-${audit.length}`, level: 'ok', title: 'Roteiro geral reconhecido', instruction: `${accepted.toLocaleString('pt-BR')} clientes prontos para juntar.`, detail: 'Os dados de roteiro, frequência de visita e RCA foram lidos.', area: 'clientes' }); continue
       }
-      if (pdvHeader >= 0) {
+      if (pyramidHeader >= 0) {
         let accepted = 0
-        for (const row of rows.slice(pdvHeader + 1)) {
+        for (const row of rows.slice(pyramidHeader + 1)) {
           const key = documentKey(at(row, 2)); if (!hasDocument(key)) continue
           if (premises.has(key)) continue
-          const average = Number(String(at(row, 10)).replace(',', '.'))
-          premises.set(key, { document: key, winthorCode: text(at(row, 3)), legalName: text(at(row, 4)), premiseSemester: text(at(row, 0)), channelType: text(at(row, 1)), premiseRange: text(at(row, 5)), premiseState: text(at(row, 6)), city: text(at(row, 7)), premiseCluster: text(at(row, 9)), premiseAverage12Months: Number.isFinite(average) ? average : undefined, premiseProfile: text(at(row, 13)), premiseNetwork: text(at(row, 16)), sources: ['Premissas'] }); accepted++
+          const rawAvg = String(at(row, 15) ?? '').replace(/[R$\s]/g, '').replace(/,/g, '')
+          const average = Number(rawAvg)
+          premises.set(key, { document: key, legalName: text(at(row, 3)), premiseSemester: text(at(row, 0)), channelType: text(at(row, 1)), premiseRange: text(at(row, 4)), premiseState: text(at(row, 5)), city: text(at(row, 6)), premiseCluster: text(at(row, 8)), premiseAverage12Months: Number.isFinite(average) ? average : undefined, premiseProfile: text(at(row, 11)), premiseNetwork: text(at(row, 14)), sources: ['Pirâmide'] }); accepted++
         }
-        audit.push({ id: 'premises-ok', level: 'ok', title: 'Premissas reconhecidas', instruction: `${accepted.toLocaleString('pt-BR')} clientes prontos para juntar.`, detail: 'Os dados de faixa, ambiente, perfil e rede foram lidos.', area: 'clientes' }); continue
+        audit.push({ id: 'premises-ok', level: 'ok', title: 'Pirâmide ativa reconhecida', instruction: `${accepted.toLocaleString('pt-BR')} clientes prontos para juntar.`, detail: 'Os dados de faixa, ambiente, perfil e rede foram lidos.', area: 'clientes' }); continue
       }
-      const warning = nearbyLayoutWarning(rows, { 0: 'codigo', 5: 'cpfcnpj', 10: 'codrca' }, 'clientes') ?? nearbyLayoutWarning(rows, { 0: 'codigocliente', 1: 'cnpj', 12: 'frequencia', 15: 'representante' }, 'carteira') ?? nearbyLayoutWarning(rows, { 2: 'codigocliente', 3: 'cnpj', 10: 'recorrencia', 13: 'diadasemana' }, 'roteiro') ?? nearbyLayoutWarning(rows, { 0: 'semestrepremissa', 2: 'codcliente', 15: 'checkpdv' }, 'premissas')
+      const warning = nearbyLayoutWarning(rows, { 0: 'codigo', 5: 'cpfcnpj', 10: 'codrca' }, 'clientes') ?? nearbyLayoutWarning(rows, { 0: 'codigocliente', 1: 'cnpj', 12: 'frequencia', 15: 'representante' }, 'carteira') ?? nearbyLayoutWarning(rows, { 2: 'codigocliente', 3: 'cnpj', 10: 'recorrencia', 13: 'diadasemana' }, 'roteiro') ?? nearbyLayoutWarning(rows, { 0: 'semestrepremissa', 2: 'codcliente', 13: 'checkpdv' }, 'piramide')
       if (warning) audit.push(warning)
     }
   }
 
-  if (!internal.size && !portfolio.size && !route.size && !premises.size) audit.push({ id: 'no-client-source', level: 'action', title: 'Nenhum arquivo de clientes foi reconhecido', instruction: 'Envie o cadastro interno, a carteira, o roteiro geral ou as premissas.', detail: 'O sistema não encontrou a estrutura esperada nos arquivos enviados. Nenhum dado foi usado.', area: 'clientes' })
+  if (!internal.size && !portfolio.size && !route.size && !premises.size) audit.push({ id: 'no-client-source', level: 'action', title: 'Nenhum arquivo de clientes foi reconhecido', instruction: 'Envie o cadastro interno, a carteira, o roteiro geral ou a pirâmide ativa.', detail: 'O sistema não encontrou a estrutura esperada nos arquivos enviados. Nenhum dado foi usado.', area: 'clientes' })
   const allKeys = new Set([...internal.keys(), ...portfolio.keys(), ...route.keys(), ...premises.keys()])
   const canonicalBase = [...allKeys].map(document => {
     const current: CanonicalClient = { document, sources: [] }
@@ -139,5 +141,5 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
   }).sort((a, b) => a.document.localeCompare(b.document))
   const indicators = { totalClients: canonicalBase.length, internal: internal.size, portfolio: portfolio.size, route: route.size, premises: premises.size, complete: canonicalBase.filter(client => client.sources.length >= 3).length }
   audit.push({ id: 'client-base-ready', level: 'ok', title: 'Base de clientes criada', instruction: `${indicators.totalClients.toLocaleString('pt-BR')} clientes na base única.`, detail: 'A base reuniu todos os clientes encontrados, mesmo quando uma fonte não tinha todas as informações.', area: 'clientes' })
-  return { canonicalBase, audit, indicators }
+  return { canonicalBase, audit, indicators, pyramidDocuments: [...premises.keys()] }
 }

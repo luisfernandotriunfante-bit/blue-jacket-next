@@ -153,7 +153,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
       }
       let lastDate = ''
       for (const m of allMovs) { const d = m.movementDate ?? ''; if (d > lastDate) lastDate = d }
-      const hasCadastro = c.sources.some(s => s !== 'Premissas')
+      const hasCadastro = c.sources.some(s => s !== 'Pirâmide')
       return {
         name: c.legalName ?? c.tradeName ?? c.document,
         document: c.document,
