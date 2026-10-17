@@ -31,12 +31,14 @@ function matchCity(rawCity: string): string | null {
 }
 
 const RAMP = ['var(--r0)', 'var(--r1)', 'var(--r2)', 'var(--r3)', 'var(--r4)']
+const GREEN_DONE = '#22c55e'
 function bin(v: number, max: number): number {
   if (max <= 1) return 2
   return Math.min(4, Math.floor((v - 1) / max * 5))
 }
 
 type Mode = 'rot' | 'nao' | 'sem'
+type PexFilter = 'all' | 'pex' | 'nao-pex'
 
 interface SellerData {
   code: string
@@ -77,6 +79,8 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
   const [selectedCity, setSelectedCity] = useState<string | null>(null)
   const [expandedClient, setExpandedClient] = useState<string | null>(null)
   const [rcas, setRcas] = useState<RcaRecord[]>([])
+  const [assignments, setAssignments] = useState<Record<string, string>>({})
+  const [pexFilter, setPexFilter] = useState<PexFilter>('all')
   const svgRef = useRef<SVGSVGElement>(null)
   const tipRef = useRef<HTMLDivElement>(null)
 
@@ -87,7 +91,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
     return () => window.removeEventListener('rj-rcas-changed', h)
   }, [])
 
-  useEffect(() => { setSelectedSeller(null); setSelectedCity(null); setExpandedClient(null) }, [mode])
+  useEffect(() => { setSelectedSeller(null); setSelectedCity(null); setExpandedClient(null); setPexFilter('all') }, [mode])
 
   const rcaMap = useMemo(() => {
     const m = new Map<string, RcaRecord>()
@@ -216,9 +220,78 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
   }, [sellers])
 
   const sel = selectedSeller ? sellers.find(s => s.code === selectedSeller) ?? null : null
-  const naoCount = useMemo(() => Object.values(naoByCity).reduce((s, l) => s + l.length, 0), [naoByCity])
-  const semCount = useMemo(() => Object.values(semByCity).reduce((s, l) => s + l.length, 0), [semByCity])
-  const activeData = mode === 'nao' ? naoByCity : mode === 'sem' ? semByCity : {}
+
+  const isPex = useCallback((c: ClientRow) => c.channel.toUpperCase().includes('PEX'), [])
+
+  const filteredNaoByCity = useMemo(() => {
+    if (pexFilter === 'all') return naoByCity
+    const m: Record<string, ClientRow[]> = {}
+    for (const [ck, clients] of Object.entries(naoByCity)) {
+      const f = clients.filter(c => pexFilter === 'pex' ? isPex(c) : !isPex(c))
+      if (f.length) m[ck] = f
+    }
+    return m
+  }, [naoByCity, pexFilter, isPex])
+
+  const filteredSemByCity = useMemo(() => {
+    if (pexFilter === 'all') return semByCity
+    const m: Record<string, ClientRow[]> = {}
+    for (const [ck, clients] of Object.entries(semByCity)) {
+      const f = clients.filter(c => pexFilter === 'pex' ? isPex(c) : !isPex(c))
+      if (f.length) m[ck] = f
+    }
+    return m
+  }, [semByCity, pexFilter, isPex])
+
+  const naoCount = useMemo(() => Object.values(filteredNaoByCity).reduce((s, l) => s + l.length, 0), [filteredNaoByCity])
+  const semCount = useMemo(() => Object.values(filteredSemByCity).reduce((s, l) => s + l.length, 0), [filteredSemByCity])
+  const activeData = mode === 'nao' ? filteredNaoByCity : mode === 'sem' ? filteredSemByCity : {}
+
+  const cityCompletion = useMemo(() => {
+    if (mode === 'rot') return {} as Record<string, { total: number; assigned: number }>
+    const result: Record<string, { total: number; assigned: number }> = {}
+    for (const [ck, clients] of Object.entries(activeData)) {
+      const assigned = clients.filter(c => assignments[c.document]).length
+      result[ck] = { total: clients.length, assigned }
+    }
+    return result
+  }, [mode, activeData, assignments])
+
+  const totalAssigned = useMemo(() => {
+    let a = 0, t = 0
+    for (const v of Object.values(cityCompletion)) { a += v.assigned; t += v.total }
+    return { assigned: a, total: t }
+  }, [cityCompletion])
+
+  const assignSeller = useCallback((clientDoc: string, sellerCode: string) => {
+    setAssignments(prev => {
+      const next = { ...prev }
+      if (sellerCode) next[clientDoc] = sellerCode
+      else delete next[clientDoc]
+      return next
+    })
+  }, [])
+
+  const downloadReport = useCallback(() => {
+    const rows: string[][] = [['Cliente', 'CNPJ', 'Cidade', 'Canal', 'Faixa', 'Rede', 'Vendedor Atribuído', 'Cód. Vendedor']]
+    for (const [ck, clients] of Object.entries(activeData)) {
+      for (const c of clients) {
+        const selCode = assignments[c.document]
+        if (!selCode) continue
+        const seller = sellers.find(s => s.code === selCode)
+        rows.push([c.name, c.document, msGeo[ck]?.n ?? ck, c.channel, c.range, c.network, seller?.name ?? '', selCode])
+      }
+    }
+    if (rows.length <= 1) return
+    const csv = rows.map(r => r.map(v => `"${v.replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `roteirizacao-${mode}-${activeComp}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [activeData, assignments, sellers, mode, activeComp])
 
   const filteredSellers = useMemo(() => {
     if (!search) return sellers
@@ -227,12 +300,12 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
   }, [sellers, search])
 
   const filteredCities = useMemo(() => {
-    const data = mode === 'nao' ? naoByCity : semByCity
+    const data = mode === 'nao' ? filteredNaoByCity : filteredSemByCity
     const keys = Object.keys(data).sort((a, b) => (data[b]?.length ?? 0) - (data[a]?.length ?? 0))
     if (!search) return keys
     const q = search.toLowerCase()
     return keys.filter(k => msGeo[k].n.toLowerCase().includes(q))
-  }, [mode, naoByCity, semByCity, search])
+  }, [mode, filteredNaoByCity, filteredSemByCity, search])
 
   /* painting */
   const cityColors = useMemo<Record<string, string>>(() => {
@@ -251,13 +324,20 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
         for (const [ck, n] of Object.entries(byC)) colors[ck] = RAMP[bin(n, max)]
       }
     } else {
-      const data = mode === 'nao' ? naoByCity : semByCity
+      const data = activeData
       const vals = Object.values(data).map(l => l.length)
       const max = Math.max(...vals, 1)
-      for (const [ck, l] of Object.entries(data)) colors[ck] = RAMP[bin(l.length, max)]
+      for (const [ck, l] of Object.entries(data)) {
+        const comp = cityCompletion[ck]
+        if (comp && comp.total > 0 && comp.assigned === comp.total) {
+          colors[ck] = GREEN_DONE
+        } else {
+          colors[ck] = RAMP[bin(l.length, max)]
+        }
+      }
     }
     return colors
-  }, [mode, sel, sellers, naoByCity, semByCity])
+  }, [mode, sel, sellers, activeData, cityCompletion])
 
   const maxLegend = useMemo(() => {
     if (mode === 'rot') {
@@ -266,9 +346,8 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
       for (const s of sellers) for (const ck of Object.keys(s.cities)) byC[ck] = (byC[ck] ?? 0) + 1
       return Math.max(...Object.values(byC), 1)
     }
-    const data = mode === 'nao' ? naoByCity : semByCity
-    return Math.max(...Object.values(data).map(l => l.length), 1)
-  }, [mode, sel, sellers, naoByCity, semByCity])
+    return Math.max(...Object.values(activeData).map(l => l.length), 1)
+  }, [mode, sel, sellers, activeData])
 
   /* tooltip */
   const showTip = useCallback((e: React.MouseEvent, ck: string) => {
@@ -288,7 +367,9 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
       }
     } else {
       const d = activeData[ck] ?? []
+      const comp = cityCompletion[ck]
       html += `<br>${d.length} cliente${d.length !== 1 ? 's' : ''} ${mode === 'nao' ? 'sem roteiro' : 'sem cadastro'}`
+      if (comp && comp.assigned > 0) html += `<br>${comp.assigned}/${comp.total} atribuído${comp.assigned !== 1 ? 's' : ''}${comp.assigned === comp.total ? ' ✓' : ''}`
     }
     tip.innerHTML = html
     tip.style.display = 'block'
@@ -444,12 +525,24 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
     if (selectedCity) {
       const clients = activeData[selectedCity] ?? []
       const cityVendors = sellersByCity[selectedCity] ?? []
+      const comp = cityCompletion[selectedCity]
+      const allSellers = sellers
       return (
         <div className="crt-side">
           <h2 className="crt-side-h2">{msGeo[selectedCity]?.n ?? selectedCity}</h2>
           <div className="crt-meta">
             <span><b>{clients.length}</b> {mode === 'nao' ? 'clientes sem roteiro' : 'clientes sem cadastro'}</span>
+            {comp && comp.assigned > 0 && (
+              <span style={{ color: comp.assigned === comp.total ? GREEN_DONE : 'var(--red)' }}>
+                <b>{comp.assigned}/{comp.total}</b> atribuídos
+              </span>
+            )}
           </div>
+          {comp && comp.total > 0 && (
+            <div className="crt-progress">
+              <div className="crt-progress-bar" style={{ width: `${comp.assigned / comp.total * 100}%`, background: comp.assigned === comp.total ? GREEN_DONE : 'var(--red)' }} />
+            </div>
+          )}
           {cityVendors.length > 0 && (
             <>
               <h3 className="crt-h3">Vendedores que podem atender</h3>
@@ -465,52 +558,52 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
           {!cityVendors.length && (
             <p className="crt-warn">Nenhum vendedor tem roteiro em {msGeo[selectedCity]?.n ?? selectedCity}.</p>
           )}
-          <h3 className="crt-h3">Clientes</h3>
+          <h3 className="crt-h3">Atribuir vendedor aos clientes</h3>
           <div className="crt-rows">
-            {clients.map(c => (
-              <details key={c.document} className="crt-det">
-                <summary>
-                  <span>{c.name}</span>
-                  <span>{c.fat > 0 ? kpiCurrency(c.fat) : '—'}</span>
-                </summary>
-                <div className="crt-detail-body">
-                  <div className="crt-detail-grid">
-                    <span>CNPJ: <b style={{ fontFamily: 'ui-monospace, SFMono-Regular, monospace' }}>{c.document}</b></span>
-                    {c.channel && <span>Canal: <b>{c.channel}</b></span>}
-                    {c.range && <span>Faixa: <b>{c.range}</b></span>}
-                    {c.network && <span>Rede: <b>{c.network}</b></span>}
-                    {c.cluster && <span>Cluster: <b>{c.cluster}</b></span>}
-                    {c.lastDate && <span>Última compra: <b>{fmtDay(c.lastDate)}</b></span>}
-                    {c.rcaCode && <span>RCA: <b>{c.rcaCode}</b></span>}
+            {clients.map(c => {
+              const assigned = assignments[c.document] ?? ''
+              return (
+                <div key={c.document} className="crt-assign-row">
+                  <div className="crt-assign-info">
+                    <span className={assigned ? 'crt-assigned' : ''}>{c.name}</span>
+                    <small>{c.document}{c.channel ? ` · ${c.channel}` : ''}{c.fat > 0 ? ` · ${kpiCurrency(c.fat)}` : ''}</small>
                   </div>
-                  {(() => {
-                    const hist = clientHistory(c.code, c.document)
-                    if (!hist.length) return <div style={{ color: 'var(--muted)' }}>Sem movimentações</div>
-                    return (
-                      <table className="crt-tb" style={{ fontSize: 11 }}>
-                        <thead><tr><th>Data</th><th>Tipo</th><th>Produto</th><th>Valor</th></tr></thead>
-                        <tbody>
-                          {hist.map((m, i) => (
-                            <tr key={i}><td>{m.movementDate ? fmtDay(m.movementDate) : ''}</td><td>{MOV_LABEL[m.movementType] ?? m.movementType}</td><td>{m.description ?? m.productCode ?? ''}</td><td>{m.value != null ? brlFull(m.value) : ''}</td></tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )
-                  })()}
+                  <select
+                    className="crt-select"
+                    value={assigned}
+                    onChange={e => assignSeller(c.document, e.target.value)}
+                  >
+                    <option value="">Selecionar…</option>
+                    {cityVendors.length > 0 && (
+                      <optgroup label="Na cidade">
+                        {cityVendors.map(s => (
+                          <option key={s.code} value={s.code}>{s.name} ({s.code})</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {allSellers.filter(s => !cityVendors.some(cv => cv.code === s.code)).length > 0 && (
+                      <optgroup label="Outros vendedores">
+                        {allSellers.filter(s => !cityVendors.some(cv => cv.code === s.code)).map(s => (
+                          <option key={s.code} value={s.code}>{s.name} ({s.code})</option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
                 </div>
-              </details>
-            ))}
+              )
+            })}
           </div>
         </div>
       )
     }
     /* general view for nao/sem */
-    const data = mode === 'nao' ? naoByCity : semByCity
+    const data = activeData
     const sorted = Object.keys(data).sort((a, b) => data[b].length - data[a].length)
     const total = sorted.reduce((a, ck) => a + data[ck].length, 0)
     const byChannel = new Map<string, number>()
     for (const ck of sorted) for (const c of data[ck]) byChannel.set(c.channel || 'Outros', (byChannel.get(c.channel || 'Outros') ?? 0) + 1)
     const channelList = [...byChannel.entries()].sort((a, b) => b[1] - a[1])
+    const completeCities = sorted.filter(ck => { const comp = cityCompletion[ck]; return comp && comp.assigned === comp.total && comp.total > 0 }).length
     return (
       <div className="crt-side">
         <h2 className="crt-side-h2">{mode === 'nao' ? 'Clientes sem roteiro' : 'Sem cadastro interno'}</h2>
@@ -518,28 +611,53 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
           <span><b>{total}</b> clientes</span>
           <span><b>{sorted.length}</b> cidades</span>
         </div>
+        {totalAssigned.assigned > 0 && (
+          <>
+            <div className="crt-meta">
+              <span style={{ color: GREEN_DONE }}><b>{totalAssigned.assigned}/{totalAssigned.total}</b> atribuídos</span>
+              <span style={{ color: GREEN_DONE }}><b>{completeCities}/{sorted.length}</b> cidades completas</span>
+            </div>
+            <div className="crt-progress">
+              <div className="crt-progress-bar" style={{ width: `${totalAssigned.assigned / totalAssigned.total * 100}%`, background: totalAssigned.assigned === totalAssigned.total ? GREEN_DONE : 'var(--red)' }} />
+            </div>
+          </>
+        )}
         <div className="crt-meta">
           {channelList.slice(0, 4).map(([ch, n]) => (
             <span key={ch}>{ch}: <b>{n}</b></span>
           ))}
         </div>
+        {totalAssigned.assigned > 0 && (
+          <button type="button" className="crt-report-btn" onClick={downloadReport}>
+            Gerar relatório ({totalAssigned.assigned} atribuições)
+          </button>
+        )}
         <p className="crt-note">{mode === 'nao'
-          ? 'Têm cadastro interno, mas não estão no roteiro de nenhum vendedor. Clique numa cidade para ver os clientes e quem pode atender.'
-          : 'O CNPJ não foi encontrado no cadastro interno. Clique numa cidade para ver os clientes.'
+          ? 'Clique numa cidade para atribuir vendedores aos clientes. Cidades verdes = todos atribuídos.'
+          : 'Clique numa cidade para atribuir vendedores. Cidades verdes = todos atribuídos.'
         }</p>
         <div className="crt-rows">
-          {sorted.map(ck => (
-            <button key={ck} type="button" className="crt-rowbtn" onClick={() => setSelectedCity(selectedCity === ck ? null : ck)}>
-              <div className="crt-row">
-                <span>{msGeo[ck]?.n ?? ck}</span>
-                <span>{data[ck].length} cli</span>
-                <span className="crt-sub">{(() => {
-                  const sv = sellersByCity[ck] ?? []
-                  return sv.length ? sv.map(s => s.name.split(' ')[0]).join(', ') : 'Sem vendedor com roteiro'
-                })()}</span>
-              </div>
-            </button>
-          ))}
+          {sorted.map(ck => {
+            const comp = cityCompletion[ck]
+            const done = comp && comp.total > 0 && comp.assigned === comp.total
+            return (
+              <button key={ck} type="button" className="crt-rowbtn" onClick={() => setSelectedCity(selectedCity === ck ? null : ck)}>
+                <div className="crt-row">
+                  <span style={done ? { color: GREEN_DONE } : undefined}>{done ? '✓ ' : ''}{msGeo[ck]?.n ?? ck}</span>
+                  <span>{data[ck].length} cli</span>
+                  {comp && comp.assigned > 0 && !done && (
+                    <span className="crt-sub" style={{ color: 'var(--red)' }}>{comp.assigned}/{comp.total} atribuídos</span>
+                  )}
+                  {!comp?.assigned && (
+                    <span className="crt-sub">{(() => {
+                      const sv = sellersByCity[ck] ?? []
+                      return sv.length ? sv.map(s => s.name.split(' ')[0]).join(', ') : 'Sem vendedor com roteiro'
+                    })()}</span>
+                  )}
+                </div>
+              </button>
+            )
+          })}
         </div>
       </div>
     )
@@ -562,6 +680,15 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
             {label} <small>{sub}</small>
           </button>
         ))}
+        {mode !== 'rot' && (
+          <div className="crt-pex-filter">
+            {(['all', 'pex', 'nao-pex'] as PexFilter[]).map(f => (
+              <button key={f} type="button" className="crt-pex-btn" aria-pressed={pexFilter === f} onClick={() => setPexFilter(f)}>
+                {f === 'all' ? 'Todos' : f === 'pex' ? 'PEX' : 'Não-PEX'}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Grid: rail | map | side */}
@@ -665,6 +792,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
               <span key={i}><i className="crt-sw" style={{ background: r }} />{i === 0 ? '1' : i === 4 ? `${maxLegend}+` : ''}</span>
             ))}
             <span><i className="crt-sw" style={{ background: 'var(--surface-raised)' }} />nenhum</span>
+            {mode !== 'rot' && <span><i className="crt-sw" style={{ background: GREEN_DONE, borderRadius: 2 }} />completo</span>}
           </div>
         </main>
 
@@ -1037,6 +1165,82 @@ const CRT_STYLES = `
   width: 100%;
 }
 .crt-rowbtn:hover { background: var(--background); }
+.crt-pex-filter {
+  display: flex;
+  gap: 4px;
+  margin-left: 8px;
+  align-items: center;
+}
+.crt-pex-btn {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font: 400 12px system-ui, sans-serif;
+  color: var(--muted);
+  background: var(--surface);
+}
+.crt-pex-btn:hover { border-color: var(--red); color: var(--text); }
+.crt-pex-btn[aria-pressed="true"] { background: var(--red); color: #fff; border-color: var(--red); }
+.crt-progress {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.crt-progress-bar {
+  height: 100%;
+  border-radius: 2px;
+  transition: width .3s;
+}
+.crt-assign-row {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 4px 8px;
+  align-items: center;
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+.crt-assign-info {
+  min-width: 0;
+  font-size: 13px;
+}
+.crt-assign-info small {
+  display: block;
+  font: 400 11px ${CRT_MONO};
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.crt-assigned { color: #22c55e; }
+.crt-select {
+  min-width: 130px;
+  max-width: 160px;
+  padding: 5px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--background);
+  color: var(--text);
+  font: 400 11px ${CRT_MONO};
+  cursor: pointer;
+}
+.crt-select:focus { outline: 2px solid var(--red); outline-offset: 1px; }
+.crt-report-btn {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  padding: 8px 14px;
+  border: 1px solid #22c55e;
+  border-radius: 6px;
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+  font: 500 13px system-ui, sans-serif;
+  text-align: center;
+}
+.crt-report-btn:hover { background: rgba(34, 197, 94, 0.2); }
 @media (max-width: 1000px) {
   .crt-grid { grid-template-columns: 1fr !important; }
   .crt-rail { max-height: 300px; }
