@@ -238,7 +238,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
   const naoByCity = useMemo(() => {
     const m: Record<string, ClientRow[]> = {}
     for (const c of filteredClients) {
-      if (c.routed) continue
+      if (c.routed && rcaMap.has(c.rcaCode)) continue
       if (!c.hasCadastro) continue
       const ck = matchCity(c.city)
       if (!ck) continue
@@ -246,7 +246,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
       m[ck].push(c)
     }
     return m
-  }, [filteredClients])
+  }, [filteredClients, rcaMap])
 
   const semByCity = useMemo(() => {
     const m: Record<string, ClientRow[]> = {}
@@ -469,12 +469,12 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
       if (!divs.has(div)) divs.set(div, { total: 0, rot: 0, nao: 0, sem: 0 })
       const d = divs.get(div)!
       d.total++
-      if (c.routed) d.rot++
+      if (c.routed && rcaMap.has(c.rcaCode)) d.rot++
       else if (c.hasCadastro) d.nao++
       else d.sem++
     }
     return [...divs.entries()].sort((a, b) => b[1].total - a[1].total)
-  }, [filteredClients])
+  }, [filteredClients, rcaMap])
 
   /* side panel */
   const renderSide = () => {
