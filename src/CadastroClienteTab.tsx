@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import type { CanonicalClient } from './domain/clientMotor'
 import type { CanonicalMovement } from './domain/movementMotor'
 
@@ -62,13 +62,23 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp }: {
 }) {
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
-  const [filterPex, setFilterPex] = useState<'all' | 'pex' | 'nao-pex'>('all')
-  const [filterRange, setFilterRange] = useState('all')
-  const [filterNetwork, setFilterNetwork] = useState('all')
-  const [filterRouted, setFilterRouted] = useState<'all' | 'sim' | 'nao'>('all')
+  const [filterPex, setFilterPex] = useState<string[]>([])
+  const [filterRange, setFilterRange] = useState<string[]>([])
+  const [filterNetwork, setFilterNetwork] = useState<string[]>([])
+  const [filterRouted, setFilterRouted] = useState<string[]>([])
+  const [openFilter, setOpenFilter] = useState<string | null>(null)
   const [pexSet, setPexSet] = useState<Set<string>>(new Set())
   const [pexText, setPexText] = useState('')
   const [showPexUpload, setShowPexUpload] = useState(false)
+
+  useEffect(() => {
+    if (!openFilter) return
+    const close = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest('.pf-filter-drop')) setOpenFilter(null)
+    }
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [openFilter])
 
   const { y, mo, monthEnd } = useMemo(() => {
     const [y, mo] = activeComp.split('-').map(Number)
@@ -185,12 +195,18 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp }: {
     return rows.filter(r => {
       if (q && !r.document.toLowerCase().includes(q) && !r.code.toLowerCase().includes(q) && !r.name.toLowerCase().includes(q) && !r.legalName.toLowerCase().includes(q) && !r.network.toLowerCase().includes(q) && !r.city.toLowerCase().includes(q) && !r.rcaCode.toLowerCase().includes(q) && !r.rcaName.toLowerCase().includes(q)) return false
       const isPex = pexSet.has(r.document)
-      if (filterPex === 'pex' && !isPex) return false
-      if (filterPex === 'nao-pex' && isPex) return false
-      if (filterRange !== 'all' && r.range !== filterRange) return false
-      if (filterNetwork !== 'all' && r.network !== filterNetwork) return false
-      if (filterRouted === 'sim' && !r.routed) return false
-      if (filterRouted === 'nao' && r.routed) return false
+      if (filterPex.length > 0) {
+        const want = filterPex[0]
+        if (want === 'PEX' && !isPex) return false
+        if (want === 'Não PEX' && isPex) return false
+      }
+      if (filterRange.length > 0 && !filterRange.includes(r.range)) return false
+      if (filterNetwork.length > 0 && !filterNetwork.includes(r.network)) return false
+      if (filterRouted.length > 0) {
+        const want = filterRouted[0]
+        if (want === 'Sim' && !r.routed) return false
+        if (want === 'Não' && r.routed) return false
+      }
       return true
     })
   }, [rows, q, pexSet, filterPex, filterRange, filterNetwork, filterRouted])
@@ -207,12 +223,13 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp }: {
     setPexSet(prev => { const next = new Set(prev); if (next.has(doc)) next.delete(doc); else next.add(doc); return next })
   }, [])
 
+  const selectedRow = useMemo(() => expanded ? rows.find(r => r.document === expanded) : undefined, [expanded, rows])
+
   const history = useMemo(() => {
-    if (!expanded) return []
-    const code = rows.find(r => r.document === expanded)?.code
-    const movs = movsByCustomer.get(code ?? '') ?? movsByCustomer.get(expanded) ?? []
+    if (!expanded || !selectedRow) return []
+    const movs = movsByCustomer.get(selectedRow.code) ?? movsByCustomer.get(expanded) ?? []
     return [...movs].sort((a, b) => (b.movementDate ?? '').localeCompare(a.movementDate ?? ''))
-  }, [expanded, rows, movsByCustomer])
+  }, [expanded, selectedRow, movsByCustomer])
 
   return (
     <section className="content">
@@ -252,51 +269,16 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp }: {
           </div>
         )}
 
-        <fieldset className="pf-range">
-          <legend>PEX</legend>
-          <div>
-            {(['all', 'pex', 'nao-pex'] as const).map(v => (
-              <button key={v} type="button" className={filterPex === v ? 'is-active' : ''} onClick={() => { setFilterPex(v); setExpanded(null) }}>
-                {v === 'all' ? 'Todos' : v === 'pex' ? 'PEX' : 'Não PEX'}
-              </button>
-            ))}
-          </div>
-        </fieldset>
-
-        {availableRanges.length > 0 && (
-          <fieldset className="pf-range">
-            <legend>Faixa</legend>
-            <div>
-              <button type="button" className={filterRange === 'all' ? 'is-active' : ''} onClick={() => { setFilterRange('all'); setExpanded(null) }}>Todas</button>
-              {availableRanges.map(r => (
-                <button key={r} type="button" className={filterRange === r ? 'is-active' : ''} onClick={() => { setFilterRange(r); setExpanded(null) }}>{r}</button>
-              ))}
-            </div>
-          </fieldset>
-        )}
-
-        {availableNetworks.length > 0 && (
-          <fieldset className="pf-range">
-            <legend>Rede</legend>
-            <div>
-              <select className="pf-select" value={filterNetwork} onChange={e => { setFilterNetwork(e.target.value); setExpanded(null) }}>
-                <option value="all">Todas as redes</option>
-                {availableNetworks.map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </div>
-          </fieldset>
-        )}
-
-        <fieldset className="pf-range">
-          <legend>Roteirizado</legend>
-          <div>
-            {(['all', 'sim', 'nao'] as const).map(v => (
-              <button key={v} type="button" className={filterRouted === v ? 'is-active' : ''} onClick={() => { setFilterRouted(v); setExpanded(null) }}>
-                {v === 'all' ? 'Todos' : v === 'sim' ? 'Sim' : 'Não'}
-              </button>
-            ))}
-          </div>
-        </fieldset>
+        <div className="pf-filters-row">
+          <FilterDrop label="PEX" options={['PEX', 'Não PEX']} selected={filterPex} onSelect={v => { setFilterPex(v); setExpanded(null) }} single open={openFilter === 'pex'} onToggle={() => setOpenFilter(openFilter === 'pex' ? null : 'pex')} />
+          {availableRanges.length > 0 && (
+            <FilterDrop label="Faixa" options={availableRanges} selected={filterRange} onSelect={v => { setFilterRange(v); setExpanded(null) }} open={openFilter === 'range'} onToggle={() => setOpenFilter(openFilter === 'range' ? null : 'range')} />
+          )}
+          {availableNetworks.length > 0 && (
+            <FilterDrop label="Rede" options={availableNetworks} selected={filterNetwork} onSelect={v => { setFilterNetwork(v); setExpanded(null) }} open={openFilter === 'network'} onToggle={() => setOpenFilter(openFilter === 'network' ? null : 'network')} />
+          )}
+          <FilterDrop label="Roteirizado" options={['Sim', 'Não']} selected={filterRouted} onSelect={v => { setFilterRouted(v); setExpanded(null) }} single open={openFilter === 'routed'} onToggle={() => setOpenFilter(openFilter === 'routed' ? null : 'routed')} />
+        </div>
       </div>
 
       {/* Count */}
@@ -307,27 +289,29 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp }: {
         {pexSet.size > 0 && <span style={{ marginLeft: 12, color: 'var(--red)', fontWeight: 700 }}>{pexSet.size} PEX</span>}
       </div>
 
-      {/* List */}
-      <div className="stock-list stock-list--cadastro">
-        <div className="stock-head">
-          <span>Cliente</span>
-          <span className="sc-num">Média 3m</span>
-          <span className="sc-num">Dias s/ compra</span>
-        </div>
-        {filtered.length === 0 && (
-          <p className="empty" style={{ padding: '24px 16px', color: 'var(--muted)', textAlign: 'center' }}>Nenhum cliente encontrado.</p>
-        )}
-        {filtered.map(r => {
-          const isExpanded = expanded === r.document
-          const isPex = pexSet.has(r.document)
-          return (
-            <div key={r.document}>
+      {/* Layout: list + side panel */}
+      <div className={`cad-layout${expanded ? ' has-detail' : ''}`}>
+        {/* List */}
+        <div className="stock-list stock-list--cadastro">
+          <div className="stock-head">
+            <span>Cliente</span>
+            <span className="sc-num">Fat. 3 Meses</span>
+            <span className="sc-num">Dias s/ compra</span>
+          </div>
+          {filtered.length === 0 && (
+            <p className="empty" style={{ padding: '24px 16px', color: 'var(--muted)', textAlign: 'center' }}>Nenhum cliente encontrado.</p>
+          )}
+          {filtered.map(r => {
+            const isSelected = expanded === r.document
+            const isPex = pexSet.has(r.document)
+            return (
               <div
-                className={`stock-row${isExpanded ? ' sel' : ''}`}
+                key={r.document}
+                className={`stock-row${isSelected ? ' sel' : ''}`}
                 role="button"
                 tabIndex={0}
-                onClick={() => setExpanded(isExpanded ? null : r.document)}
-                onKeyDown={e => e.key === 'Enter' && setExpanded(isExpanded ? null : r.document)}
+                onClick={() => setExpanded(isSelected ? null : r.document)}
+                onKeyDown={e => e.key === 'Enter' && setExpanded(isSelected ? null : r.document)}
               >
                 <span className="sc-desc">
                   <span className="p-name">{r.name}</span>
@@ -345,9 +329,11 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp }: {
                   </span>
                 </span>
                 <span className="sc-num">
-                  {r.avgMonth3m > 0
-                    ? <strong className="c-blue">{kpiCurrency(r.avgMonth3m)}</strong>
-                    : <strong className="c-muted">—</strong>}
+                  {r.fatTotal3m > 0
+                    ? <strong className="c-blue">{kpiCurrency(r.fatTotal3m)}</strong>
+                    : r.premiseAvg12m != null && r.premiseAvg12m > 0
+                      ? <strong style={{ color: 'var(--muted)', fontSize: 11 }}>Pir. {kpiCurrency(r.premiseAvg12m)}</strong>
+                      : <strong className="c-muted">—</strong>}
                 </span>
                 <span className="sc-num">
                   {r.daysSincePurchase >= 0
@@ -355,111 +341,121 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp }: {
                     : <span style={{ color: 'var(--muted)', fontSize: 11, fontWeight: 700 }}>nunca</span>}
                 </span>
               </div>
+            )
+          })}
+        </div>
 
-              {isExpanded && (
-                <div className="cad-detail">
-                  <div className="cad-sections">
-                    <div className="cad-section">
-                      <h4>Informações Gerais</h4>
-                      <div className="cad-fields">
-                        <Field label="Razão Social" value={r.legalName} />
-                        <Field label="Nome Fantasia" value={r.name} />
-                        <Field label="CNPJ/CPF" value={r.document} />
-                        <Field label="Código" value={r.code} />
-                        <Field label="Cidade" value={r.city} />
-                        <Field label="Bairro" value={r.district} />
-                        <Field label="Endereço" value={r.address} />
-                        <Field label="Filial" value={r.branch} />
-                        <Field label="Tipo Cobrança" value={r.billingType} />
-                        <Field label="Fontes" value={r.sources.join(', ')} />
-                      </div>
-                    </div>
+        {/* Side panel */}
+        {selectedRow && (
+          <aside className="cad-side-panel">
+            <div className="cad-side-header">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <h3>{selectedRow.name}</h3>
+                  <small>{selectedRow.document} · {selectedRow.code}</small>
+                </div>
+                <button type="button" style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 18, padding: '0 4px', lineHeight: 1 }} onClick={() => setExpanded(null)}>✕</button>
+              </div>
+            </div>
+            <div className="cad-side-body">
+              <div className="cad-section">
+                <h4>Informações Gerais</h4>
+                <div className="cad-fields">
+                  <Field label="Razão Social" value={selectedRow.legalName} />
+                  <Field label="Nome Fantasia" value={selectedRow.name} />
+                  <Field label="CNPJ/CPF" value={selectedRow.document} />
+                  <Field label="Código" value={selectedRow.code} />
+                  <Field label="Cidade" value={selectedRow.city} />
+                  <Field label="Bairro" value={selectedRow.district} />
+                  <Field label="Endereço" value={selectedRow.address} />
+                  <Field label="Filial" value={selectedRow.branch} />
+                  <Field label="Tipo Cobrança" value={selectedRow.billingType} />
+                  <Field label="Fontes" value={selectedRow.sources.join(', ')} />
+                </div>
+              </div>
 
-                    <div className="cad-section">
-                      <h4>Comercial</h4>
-                      <div className="cad-fields">
-                        <Field label="Vendedor" value={r.rcaCode ? `${r.rcaCode}${r.rcaName ? ` — ${r.rcaName}` : ''}` : ''} />
-                        <Field label="Supervisor" value={r.supervisor} />
-                        <Field label="Frequência Visita" value={r.visitFrequency} />
-                        <Field label="Dia Visita" value={r.visitDay} />
-                        <Field label="Roteirizado" value={r.routed ? 'Sim' : 'Não'} />
-                      </div>
-                    </div>
+              <div className="cad-section">
+                <h4>Comercial</h4>
+                <div className="cad-fields">
+                  <Field label="Vendedor" value={selectedRow.rcaCode ? `${selectedRow.rcaCode}${selectedRow.rcaName ? ` — ${selectedRow.rcaName}` : ''}` : ''} />
+                  <Field label="Supervisor" value={selectedRow.supervisor} />
+                  <Field label="Frequência Visita" value={selectedRow.visitFrequency} />
+                  <Field label="Dia Visita" value={selectedRow.visitDay} />
+                  <Field label="Roteirizado" value={selectedRow.routed ? 'Sim' : 'Não'} />
+                </div>
+              </div>
 
-                    <div className="cad-section">
-                      <h4>Indicadores</h4>
-                      <div className="cad-fields">
-                        <Field label="Fat. 3 Meses" value={r.fatTotal3m > 0 ? brlFull(r.fatTotal3m) : '—'} highlight={r.fatTotal3m > 0} />
-                        <Field label="Média Mensal 3m" value={r.avgMonth3m > 0 ? brlFull(r.avgMonth3m) : '—'} highlight={r.avgMonth3m > 0} />
-                        <Field label="Média Pirâmide 12m" value={r.premiseAvg12m != null ? brlFull(r.premiseAvg12m) : '—'} />
-                        <Field label="Dias sem Compra" value={r.daysSincePurchase >= 0 ? `${r.daysSincePurchase} dias` : 'Nunca comprou'} warn={r.daysSincePurchase > 90} />
-                        <Field label="Última Compra" value={r.lastPurchaseDate ? fmtDay(r.lastPurchaseDate) : 'Nunca'} />
-                        <Field label="Compra Todo Mês" value={r.purchasedEveryMonth ? 'Sim' : 'Não'} highlight={r.purchasedEveryMonth} />
-                        <Field label="Meses com Compra" value={`${r.monthsWithPurchase}/3`} />
-                      </div>
-                    </div>
+              <div className="cad-section">
+                <h4>Indicadores</h4>
+                <div className="cad-fields">
+                  <Field label="Fat. 3 Meses" value={selectedRow.fatTotal3m > 0 ? brlFull(selectedRow.fatTotal3m) : '—'} highlight={selectedRow.fatTotal3m > 0} />
+                  <Field label="Média Mensal 3m" value={selectedRow.avgMonth3m > 0 ? brlFull(selectedRow.avgMonth3m) : '—'} highlight={selectedRow.avgMonth3m > 0} />
+                  <Field label="Média Pirâmide 12m" value={selectedRow.premiseAvg12m != null ? brlFull(selectedRow.premiseAvg12m) : '—'} />
+                  <Field label="Dias sem Compra" value={selectedRow.daysSincePurchase >= 0 ? `${selectedRow.daysSincePurchase} dias` : 'Nunca comprou'} warn={selectedRow.daysSincePurchase > 90} />
+                  <Field label="Última Compra" value={selectedRow.lastPurchaseDate ? fmtDay(selectedRow.lastPurchaseDate) : 'Nunca'} />
+                  <Field label="Compra Todo Mês" value={selectedRow.purchasedEveryMonth ? 'Sim' : 'Não'} highlight={selectedRow.purchasedEveryMonth} />
+                  <Field label="Meses com Compra" value={`${selectedRow.monthsWithPurchase}/3`} />
+                </div>
+              </div>
 
-                    <div className="cad-section">
-                      <h4>Classificação</h4>
-                      <div className="cad-fields">
-                        <Field label="Faixa" value={r.range} />
-                        <Field label="Canal" value={r.channel} />
-                        <Field label="Cluster" value={r.cluster} />
-                        <Field label="Perfil" value={r.profile} />
-                        <Field label="Rede" value={r.network} />
-                        <div className="cad-field">
-                          <span className="cad-field-label">PEX</span>
-                          <button
-                            type="button"
-                            className={`cad-pex-toggle${isPex ? ' on' : ''}`}
-                            onClick={e => { e.stopPropagation(); togglePex(r.document) }}
-                          >
-                            {isPex ? 'PEX ✓' : 'Não PEX'}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+              <div className="cad-section">
+                <h4>Classificação</h4>
+                <div className="cad-fields">
+                  <Field label="Faixa" value={selectedRow.range} />
+                  <Field label="Canal" value={selectedRow.channel} />
+                  <Field label="Cluster" value={selectedRow.cluster} />
+                  <Field label="Perfil" value={selectedRow.profile} />
+                  <Field label="Rede" value={selectedRow.network} />
+                  <div className="cad-field">
+                    <span className="cad-field-label">PEX</span>
+                    <button
+                      type="button"
+                      className={`cad-pex-toggle${pexSet.has(selectedRow.document) ? ' on' : ''}`}
+                      onClick={e => { e.stopPropagation(); togglePex(selectedRow.document) }}
+                    >
+                      {pexSet.has(selectedRow.document) ? 'PEX ✓' : 'Não PEX'}
+                    </button>
                   </div>
+                </div>
+              </div>
 
-                  {history.length > 0 && (
-                    <div className="cad-history">
-                      <div className="cl-history-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span className="so-chart-tag">Histórico · {r.name}</span>
-                        <span style={{ color: 'var(--muted)', fontSize: 11 }}>{history.length} movimentações</span>
-                      </div>
-                      <div style={{ overflowX: 'auto', maxHeight: 280, overflowY: 'auto' }}>
-                        <table className="so-day-detail-table">
-                          <thead>
-                            <tr>
-                              <th>Data</th>
-                              <th>Tipo</th>
-                              <th>Produto</th>
-                              <th>Vendedor</th>
-                              <th className="n-right">Qtd</th>
-                              <th className="n-right">Valor</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {history.map((m, i) => (
-                              <tr key={i} className={`so-dm-row so-dm-${m.movementType}`}>
-                                <td style={{ color: 'var(--muted)', fontSize: 11, whiteSpace: 'nowrap' }}>{m.movementDate ? fmtDay(m.movementDate) : '—'}</td>
-                                <td><span className={`so-mov-badge so-mov-${m.movementType}`}>{MOV_LABEL[m.movementType] ?? m.movementType}</span></td>
-                                <td className="so-dm-product">{m.description ?? m.productCode ?? '—'}</td>
-                                <td style={{ fontSize: 11, color: 'var(--muted)' }}>{m.seller ?? m.sellerCode ?? '—'}</td>
-                                <td className="n-right so-dm-qty">{m.quantity != null ? m.quantity.toLocaleString('pt-BR') : '—'}</td>
-                                <td className="n-right so-dm-value">{m.value != null ? brlFull(m.value) : '—'}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
+              {history.length > 0 && (
+                <div className="cad-history">
+                  <div className="cl-history-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="so-chart-tag">Histórico</span>
+                    <span style={{ color: 'var(--muted)', fontSize: 11 }}>{history.length} movimentações</span>
+                  </div>
+                  <div style={{ overflowX: 'auto', maxHeight: 280, overflowY: 'auto' }}>
+                    <table className="so-day-detail-table">
+                      <thead>
+                        <tr>
+                          <th>Data</th>
+                          <th>Tipo</th>
+                          <th>Produto</th>
+                          <th>Vendedor</th>
+                          <th className="n-right">Qtd</th>
+                          <th className="n-right">Valor</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {history.map((m, i) => (
+                          <tr key={i} className={`so-dm-row so-dm-${m.movementType}`}>
+                            <td style={{ color: 'var(--muted)', fontSize: 11, whiteSpace: 'nowrap' }}>{m.movementDate ? fmtDay(m.movementDate) : '—'}</td>
+                            <td><span className={`so-mov-badge so-mov-${m.movementType}`}>{MOV_LABEL[m.movementType] ?? m.movementType}</span></td>
+                            <td className="so-dm-product">{m.description ?? m.productCode ?? '—'}</td>
+                            <td style={{ fontSize: 11, color: 'var(--muted)' }}>{m.seller ?? m.sellerCode ?? '—'}</td>
+                            <td className="n-right so-dm-qty">{m.quantity != null ? m.quantity.toLocaleString('pt-BR') : '—'}</td>
+                            <td className="n-right so-dm-value">{m.value != null ? brlFull(m.value) : '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>
-          )
-        })}
+          </aside>
+        )}
       </div>
     </section>
   )
@@ -470,6 +466,56 @@ function Field({ label, value, highlight, warn }: { label: string; value: string
     <div className="cad-field">
       <span className="cad-field-label">{label}</span>
       <span className={`cad-field-value${highlight ? ' cad-highlight' : ''}${warn ? ' cad-warn' : ''}`}>{value || '—'}</span>
+    </div>
+  )
+}
+
+function FilterDrop({ label, options, selected, onSelect, single, open, onToggle }: {
+  label: string
+  options: string[]
+  selected: string[]
+  onSelect: (vals: string[]) => void
+  single?: boolean
+  open: boolean
+  onToggle: () => void
+}) {
+  const [q, setQ] = useState('')
+  const fq = q.toLowerCase()
+  const vis = fq ? options.filter(o => o.toLowerCase().includes(fq)) : options
+  return (
+    <div className="pf-filter-drop">
+      <button type="button" className={`pf-filter-btn${selected.length > 0 ? ' has-value' : ''}${open ? ' open' : ''}`} onClick={onToggle}>
+        {label}
+        {selected.length > 0 && <span className="pf-filter-count">{selected.length}</span>}
+        <span className="pf-arrow">▼</span>
+      </button>
+      {open && (
+        <div className="pf-filter-panel" onClick={e => e.stopPropagation()}>
+          {options.length > 8 && (
+            <input className="pf-panel-search" placeholder="Filtrar..." value={q} onChange={e => setQ(e.target.value)} autoFocus />
+          )}
+          {single ? (
+            <>
+              <label><input type="radio" name={`fd-${label}`} checked={selected.length === 0} onChange={() => { onSelect([]); onToggle() }} /> Todos</label>
+              {vis.map(o => (
+                <label key={o}><input type="radio" name={`fd-${label}`} checked={selected.includes(o)} onChange={() => { onSelect([o]); onToggle() }} /> {o}</label>
+              ))}
+            </>
+          ) : (
+            <>
+              {selected.length > 0 && (
+                <label style={{ color: 'var(--red)', fontWeight: 600 }}><input type="checkbox" checked={false} onChange={() => onSelect([])} /> Limpar</label>
+              )}
+              {vis.map(o => (
+                <label key={o}><input type="checkbox" checked={selected.includes(o)} onChange={() => {
+                  const next = selected.includes(o) ? selected.filter(x => x !== o) : [...selected, o]
+                  onSelect(next)
+                }} /> {o}</label>
+              ))}
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }

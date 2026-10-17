@@ -18,6 +18,7 @@ import { RcaManager, readRcas, type RcaRecord } from './RcaManager'
 import { CampaignTab } from './CampaignTab'
 import { CarteiraTab } from './CarteiraTab'
 import { CadastroClienteTab } from './CadastroClienteTab'
+import { PiramideTab } from './PiramideTab'
 import { saveCompetenciaSnap, loadCompetenciaSnap, listClosedCompetencias, fmtCompetencia, getActiveComp, setActiveComp, type CompetenciaSnapshot } from './domain/competenciaEngine'
 import { exportBundle, importBundle, downloadBundle, validateBundle } from './domain/syncEngine'
 import { pushToCloud, pullFromCloud, listenForChanges, schedulePush, onSyncStatus, getSyncDetail } from './domain/cloudSync'
@@ -132,7 +133,8 @@ export function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
   const [section, setSection] = useState<'sellout' | 'estoque' | 'clientes' | 'campanhas' | 'administracao'>('sellout')
   const [selloutTab, setSelloutTab] = useState<'dashboard' | 'gerencial' | 'clientes'>('dashboard')
-  const [clientesTab, setClientesTab] = useState<'carteira' | 'cadastro'>('carteira')
+  const [clientesTab, setClientesTab] = useState<'carteira' | 'cadastro' | 'piramide'>('carteira')
+  const [pexSet, setPexSet] = useState<Set<string>>(new Set())
   const [tab, setTab] = useState<'uploads' | 'auditoria' | 'config' | 'rcas' | 'dados'>('uploads')
 
   const monthLabel = useMemo(() => fmtCompetencia(viewingComp ?? activeComp).toUpperCase(), [viewingComp, activeComp])
@@ -517,6 +519,7 @@ export function App() {
           <div style={{ display: 'flex' }}>
             <button type="button" className={`stock-nav-btn${clientesTab === 'carteira' ? ' on' : ''}`} onClick={() => setClientesTab('carteira')}>Carteira</button>
             <button type="button" className={`stock-nav-btn${clientesTab === 'cadastro' ? ' on' : ''}`} onClick={() => setClientesTab('cadastro')}>Cadastro</button>
+            <button type="button" className={`stock-nav-btn${clientesTab === 'piramide' ? ' on' : ''}`} onClick={() => setClientesTab('piramide')}>Pirâmide</button>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 16 }}>
             <span className="so-month-label">{monthLabel}</span>
@@ -524,6 +527,7 @@ export function App() {
         </header>
         {clientesTab === 'carteira' && <CarteiraTab clientBase={effectiveClients} movementBase={effectiveMovements} activeComp={displayComp} />}
         {clientesTab === 'cadastro' && <CadastroClienteTab clientBase={effectiveClients} movementBase={effectiveMovements} activeComp={displayComp} />}
+        {clientesTab === 'piramide' && <PiramideTab clientBase={effectiveClients} movementBase={effectiveMovements} activeComp={displayComp} pexSet={pexSet} onPexChange={setPexSet} />}
       </>) : section === 'campanhas' ? <>
         <CampaignTab />
       </> : <>
