@@ -561,3 +561,42 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 .comp-readonly-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: color-mix(in srgb, var(--blue) 15%, var(--surface)); border-bottom: 1px solid var(--blue); padding: 8px 20px; font-size: 12px; color: var(--text); flex-shrink: 0; flex-wrap: wrap; }
 .comp-close-btn { background: var(--blue); color: #fff; border: none; border-radius: 6px; padding: 4px 12px; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .comp-close-btn:hover { opacity: .85; }
+
+/* ── Cadastro Cliente Tab ───────────────────────────────────── */
+.stock-list--cadastro .stock-head,
+.stock-list--cadastro .stock-row { grid-template-columns: minmax(0,1fr) 100px 100px; }
+@media (max-width: 600px) {
+  .stock-list--cadastro .stock-head,
+  .stock-list--cadastro .stock-row { grid-template-columns: minmax(0,1fr) 80px 80px; }
+}
+
+.cad-badge-range { background: rgba(59,130,246,.10); color: var(--blue); border: 1px solid rgba(59,130,246,.25); padding: 0 5px; border-radius: 4px; font-weight: 700; font-size: 10px; }
+.cad-badge-net { background: rgba(139,92,246,.10); color: #8b5cf6; border: 1px solid rgba(139,92,246,.25); padding: 0 5px; border-radius: 4px; font-weight: 700; font-size: 10px; }
+.cad-badge-rot { background: rgba(16,185,129,.10); color: #10b981; border: 1px solid rgba(16,185,129,.25); padding: 0 5px; border-radius: 4px; font-weight: 700; font-size: 10px; }
+.cad-badge-ext { background: rgba(245,158,11,.10); color: #f59e0b; border: 1px solid rgba(245,158,11,.25); padding: 0 5px; border-radius: 4px; font-weight: 700; font-size: 10px; }
+
+.cad-upload-area { background: var(--surface-raised); border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.cad-upload-textarea { width: 100%; resize: vertical; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); padding: 10px; font: inherit; font-size: 13px; min-height: 70px; }
+.cad-upload-textarea:focus { outline: none; border-color: var(--red); }
+.cad-pex-btn { background: var(--red); color: #fff; border: none; border-radius: 8px; padding: 8px 18px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.cad-pex-btn:hover { opacity: .85; }
+.cad-pex-clear { background: transparent; color: var(--muted); border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; font-size: 12px; cursor: pointer; }
+.cad-pex-clear:hover { border-color: var(--text); color: var(--text); }
+
+.cad-detail { border-top: 1px solid var(--border); background: var(--surface-raised); padding: 16px; }
+.cad-sections { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 16px; }
+.cad-section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+.cad-section h4 { margin: 0 0 10px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+.cad-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; }
+@media (max-width: 600px) { .cad-fields { grid-template-columns: 1fr; } }
+.cad-field { display: flex; flex-direction: column; gap: 1px; }
+.cad-field-label { font-size: 10px; color: var(--muted); font-weight: 700; letter-spacing: .03em; }
+.cad-field-value { font-size: 13px; color: var(--text); word-break: break-word; }
+.cad-field-value.cad-highlight { color: var(--blue); font-weight: 700; }
+.cad-field-value.cad-warn { color: var(--red); font-weight: 700; }
+
+.cad-pex-toggle { padding: 4px 14px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--muted); }
+.cad-pex-toggle:hover { border-color: var(--red); color: var(--red); }
+.cad-pex-toggle.on { background: var(--red); color: #fff; border-color: var(--red); }
+
+.cad-history { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--surface); }
