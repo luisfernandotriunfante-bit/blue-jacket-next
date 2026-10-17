@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import * as XLSX from 'xlsx'
 
 /* ── types ───────────────────────────────────────────── */
 export interface RcaRecord {
@@ -44,6 +45,8 @@ export function RcaManager() {
   const [search, setSearch] = useState('')
   const [showInactive, setShowInactive] = useState(false)
   const [formErrors, setFormErrors] = useState<string[]>([])
+  const [importMsg, setImportMsg] = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const onUpdate = () => setRcas(readRcas())
@@ -90,6 +93,47 @@ export function RcaManager() {
     setFormErrors([])
   }
 
+  async function handleImportFile(file: File) {
+    try {
+      const wb = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: 'array', raw: false })
+      const norm = (v: unknown) => String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
+      let added = 0, updated = 0
+      const current = [...rcas]
+      for (const sheetName of wb.SheetNames) {
+        const rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[sheetName], { header: 1, defval: '', raw: false })
+        const hdr = rows.findIndex(r => norm(r[0]) === 'setor' && (norm(r[3]) === 'nomevendedor' || norm(r[3]) === 'vendedor'))
+        if (hdr < 0) continue
+        for (const row of rows.slice(hdr + 1)) {
+          const code = String(row[0] ?? '').trim()
+          const name = String(row[3] ?? '').trim()
+          if (!code || !name) continue
+          const supCode = String(row[1] ?? '').trim()
+          const supName = String(row[2] ?? '').trim()
+          const existing = current.find(r => r.code === code)
+          if (existing) {
+            existing.name = name
+            existing.supervisorCode = supCode
+            existing.supervisor = supName
+            existing.active = true
+            updated++
+          } else {
+            current.push({ code, name, city: '', supervisor: supName, supervisorCode: supCode, type: '', class: '', goal: null, active: true })
+            added++
+          }
+        }
+      }
+      if (added + updated === 0) {
+        setImportMsg('Nenhum vendedor encontrado. Verifique se o arquivo tem as colunas "Setor" e "Nome Vendedor".')
+      } else {
+        persist(current)
+        setImportMsg(`Importação concluída: ${added} adicionado${added !== 1 ? 's' : ''}, ${updated} atualizado${updated !== 1 ? 's' : ''}.`)
+      }
+    } catch {
+      setImportMsg('Erro ao ler o arquivo. Verifique se é um .xlsx válido.')
+    }
+    setTimeout(() => setImportMsg(null), 6000)
+  }
+
   const q = search.toLowerCase()
   const filtered = rcas.filter(r =>
     (showInactive || r.active) &&
@@ -110,10 +154,20 @@ export function RcaManager() {
           <input type="checkbox" checked={showInactive} onChange={e => setShowInactive(e.target.checked)} />
           Mostrar inativos
         </label>
+        <input ref={fileRef} type="file" accept=".xlsx,.xls" hidden onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFile(f); e.target.value = '' }} />
+        <button className="add-button" style={{ margin: 0, flexShrink: 0 }} type="button" onClick={() => fileRef.current?.click()}>
+          Importar planilha
+        </button>
         <button className="process-button" style={{ margin: 0, flexShrink: 0 }} type="button" onClick={openNew}>
           + Novo vendedor
         </button>
       </div>
+
+      {importMsg && (
+        <div className="rca-import-msg" style={{ padding: '8px 14px', margin: '0 0 8px', borderRadius: 8, background: 'var(--glass)', fontSize: 13, color: 'var(--text)' }}>
+          {importMsg}
+        </div>
+      )}
 
       <div className="rca-count">
         {filtered.length} vendedor{filtered.length !== 1 ? 'es' : ''} {showInactive ? '' : 'ativos'}
