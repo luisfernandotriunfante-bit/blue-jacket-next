@@ -34,7 +34,7 @@ const motors: Array<{ id: Exclude<SourceArea, 'diario'>; name: string }> = [
 const areaName: Record<SourceArea, string> = { diario: 'Diários', produtos: 'Produtos', clientes: 'Clientes', movimentacoes: 'Movimentações', recebimentos: 'Chegada de notas', historico: 'Histórico' }
 const clientSources = [
   { id: 'internal', label: 'Cadastro de clientes (1203)' },
-  { id: 'portfolio', label: 'Carteira de clientes' },
+  { id: 'portfolio', label: 'Roteiro geral' },
   { id: 'premises', label: 'Premissas de clientes' },
 ] as const
 const productSources = [
