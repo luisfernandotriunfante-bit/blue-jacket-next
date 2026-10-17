@@ -171,13 +171,13 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
         avg3m: fat3m / 3,
         premiseAvg12m: c.premiseAverage12Months,
         lastDate,
-        routed: !!(c.visitFrequency || c.visitDay) && rcaMap.has(c.rcaCode ?? ''),
+        routed: !!(c.visitFrequency || c.visitDay),
         rcaCode: c.rcaCode ?? '',
         rcaName: c.rcaName ?? c.representative ?? '',
         hasCadastro,
       }
     })
-  }, [clientBase, movsByCustomer, monthStart, monthEnd, threeMonthRange, rcaMap])
+  }, [clientBase, movsByCustomer, monthStart, monthEnd, threeMonthRange])
 
   const availableRanges = useMemo(() => [...new Set(allClients.map(c => c.range).filter(Boolean))].sort(), [allClients])
   const availableNetworks = useMemo(() => [...new Set(allClients.map(c => c.network).filter(Boolean))].sort(), [allClients])
