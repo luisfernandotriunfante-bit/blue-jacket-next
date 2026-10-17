@@ -601,22 +601,37 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 
 .cad-history { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--surface); }
 
-/* Modern thin scrollbar */
-.crt-sellers, .crt-cities, .crt-right-detail {
+/* Modern thin scrollbar — applied globally to all scrollable containers */
+.crt-sellers, .crt-cities, .crt-right-detail,
+.stock-detail, .notas-section-body, .cl-history-wrap,
+.so-day-detail-wrap, .so-table-wrap, .cad-history,
+.pf-filter-panel, .cad-side-panel, .notas-inv-items {
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
 }
-.crt-sellers::-webkit-scrollbar, .crt-cities::-webkit-scrollbar, .crt-right-detail::-webkit-scrollbar {
-  width: 6px;
+.crt-sellers::-webkit-scrollbar, .crt-cities::-webkit-scrollbar, .crt-right-detail::-webkit-scrollbar,
+.stock-detail::-webkit-scrollbar, .notas-section-body::-webkit-scrollbar, .cl-history-wrap::-webkit-scrollbar,
+.so-day-detail-wrap::-webkit-scrollbar, .so-table-wrap::-webkit-scrollbar, .cad-history::-webkit-scrollbar,
+.pf-filter-panel::-webkit-scrollbar, .cad-side-panel::-webkit-scrollbar, .notas-inv-items::-webkit-scrollbar {
+  width: 6px; height: 6px;
 }
-.crt-sellers::-webkit-scrollbar-track, .crt-cities::-webkit-scrollbar-track, .crt-right-detail::-webkit-scrollbar-track {
+.crt-sellers::-webkit-scrollbar-track, .crt-cities::-webkit-scrollbar-track, .crt-right-detail::-webkit-scrollbar-track,
+.stock-detail::-webkit-scrollbar-track, .notas-section-body::-webkit-scrollbar-track, .cl-history-wrap::-webkit-scrollbar-track,
+.so-day-detail-wrap::-webkit-scrollbar-track, .so-table-wrap::-webkit-scrollbar-track, .cad-history::-webkit-scrollbar-track,
+.pf-filter-panel::-webkit-scrollbar-track, .cad-side-panel::-webkit-scrollbar-track, .notas-inv-items::-webkit-scrollbar-track {
   background: transparent;
 }
-.crt-sellers::-webkit-scrollbar-thumb, .crt-cities::-webkit-scrollbar-thumb, .crt-right-detail::-webkit-scrollbar-thumb {
+.crt-sellers::-webkit-scrollbar-thumb, .crt-cities::-webkit-scrollbar-thumb, .crt-right-detail::-webkit-scrollbar-thumb,
+.stock-detail::-webkit-scrollbar-thumb, .notas-section-body::-webkit-scrollbar-thumb, .cl-history-wrap::-webkit-scrollbar-thumb,
+.so-day-detail-wrap::-webkit-scrollbar-thumb, .so-table-wrap::-webkit-scrollbar-thumb, .cad-history::-webkit-scrollbar-thumb,
+.pf-filter-panel::-webkit-scrollbar-thumb, .cad-side-panel::-webkit-scrollbar-thumb, .notas-inv-items::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: 3px;
 }
-.crt-sellers::-webkit-scrollbar-thumb:hover, .crt-cities::-webkit-scrollbar-thumb:hover, .crt-right-detail::-webkit-scrollbar-thumb:hover {
+.crt-sellers::-webkit-scrollbar-thumb:hover, .crt-cities::-webkit-scrollbar-thumb:hover, .crt-right-detail::-webkit-scrollbar-thumb:hover,
+.stock-detail::-webkit-scrollbar-thumb:hover, .notas-section-body::-webkit-scrollbar-thumb:hover, .cl-history-wrap::-webkit-scrollbar-thumb:hover,
+.so-day-detail-wrap::-webkit-scrollbar-thumb:hover, .so-table-wrap::-webkit-scrollbar-thumb:hover, .cad-history::-webkit-scrollbar-thumb:hover,
+.pf-filter-panel::-webkit-scrollbar-thumb:hover, .cad-side-panel::-webkit-scrollbar-thumb:hover, .notas-inv-items::-webkit-scrollbar-thumb:hover {
   background: var(--muted);
 }
 
@@ -641,10 +656,7 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 /* Cadastro side panel layout */
 .cad-layout { display: grid; grid-template-columns: 1fr; gap: 16px; }
 .cad-layout.has-detail { grid-template-columns: minmax(0, 1fr) 380px; align-items: start; }
-.cad-side-panel { position: sticky; top: 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden; max-height: calc(100vh - 80px); overflow-y: auto; animation: sd-in 0.18s cubic-bezier(0.2,0,0,1); scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
-.cad-side-panel::-webkit-scrollbar { width: 6px; }
-.cad-side-panel::-webkit-scrollbar-track { background: transparent; }
-.cad-side-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.cad-side-panel { position: sticky; top: 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden; max-height: calc(100vh - 80px); overflow-y: auto; animation: sd-in 0.18s cubic-bezier(0.2,0,0,1); }
 .cad-side-header { padding: 14px 16px 10px; border-bottom: 1px solid var(--border); }
 .cad-side-header h3 { margin: 0; font-size: 15px; font-weight: 700; }
 .cad-side-header small { color: var(--muted); font-size: 12px; }

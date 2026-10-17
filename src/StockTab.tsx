@@ -618,19 +618,21 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                 />
-                <select
-                  className="pf-select"
-                  value={filterStatus}
-                  onChange={e => setFilterStatus(e.target.value as StockFilter)}
-                  aria-label="Filtrar situação"
-                >
-                  <option value="all">Todas as situações</option>
-                  <option value="com_estoque">Com estoque</option>
-                  <option value="sem_estoque">Sem estoque</option>
-                  <option value="em_transito">Em trânsito</option>
-                </select>
               </div>
               <div className="pf-filters-row">
+                <FilterDrop
+                  label="Situação"
+                  options={['Com estoque', 'Sem estoque', 'Em trânsito']}
+                  selected={filterStatus === 'all' ? [] : [filterStatus === 'com_estoque' ? 'Com estoque' : filterStatus === 'sem_estoque' ? 'Sem estoque' : 'Em trânsito']}
+                  onSelect={vals => {
+                    if (vals.length === 0) setFilterStatus('all')
+                    else setFilterStatus(vals[0] === 'Com estoque' ? 'com_estoque' : vals[0] === 'Sem estoque' ? 'sem_estoque' : 'em_transito')
+                    setSelected(null)
+                  }}
+                  single
+                  open={openFilter === 'situacao'}
+                  onToggle={() => setOpenFilter(o => o === 'situacao' ? null : 'situacao')}
+                />
                 {availableChannels.length > 0 && (
                   <FilterDrop
                     label="Sortimento"
@@ -662,26 +664,29 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                     onToggle={() => setOpenFilter(o => o === 'marca' ? null : 'marca')}
                   />
                 )}
-                <fieldset className="pf-range" style={{ border: 'none', padding: 0, margin: 0 }}>
-                  <legend>Marcação</legend>
-                  <div>
-                    {(['all', 'mandatory', 'important'] as const).map(m => (
-                      <button key={m} type="button" className={filterMarcacao === m ? 'is-active' : ''} onClick={() => setFilterMarcacao(m)}>
-                        {m === 'all' ? 'Todos' : m === 'mandatory' ? 'Mandatório' : 'Importante'}
-                      </button>
-                    ))}
-                  </div>
-                </fieldset>
+                <FilterDrop
+                  label="Marcação"
+                  options={['Mandatório', 'Importante']}
+                  selected={filterMarcacao === 'all' ? [] : [filterMarcacao === 'mandatory' ? 'Mandatório' : 'Importante']}
+                  onSelect={vals => {
+                    if (vals.length === 0) setFilterMarcacao('all')
+                    else setFilterMarcacao(vals[0] === 'Mandatório' ? 'mandatory' : 'important')
+                    setSelected(null)
+                  }}
+                  single
+                  open={openFilter === 'marcacao'}
+                  onToggle={() => setOpenFilter(o => o === 'marcacao' ? null : 'marcacao')}
+                />
                 {abcMap.size > 0 && (
-                  <fieldset className="pf-range" style={{ border: 'none', padding: 0, margin: 0 }}>
-                    <legend>Curva ABC</legend>
-                    <div>
-                      <button type="button" className={filterAbc === 'all' ? 'is-active' : ''} onClick={() => setFilterAbc('all')}>Todos</button>
-                      {(['A', 'B', 'C'] as const).map(faixa => (
-                        <button key={faixa} type="button" className={`${filterAbc === faixa ? 'is-active' : ''} abc-filter-${faixa.toLowerCase()}`} onClick={() => setFilterAbc(faixa)}>{faixa}</button>
-                      ))}
-                    </div>
-                  </fieldset>
+                  <FilterDrop
+                    label="Curva ABC"
+                    options={['A', 'B', 'C']}
+                    selected={filterAbc === 'all' ? [] : [filterAbc]}
+                    onSelect={vals => { setFilterAbc(vals.length === 0 ? 'all' : vals[0] as 'A' | 'B' | 'C'); setSelected(null) }}
+                    single
+                    open={openFilter === 'abc'}
+                    onToggle={() => setOpenFilter(o => o === 'abc' ? null : 'abc')}
+                  />
                 )}
               </div>
             </div>
@@ -913,32 +918,33 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                   value={lncSearch}
                   onChange={e => setLncSearch(e.target.value)}
                 />
-                <select
-                  className="pf-select"
-                  value={lncStatus}
-                  onChange={e => setLncStatus(e.target.value as StockFilter)}
-                  aria-label="Filtrar situação"
-                >
-                  <option value="all">Todas as situações</option>
-                  <option value="com_estoque">Com estoque</option>
-                  <option value="sem_estoque">Sem estoque</option>
-                  <option value="em_transito">Em trânsito</option>
-                </select>
               </div>
-              <fieldset className="pf-range">
-                <legend>Tipo</legend>
-                <div>
-                  <button type="button" className={lncFilter === 'all' ? 'is-active' : ''} onClick={() => setLncFilter('all')}>
-                    Todos {lncCounts.total > 0 && `(${lncCounts.total})`}
-                  </button>
-                  <button type="button" className={lncFilter === 'launch' ? 'is-active' : ''} onClick={() => setLncFilter('launch')}>
-                    Lançamentos {lncCounts.launch > 0 && `(${lncCounts.launch})`}
-                  </button>
-                  <button type="button" className={lncFilter === 'pex' ? 'is-active' : ''} onClick={() => setLncFilter('pex')}>
-                    PEX {lncCounts.pex > 0 && `(${lncCounts.pex})`}
-                  </button>
-                </div>
-              </fieldset>
+              <div className="pf-filters-row">
+                <FilterDrop
+                  label="Situação"
+                  options={['Com estoque', 'Sem estoque', 'Em trânsito']}
+                  selected={lncStatus === 'all' ? [] : [lncStatus === 'com_estoque' ? 'Com estoque' : lncStatus === 'sem_estoque' ? 'Sem estoque' : 'Em trânsito']}
+                  onSelect={vals => {
+                    if (vals.length === 0) setLncStatus('all')
+                    else setLncStatus(vals[0] === 'Com estoque' ? 'com_estoque' : vals[0] === 'Sem estoque' ? 'sem_estoque' : 'em_transito')
+                  }}
+                  single
+                  open={openFilter === 'lnc-situacao'}
+                  onToggle={() => setOpenFilter(o => o === 'lnc-situacao' ? null : 'lnc-situacao')}
+                />
+                <FilterDrop
+                  label="Tipo"
+                  options={['Lançamentos', 'PEX']}
+                  selected={lncFilter === 'all' ? [] : [lncFilter === 'launch' ? 'Lançamentos' : 'PEX']}
+                  onSelect={vals => {
+                    if (vals.length === 0) setLncFilter('all')
+                    else setLncFilter(vals[0] === 'Lançamentos' ? 'launch' : 'pex')
+                  }}
+                  single
+                  open={openFilter === 'lnc-tipo'}
+                  onToggle={() => setOpenFilter(o => o === 'lnc-tipo' ? null : 'lnc-tipo')}
+                />
+              </div>
             </div>
 
             <div className="stock-count">
