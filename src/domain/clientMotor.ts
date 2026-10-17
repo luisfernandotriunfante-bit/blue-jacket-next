@@ -96,11 +96,11 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
         if (hasPdvSheet) { audit.push({ id: `portfolio-ignored-${audit.length}`, level: 'ok', title: 'Aba auxiliar ignorada', instruction: 'Nada precisa ser feito.', detail: 'A carteira dentro da Base de Premissas não alterou a base de clientes.', area: 'clientes' }); continue }
         let accepted = 0
         for (const row of rows.slice(start)) {
-          const key = documentKey(at(row, 1)); if (!hasDocument(key)) continue
+          const key = documentKey(at(row, 3)); if (!hasDocument(key)) continue
           if (portfolio.has(key)) continue
-          portfolio.set(key, { document: key, winthorCode: text(at(row, 0)), legalName: text(at(row, 2)), tradeName: text(at(row, 3)), commercialActivity: text(at(row, 4)), city: text(at(row, 5)), district: text(at(row, 6)), address: text(at(row, 7)), latitude: text(at(row, 8)), longitude: text(at(row, 9)), visitFrequency: text(at(row, 12)), visitDay: text(at(row, 13)), daysWithoutPurchase: text(at(row, 14)), representative: text(at(row, 15)), rcaCode: text(at(row, 15)), sources: ['Carteira de clientes'] }); accepted++
+          portfolio.set(key, { document: key, winthorCode: text(at(row, 2)), legalName: text(at(row, 4)), tradeName: text(at(row, 5)), city: text(at(row, 6)), district: text(at(row, 7)), address: text(at(row, 8)), visitFrequency: text(at(row, 10)), visitDay: text(at(row, 13)), rcaCode: text(at(row, 0)), rcaName: text(at(row, 1)), sources: ['Roteiro geral'] }); accepted++
         }
-        audit.push({ id: `portfolio-ok-${audit.length}`, level: 'ok', title: 'Carteira de clientes reconhecida', instruction: `${accepted.toLocaleString('pt-BR')} clientes prontos para juntar.`, detail: 'Os dados de endereço, frequência e visita foram lidos.', area: 'clientes' }); continue
+        audit.push({ id: `portfolio-ok-${audit.length}`, level: 'ok', title: 'Roteiro geral reconhecido', instruction: `${accepted.toLocaleString('pt-BR')} clientes prontos para juntar.`, detail: 'Os dados de endereço, frequência de visita e RCA foram lidos.', area: 'clientes' }); continue
       }
       if (routeHeader >= 0) {
         let accepted = 0
