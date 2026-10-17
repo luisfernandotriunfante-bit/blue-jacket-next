@@ -204,7 +204,7 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 .stock-layout.has-detail { grid-template-columns: minmax(0, 1fr) 360px; align-items: start; }
 
 /* List */
-.stock-list { border: 1px solid var(--border); border-radius: 10px; overflow-x: hidden; overflow-y: auto; max-height: clamp(340px, 56vh, 700px); position: relative; }
+.stock-list { border: 1px solid var(--border); border-radius: 10px; overflow-x: hidden; overflow-y: visible; position: relative; }
 .stock-head { display: grid; gap: 0; padding: 9px 14px; background: var(--surface-raised); border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; position: sticky; top: 0; z-index: 2; }
 .stock-list--estoque .stock-head { grid-template-columns: minmax(0,1fr) 90px 110px 110px; }
 .stock-list--produtos .stock-head { grid-template-columns: minmax(0,1fr) 80px 80px 60px; }
@@ -371,7 +371,7 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 .so-window-sub { font-size: 10px; color: var(--muted); margin-top: 3px; }
 .so-compact-btn { font-size: 11px; font-weight: 700; color: var(--blue); background: transparent; border: 1px solid var(--blue); border-radius: 6px; padding: 3px 9px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
 .so-compact-btn:hover, .so-compact-btn.active { background: var(--blue); color: #fff; }
-.so-table-wrap { overflow-y: auto; max-height: 420px; }
+.so-table-wrap { overflow-y: visible; }
 .so-daily-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
 .so-daily-table thead th { font-size: 9px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface-raised); z-index: 1; }
 .so-daily-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
@@ -600,3 +600,53 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 .cad-pex-toggle.on { background: var(--red); color: #fff; border-color: var(--red); }
 
 .cad-history { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--surface); }
+
+/* Modern thin scrollbar */
+.crt-sellers, .crt-cities, .crt-right-detail {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.crt-sellers::-webkit-scrollbar, .crt-cities::-webkit-scrollbar, .crt-right-detail::-webkit-scrollbar {
+  width: 6px;
+}
+.crt-sellers::-webkit-scrollbar-track, .crt-cities::-webkit-scrollbar-track, .crt-right-detail::-webkit-scrollbar-track {
+  background: transparent;
+}
+.crt-sellers::-webkit-scrollbar-thumb, .crt-cities::-webkit-scrollbar-thumb, .crt-right-detail::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+.crt-sellers::-webkit-scrollbar-thumb:hover, .crt-cities::-webkit-scrollbar-thumb:hover, .crt-right-detail::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+/* Collapsible filter dropdowns */
+.pf-filter-drop { position: relative; display: inline-block; }
+.pf-filter-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 13px; cursor: pointer; transition: border-color .15s, background .15s; white-space: nowrap; }
+.pf-filter-btn:hover { border-color: var(--muted); }
+.pf-filter-btn.has-value { border-color: var(--blue); color: var(--blue); }
+.pf-filter-btn .pf-arrow { font-size: 10px; opacity: .5; transition: transform .15s; }
+.pf-filter-btn.open .pf-arrow { transform: rotate(180deg); }
+.pf-filter-panel { position: absolute; top: calc(100% + 4px); left: 0; z-index: 20; min-width: 200px; max-height: 280px; overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.25); padding: 6px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.pf-filter-panel label { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 6px; font-size: 13px; color: var(--text); cursor: pointer; transition: background .1s; }
+.pf-filter-panel label:hover { background: var(--surface-raised); }
+.pf-filter-panel label input[type="checkbox"], .pf-filter-panel label input[type="radio"] { accent-color: var(--blue); }
+.pf-filter-panel .pf-panel-search { width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-raised); color: var(--text); font-size: 12px; margin-bottom: 4px; outline: none; }
+.pf-filter-panel .pf-panel-search:focus { border-color: var(--blue); }
+.pf-filter-count { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; border-radius: 9px; background: var(--blue); color: #fff; font-size: 10px; font-weight: 700; padding: 0 5px; }
+
+/* Filter bar row */
+.pf-filters-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 0 0 8px; }
+
+/* Cadastro side panel layout */
+.cad-layout { display: grid; grid-template-columns: 1fr; gap: 16px; }
+.cad-layout.has-detail { grid-template-columns: minmax(0, 1fr) 380px; align-items: start; }
+.cad-side-panel { position: sticky; top: 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden; max-height: calc(100vh - 80px); overflow-y: auto; animation: sd-in 0.18s cubic-bezier(0.2,0,0,1); scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.cad-side-panel::-webkit-scrollbar { width: 6px; }
+.cad-side-panel::-webkit-scrollbar-track { background: transparent; }
+.cad-side-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.cad-side-header { padding: 14px 16px 10px; border-bottom: 1px solid var(--border); }
+.cad-side-header h3 { margin: 0; font-size: 15px; font-weight: 700; }
+.cad-side-header small { color: var(--muted); font-size: 12px; }
+.cad-side-body { padding: 12px 16px 16px; }
+@media (max-width: 900px) { .cad-layout.has-detail { grid-template-columns: 1fr; } .cad-side-panel { position: static; max-height: none; } }

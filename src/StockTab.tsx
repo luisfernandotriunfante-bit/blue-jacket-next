@@ -58,6 +58,9 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
   const [filterChannel, setFilterChannel] = useState('')
   const [filterMarcacao, setFilterMarcacao] = useState<'all' | 'mandatory' | 'important'>('all')
   const [filterAbc, setFilterAbc] = useState<'all' | 'A' | 'B' | 'C'>('all')
+  const [filterGroupFamily, setFilterGroupFamily] = useState<string[]>([])
+  const [filterBrand, setFilterBrand] = useState<string[]>([])
+  const [openFilter, setOpenFilter] = useState<string | null>(null)
   const [selected, setSelected] = useState<CanonicalProduct | null>(null)
   const [tags, setTags] = useState<Tags>(loadTags)
   const [lncSearch, setLncSearch] = useState('')
@@ -114,6 +117,15 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
     try { localStorage.setItem('rj-notas-seen', String(notasSeen)) }
     catch { /* */ }
   }, [notasSeen])
+
+  useEffect(() => {
+    if (!openFilter) return
+    const close = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest('.pf-filter-drop')) setOpenFilter(null)
+    }
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [openFilter])
 
   const receiptGroups = useMemo(() => groupReceiptsByInvoice(receiptBase), [receiptBase])
 
@@ -279,6 +291,18 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
     return Array.from(seen).filter(ch => !isBlockedChannel(ch)).sort()
   }, [productBase])
 
+  const availableFamilies = useMemo(() => {
+    const set = new Set<string>()
+    for (const p of productBase) if (p.groupFamily) set.add(p.groupFamily)
+    return [...set].sort()
+  }, [productBase])
+
+  const availableBrands = useMemo(() => {
+    const set = new Set<string>()
+    for (const p of productBase) if (p.brand) set.add(p.brand)
+    return [...set].sort()
+  }, [productBase])
+
   const filtered = useMemo(() => {
     const q = search.trim()
     return productBase.filter(p => {
@@ -307,9 +331,11 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
       if (filterMarcacao === 'mandatory' && !Object.values(p.sortimentChannels ?? {}).some(v => v === 1)) return false
       if (filterMarcacao === 'important' && !Object.values(p.sortimentChannels ?? {}).some(v => v === 2)) return false
       if (filterAbc !== 'all' && (p.internalCode ? abcMap.get(p.internalCode) : undefined) !== filterAbc) return false
+      if (filterGroupFamily.length > 0 && !filterGroupFamily.includes(p.groupFamily ?? '')) return false
+      if (filterBrand.length > 0 && !filterBrand.includes(p.brand ?? '')) return false
       return true
     })
-  }, [productBase, search, filterStatus, filterChannel, filterMarcacao, filterAbc, abcMap])
+  }, [productBase, search, filterStatus, filterChannel, filterMarcacao, filterAbc, abcMap, filterGroupFamily, filterBrand])
 
   const filteredLnc = useMemo(() => {
     const q = lncSearch.trim()
@@ -604,38 +630,60 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                   <option value="em_transito">Em trânsito</option>
                 </select>
               </div>
-              {availableChannels.length > 0 && (
-                <fieldset className="pf-range">
-                  <legend>Sortimento</legend>
+              <div className="pf-filters-row">
+                {availableChannels.length > 0 && (
+                  <FilterDrop
+                    label="Sortimento"
+                    options={availableChannels}
+                    selected={filterChannel ? [filterChannel] : []}
+                    onSelect={vals => { setFilterChannel(vals[0] ?? ''); setSelected(null) }}
+                    single
+                    open={openFilter === 'sortimento'}
+                    onToggle={() => setOpenFilter(o => o === 'sortimento' ? null : 'sortimento')}
+                  />
+                )}
+                {availableFamilies.length > 0 && (
+                  <FilterDrop
+                    label="Família"
+                    options={availableFamilies}
+                    selected={filterGroupFamily}
+                    onSelect={vals => { setFilterGroupFamily(vals); setSelected(null) }}
+                    open={openFilter === 'familia'}
+                    onToggle={() => setOpenFilter(o => o === 'familia' ? null : 'familia')}
+                  />
+                )}
+                {availableBrands.length > 0 && (
+                  <FilterDrop
+                    label="Marca"
+                    options={availableBrands}
+                    selected={filterBrand}
+                    onSelect={vals => { setFilterBrand(vals); setSelected(null) }}
+                    open={openFilter === 'marca'}
+                    onToggle={() => setOpenFilter(o => o === 'marca' ? null : 'marca')}
+                  />
+                )}
+                <fieldset className="pf-range" style={{ border: 'none', padding: 0, margin: 0 }}>
+                  <legend>Marcação</legend>
                   <div>
-                    <button type="button" className={filterChannel === '' ? 'is-active' : ''} onClick={() => setFilterChannel('')}>Todos</button>
-                    {availableChannels.map(ch => (
-                      <button key={ch} type="button" className={filterChannel === ch ? 'is-active' : ''} onClick={() => setFilterChannel(ch)}>{ch}</button>
+                    {(['all', 'mandatory', 'important'] as const).map(m => (
+                      <button key={m} type="button" className={filterMarcacao === m ? 'is-active' : ''} onClick={() => setFilterMarcacao(m)}>
+                        {m === 'all' ? 'Todos' : m === 'mandatory' ? 'Mandatório' : 'Importante'}
+                      </button>
                     ))}
                   </div>
                 </fieldset>
-              )}
-              <fieldset className="pf-range">
-                <legend>Marcação</legend>
-                <div>
-                  {(['all', 'mandatory', 'important'] as const).map(m => (
-                    <button key={m} type="button" className={filterMarcacao === m ? 'is-active' : ''} onClick={() => setFilterMarcacao(m)}>
-                      {m === 'all' ? 'Todos' : m === 'mandatory' ? 'Mandatório' : 'Importante'}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-              {abcMap.size > 0 && (
-                <fieldset className="pf-range">
-                  <legend>Curva ABC</legend>
-                  <div>
-                    <button type="button" className={filterAbc === 'all' ? 'is-active' : ''} onClick={() => setFilterAbc('all')}>Todos</button>
-                    {(['A', 'B', 'C'] as const).map(faixa => (
-                      <button key={faixa} type="button" className={`${filterAbc === faixa ? 'is-active' : ''} abc-filter-${faixa.toLowerCase()}`} onClick={() => setFilterAbc(faixa)}>{faixa}</button>
-                    ))}
-                  </div>
-                </fieldset>
-              )}
+                {abcMap.size > 0 && (
+                  <fieldset className="pf-range" style={{ border: 'none', padding: 0, margin: 0 }}>
+                    <legend>Curva ABC</legend>
+                    <div>
+                      <button type="button" className={filterAbc === 'all' ? 'is-active' : ''} onClick={() => setFilterAbc('all')}>Todos</button>
+                      {(['A', 'B', 'C'] as const).map(faixa => (
+                        <button key={faixa} type="button" className={`${filterAbc === faixa ? 'is-active' : ''} abc-filter-${faixa.toLowerCase()}`} onClick={() => setFilterAbc(faixa)}>{faixa}</button>
+                      ))}
+                    </div>
+                  </fieldset>
+                )}
+              </div>
             </div>
 
             <div className="stock-count">
@@ -1441,6 +1489,57 @@ function DI({ label, value, hi }: { label: string; value: string; hi?: boolean }
     <div className="di">
       <span className="di-label">{label}</span>
       <strong className={hi ? 'c-blue' : ''}>{value}</strong>
+    </div>
+  )
+}
+
+function FilterDrop({ label, options, selected, onSelect, single, open, onToggle }: {
+  label: string
+  options: string[]
+  selected: string[]
+  onSelect: (vals: string[]) => void
+  single?: boolean
+  open: boolean
+  onToggle: () => void
+}) {
+  const [q, setQ] = useState('')
+  const fq = q.toLowerCase()
+  const vis = fq ? options.filter(o => o.toLowerCase().includes(fq)) : options
+
+  return (
+    <div className="pf-filter-drop">
+      <button type="button" className={`pf-filter-btn${selected.length > 0 ? ' has-value' : ''}${open ? ' open' : ''}`} onClick={onToggle}>
+        {label}
+        {selected.length > 0 && <span className="pf-filter-count">{selected.length}</span>}
+        <span className="pf-arrow">▼</span>
+      </button>
+      {open && (
+        <div className="pf-filter-panel" onClick={e => e.stopPropagation()}>
+          {options.length > 8 && (
+            <input className="pf-panel-search" placeholder="Filtrar..." value={q} onChange={e => setQ(e.target.value)} autoFocus />
+          )}
+          {single ? (
+            <>
+              <label><input type="radio" name={`fd-${label}`} checked={selected.length === 0} onChange={() => { onSelect([]); onToggle() }} /> Todos</label>
+              {vis.map(o => (
+                <label key={o}><input type="radio" name={`fd-${label}`} checked={selected.includes(o)} onChange={() => { onSelect([o]); onToggle() }} /> {o}</label>
+              ))}
+            </>
+          ) : (
+            <>
+              {selected.length > 0 && (
+                <label style={{ color: 'var(--red)', fontWeight: 600 }}><input type="checkbox" checked={false} onChange={() => onSelect([])} /> Limpar seleção</label>
+              )}
+              {vis.map(o => (
+                <label key={o}><input type="checkbox" checked={selected.includes(o)} onChange={() => {
+                  const next = selected.includes(o) ? selected.filter(x => x !== o) : [...selected, o]
+                  onSelect(next)
+                }} /> {o}</label>
+              ))}
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }
