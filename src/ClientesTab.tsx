@@ -46,6 +46,21 @@ export function ClientesTab({ movementBase, clientBase, monthLabel, activeComp }
 }) {
   const [search, setSearch] = useState('')
   const [expandedCustomer, setExpandedCustomer] = useState<string | null>(null)
+  const [filterRange, setFilterRange] = useState<string[]>([])
+  const [filterNetwork, setFilterNetwork] = useState<string[]>([])
+  const [filterProfile, setFilterProfile] = useState<string[]>([])
+  const [filterSource, setFilterSource] = useState<string[]>([])
+  const [filterChannel, setFilterChannel] = useState<string[]>([])
+  const [openFilter, setOpenFilter] = useState<string | null>(null)
+
+  const clientLookup = useMemo(() => {
+    const m = new Map<string, CanonicalClient>()
+    for (const c of clientBase) {
+      if (c.winthorCode) m.set(c.winthorCode, c)
+      m.set(c.document, c)
+    }
+    return m
+  }, [clientBase])
 
   const { monthStart, monthEnd } = useMemo(() => {
     const [y, mo] = activeComp.split('-').map(Number)
@@ -86,11 +101,14 @@ export function ClientesTab({ movementBase, clientBase, monthLabel, activeComp }
   }, [movementBase])
 
   const positivados = useMemo(() => {
-    const map = new Map<string, { code: string; name: string; fat: number; afat: number; seller: string; lastDate: string }>()
+    const map = new Map<string, { code: string; name: string; fat: number; afat: number; seller: string; lastDate: string; range: string; network: string; profile: string; channel: string; sources: string[] }>()
     for (const m of monthBase) {
       const code = m.customerCode ?? ''; if (!code) continue
       if (m.movementType === 'venda_faturada' || m.movementType === 'a_faturar') {
-        if (!map.has(code)) map.set(code, { code, name: m.customerName ?? code, fat: 0, afat: 0, seller: m.seller ?? m.sellerCode ?? '—', lastDate: m.movementDate ?? '' })
+        if (!map.has(code)) {
+          const cli = clientLookup.get(code) ?? clientLookup.get(m.customerDocument ?? '')
+          map.set(code, { code, name: m.customerName ?? code, fat: 0, afat: 0, seller: m.seller ?? m.sellerCode ?? '—', lastDate: m.movementDate ?? '', range: cli?.premiseRange ?? '', network: cli?.premiseNetwork ?? '', profile: cli?.premiseProfile ?? '', channel: cli?.channelType ?? '', sources: cli?.sources ?? [] })
+        }
       } else if (m.movementType === 'devolucao') {
         if (!map.has(code)) continue
       } else {
@@ -106,14 +124,27 @@ export function ClientesTab({ movementBase, clientBase, monthLabel, activeComp }
       }
     }
     return [...map.values()].sort((a, b) => b.fat - a.fat)
-  }, [monthBase])
+  }, [monthBase, clientLookup])
 
   const totalFat = useMemo(() => positivados.reduce((s, p) => s + p.fat, 0), [positivados])
 
+  const availableRanges = useMemo(() => [...new Set(positivados.map(p => p.range).filter(Boolean))].sort(), [positivados])
+  const availableNetworks = useMemo(() => [...new Set(positivados.map(p => p.network).filter(Boolean))].sort(), [positivados])
+  const availableProfiles = useMemo(() => [...new Set(positivados.map(p => p.profile).filter(Boolean))].sort(), [positivados])
+  const availableSources = useMemo(() => [...new Set(positivados.flatMap(p => p.sources))].sort(), [positivados])
+  const availableChannels = useMemo(() => [...new Set(positivados.map(p => p.channel).filter(Boolean))].sort(), [positivados])
+  const hasActiveFilter = filterRange.length > 0 || filterNetwork.length > 0 || filterProfile.length > 0 || filterSource.length > 0 || filterChannel.length > 0
+
   const q = search.toLowerCase()
-  const filteredPosit = positivados.filter(p =>
-    !q || p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q) || p.seller.toLowerCase().includes(q)
-  )
+  const filteredPosit = positivados.filter(p => {
+    if (q && !p.name.toLowerCase().includes(q) && !p.code.toLowerCase().includes(q) && !p.seller.toLowerCase().includes(q)) return false
+    if (filterRange.length && !filterRange.includes(p.range)) return false
+    if (filterNetwork.length && !filterNetwork.includes(p.network)) return false
+    if (filterProfile.length && !filterProfile.includes(p.profile)) return false
+    if (filterSource.length && !filterSource.some(s => p.sources.includes(s))) return false
+    if (filterChannel.length && !filterChannel.includes(p.channel)) return false
+    return true
+  })
 
   function toggleCustomer(code: string) {
     setExpandedCustomer(prev => prev === code ? null : code)
@@ -145,6 +176,29 @@ export function ClientesTab({ movementBase, clientBase, monthLabel, activeComp }
           onChange={e => { setSearch(e.target.value); setExpandedCustomer(null) }}
           style={{ flex: 1 }}
         />
+      </div>
+
+      <div className="pf-filters-row" style={{ marginBottom: 8 }} onClick={() => setOpenFilter(null)}>
+        {availableRanges.length > 0 && (
+          <FilterDrop label="Faixa" options={availableRanges} selected={filterRange} onSelect={v => { setFilterRange(v); setExpandedCustomer(null) }} open={openFilter === 'range'} onToggle={() => setOpenFilter(openFilter === 'range' ? null : 'range')} />
+        )}
+        {availableNetworks.length > 0 && (
+          <FilterDrop label="Rede" options={availableNetworks} selected={filterNetwork} onSelect={v => { setFilterNetwork(v); setExpandedCustomer(null) }} open={openFilter === 'network'} onToggle={() => setOpenFilter(openFilter === 'network' ? null : 'network')} />
+        )}
+        {availableProfiles.length > 0 && (
+          <FilterDrop label="Perfil" options={availableProfiles} selected={filterProfile} onSelect={v => { setFilterProfile(v); setExpandedCustomer(null) }} open={openFilter === 'profile'} onToggle={() => setOpenFilter(openFilter === 'profile' ? null : 'profile')} />
+        )}
+        {availableChannels.length > 0 && (
+          <FilterDrop label="Canal" options={availableChannels} selected={filterChannel} onSelect={v => { setFilterChannel(v); setExpandedCustomer(null) }} open={openFilter === 'channel'} onToggle={() => setOpenFilter(openFilter === 'channel' ? null : 'channel')} />
+        )}
+        {availableSources.length > 0 && (
+          <FilterDrop label="Fonte" options={availableSources} selected={filterSource} onSelect={v => { setFilterSource(v); setExpandedCustomer(null) }} open={openFilter === 'source'} onToggle={() => setOpenFilter(openFilter === 'source' ? null : 'source')} />
+        )}
+        {hasActiveFilter && (
+          <button type="button" className="pf-clear-btn" onClick={e => { e.stopPropagation(); setFilterRange([]); setFilterNetwork([]); setFilterProfile([]); setFilterSource([]); setFilterChannel([]) }}>
+            Limpar filtros
+          </button>
+        )}
       </div>
 
       <div className="notas-section" style={{ marginBottom: 24 }}>
@@ -244,5 +298,55 @@ export function ClientesTab({ movementBase, clientBase, monthLabel, activeComp }
         </div>
       </div>
     </section>
+  )
+}
+
+function FilterDrop({ label, options, selected, onSelect, single, open, onToggle }: {
+  label: string
+  options: string[]
+  selected: string[]
+  onSelect: (vals: string[]) => void
+  single?: boolean
+  open: boolean
+  onToggle: () => void
+}) {
+  const [q, setQ] = useState('')
+  const fq = q.toLowerCase()
+  const vis = fq ? options.filter(o => o.toLowerCase().includes(fq)) : options
+  return (
+    <div className="pf-filter-drop" onClick={e => e.stopPropagation()}>
+      <button type="button" className={`pf-filter-btn${selected.length > 0 ? ' has-value' : ''}${open ? ' open' : ''}`} onClick={onToggle}>
+        {label}
+        {selected.length > 0 && <span className="pf-filter-count">{selected.length}</span>}
+        <span className="pf-arrow">▼</span>
+      </button>
+      {open && (
+        <div className="pf-filter-panel" onClick={e => e.stopPropagation()}>
+          {options.length > 8 && (
+            <input className="pf-panel-search" placeholder="Filtrar..." value={q} onChange={e => setQ(e.target.value)} autoFocus />
+          )}
+          {single ? (
+            <>
+              <label><input type="radio" name={`fd-${label}`} checked={selected.length === 0} onChange={() => { onSelect([]); onToggle() }} /> Todos</label>
+              {vis.map(o => (
+                <label key={o}><input type="radio" name={`fd-${label}`} checked={selected.includes(o)} onChange={() => { onSelect([o]); onToggle() }} /> {o}</label>
+              ))}
+            </>
+          ) : (
+            <>
+              {selected.length > 0 && (
+                <label style={{ color: 'var(--red)', fontWeight: 600 }}><input type="checkbox" checked={false} onChange={() => onSelect([])} /> Limpar</label>
+              )}
+              {vis.map(o => (
+                <label key={o}><input type="checkbox" checked={selected.includes(o)} onChange={() => {
+                  const next = selected.includes(o) ? selected.filter(x => x !== o) : [...selected, o]
+                  onSelect(next)
+                }} /> {o}</label>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
