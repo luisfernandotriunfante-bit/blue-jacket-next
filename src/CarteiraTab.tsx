@@ -152,7 +152,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
       }
       let lastDate = ''
       for (const m of allMovs) { const d = m.movementDate ?? ''; if (d > lastDate) lastDate = d }
-      const hasCadastro = c.sources.includes('Cadastro interno')
+      const hasCadastro = c.sources.length > 0
       return {
         name: c.legalName ?? c.tradeName ?? c.document,
         document: c.document,
@@ -657,7 +657,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
     const completeCities = sorted.filter(ck => { const comp = cityCompletion[ck]; return comp && comp.assigned === comp.total && comp.total > 0 }).length
     return (
       <div className="crt-side">
-        <h2 className="crt-side-h2">{mode === 'nao' ? 'Clientes sem roteiro' : 'Sem cadastro interno'}</h2>
+        <h2 className="crt-side-h2">{mode === 'nao' ? 'Clientes sem roteiro' : 'Sem cadastro'}</h2>
         <div className="crt-meta">
           <span><b>{total}</b> clientes</span>
           <span><b>{sorted.length}</b> cidades</span>
@@ -725,7 +725,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
         {([
           ['rot', 'Roterizados', `${sellers.length} vendedores`],
           ['nao', 'Não roterizados', `${naoCount} clientes`],
-          ['sem', 'Sem cadastro interno', `${semCount} clientes`],
+          ['sem', 'Sem cadastro', `${semCount} clientes`],
         ] as [Mode, string, string][]).map(([k, label, sub]) => (
           <button key={k} type="button" className="crt-mode" aria-pressed={mode === k} onClick={() => setMode(k)}>
             {label} <small>{sub}</small>
