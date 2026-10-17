@@ -60,6 +60,9 @@ interface ClientRow {
   network: string
   cluster: string
   fat: number
+  fat3m: number
+  avg3m: number
+  premiseAvg12m: number | undefined
   lastDate: string
   routed: boolean
   rcaCode: string
@@ -116,6 +119,13 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
     return m
   }, [movementBase])
 
+  const threeMonthRange = useMemo(() => {
+    const d = new Date(y, mo - 1, 1)
+    d.setMonth(d.getMonth() - 2)
+    const start = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+    return { start, end: monthEnd }
+  }, [y, mo, monthEnd])
+
   const allClients = useMemo<ClientRow[]>(() => {
     return clientBase.map(c => {
       const code = c.winthorCode ?? c.document
@@ -125,6 +135,12 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
       for (const m of monthMovs) {
         if (m.movementType === 'venda_faturada') fat += m.value ?? 0
         else if (m.movementType === 'devolucao') fat -= m.value ?? 0
+      }
+      const movs3m = allMovs.filter(m => { const d = m.movementDate ?? ''; return d >= threeMonthRange.start && d <= threeMonthRange.end })
+      let fat3m = 0
+      for (const m of movs3m) {
+        if (m.movementType === 'venda_faturada') fat3m += m.value ?? 0
+        else if (m.movementType === 'devolucao') fat3m -= m.value ?? 0
       }
       let lastDate = ''
       for (const m of allMovs) { const d = m.movementDate ?? ''; if (d > lastDate) lastDate = d }
@@ -140,6 +156,9 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
         network: c.premiseNetwork ?? '',
         cluster: c.premiseCluster ?? '',
         fat,
+        fat3m,
+        avg3m: fat3m / 3,
+        premiseAvg12m: c.premiseAverage12Months,
         lastDate,
         routed: !!(c.visitFrequency || c.visitDay),
         rcaCode: c.rcaCode ?? '',
@@ -147,7 +166,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
         hasCadastro,
       }
     })
-  }, [clientBase, movsByCustomer, monthStart, monthEnd])
+  }, [clientBase, movsByCustomer, monthStart, monthEnd, threeMonthRange])
 
   const sellers = useMemo<SellerData[]>(() => {
     const map = new Map<string, SellerData>()
@@ -273,13 +292,13 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
   }, [])
 
   const downloadReport = useCallback(() => {
-    const rows: string[][] = [['Cliente', 'CNPJ', 'Cidade', 'Canal', 'Faixa', 'Rede', 'Vendedor Atribuído', 'Cód. Vendedor']]
+    const rows: string[][] = [['Cliente', 'CNPJ', 'Cidade', 'Canal', 'Faixa', 'Rede', 'Vendedor Atribuído', 'Cód. Vendedor', 'Supervisor', 'Fat. Mês Atual', 'Fat. 3 Meses', 'Média Mensal 3M', 'Média Pirâmide 12M']]
     for (const [ck, clients] of Object.entries(activeData)) {
       for (const c of clients) {
         const selCode = assignments[c.document]
         if (!selCode) continue
         const seller = sellers.find(s => s.code === selCode)
-        rows.push([c.name, c.document, msGeo[ck]?.n ?? ck, c.channel, c.range, c.network, seller?.name ?? '', selCode])
+        rows.push([c.name, c.document, msGeo[ck]?.n ?? ck, c.channel, c.range, c.network, seller?.name ?? '', selCode, seller?.supervisor ?? '', c.fat.toFixed(2), c.fat3m.toFixed(2), c.avg3m.toFixed(2), c.premiseAvg12m != null ? c.premiseAvg12m.toFixed(2) : ''])
       }
     }
     if (rows.length <= 1) return
@@ -458,7 +477,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
                       {clients.map(c => (
                         <li key={c.document}>
                           <span>{c.name}<br /><small>{c.document}</small></span>
-                          <span className="crt-v">{c.fat > 0 ? kpiCurrency(c.fat) : '—'}</span>
+                          <span className="crt-v">{c.fat > 0 ? kpiCurrency(c.fat) : c.premiseAvg12m != null && c.premiseAvg12m > 0 ? `Pir. ${kpiCurrency(c.premiseAvg12m)}` : '—'}</span>
                         </li>
                       ))}
                     </ul>
@@ -566,7 +585,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
                 <div key={c.document} className="crt-assign-row">
                   <div className="crt-assign-info">
                     <span className={assigned ? 'crt-assigned' : ''}>{c.name}</span>
-                    <small>{c.document}{c.channel ? ` · ${c.channel}` : ''}{c.fat > 0 ? ` · ${kpiCurrency(c.fat)}` : ''}</small>
+                    <small>{c.document}{c.channel ? ` · ${c.channel}` : ''}{c.fat > 0 ? ` · ${kpiCurrency(c.fat)}` : ''}{c.avg3m > 0 ? ` · Méd.3m ${kpiCurrency(c.avg3m)}` : ''}{c.premiseAvg12m != null && c.premiseAvg12m > 0 && c.fat === 0 ? ` · Pirâm.12m ${kpiCurrency(c.premiseAvg12m)}` : ''}</small>
                   </div>
                   <select
                     className="crt-select"
@@ -729,7 +748,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
                         aria-pressed={selectedSeller === s.code}
                         onClick={() => { setSelectedSeller(s.code); setSelectedCity(null); setExpandedClient(null) }}
                       >
-                        <span>{s.name}</span>
+                        <span>{s.name} <small style={{ opacity: .6 }}>({s.code})</small></span>
                         <small>{s.totalClients}</small>
                       </button>
                     </div>
