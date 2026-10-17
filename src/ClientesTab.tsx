@@ -152,7 +152,7 @@ export function ClientesTab({ movementBase, clientBase, monthLabel, activeComp }
           <span className="notas-section-title">Positivados · {monthLabel}</span>
           <small style={{ color: 'var(--muted)', fontSize: 11 }}>clique numa linha para ver histórico</small>
         </div>
-        <div style={{ overflowX: 'auto' }}>
+        <div>
           <table className="gr-table">
             <thead>
               <tr>
@@ -204,7 +204,7 @@ export function ClientesTab({ movementBase, clientBase, monthLabel, activeComp }
                             <span className="so-chart-tag">HISTÓRICO · {p.name}</span>
                             <span style={{ color: 'var(--muted)', fontSize: 11 }}>{history.length} movimentações</span>
                           </div>
-                          <div style={{ overflowX: 'auto', maxHeight: 280, overflowY: 'auto' }}>
+                          <div>
                             <table className="so-day-detail-table">
                               <thead>
                                 <tr>
