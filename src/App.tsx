@@ -525,7 +525,7 @@ export function App() {
             <span className="so-month-label">{monthLabel}</span>
           </div>
         </header>
-        {clientesTab === 'carteira' && <CarteiraTab clientBase={effectiveClients} movementBase={effectiveMovements} activeComp={displayComp} />}
+        {clientesTab === 'carteira' && <CarteiraTab clientBase={effectiveClients} movementBase={effectiveMovements} activeComp={displayComp} pexSet={pexSet} />}
         {clientesTab === 'cadastro' && <CadastroClienteTab clientBase={effectiveClients} movementBase={effectiveMovements} activeComp={displayComp} />}
         {clientesTab === 'piramide' && <PiramideTab clientBase={effectiveClients} movementBase={effectiveMovements} activeComp={displayComp} pexSet={pexSet} onPexChange={setPexSet} />}
       </>) : section === 'campanhas' ? <>

@@ -73,10 +73,11 @@ interface ClientRow {
 }
 
 /* ── Component ────────────────────────────────────────── */
-export function CarteiraTab({ clientBase, movementBase, activeComp }: {
+export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
   clientBase: CanonicalClient[]
   movementBase: CanonicalMovement[]
   activeComp: string
+  pexSet: Set<string>
 }) {
   const [mode, setMode] = useState<Mode>('rot')
   const [search, setSearch] = useState('')
@@ -170,13 +171,13 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
         avg3m: fat3m / 3,
         premiseAvg12m: c.premiseAverage12Months,
         lastDate,
-        routed: !!(c.visitFrequency || c.visitDay),
+        routed: !!(c.visitFrequency || c.visitDay) && rcaMap.has(c.rcaCode ?? ''),
         rcaCode: c.rcaCode ?? '',
         rcaName: c.rcaName ?? c.representative ?? '',
         hasCadastro,
       }
     })
-  }, [clientBase, movsByCustomer, monthStart, monthEnd, threeMonthRange])
+  }, [clientBase, movsByCustomer, monthStart, monthEnd, threeMonthRange, rcaMap])
 
   const availableRanges = useMemo(() => [...new Set(allClients.map(c => c.range).filter(Boolean))].sort(), [allClients])
   const availableNetworks = useMemo(() => [...new Set(allClients.map(c => c.network).filter(Boolean))].sort(), [allClients])
@@ -272,7 +273,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
 
   const sel = selectedSeller ? sellers.find(s => s.code === selectedSeller) ?? null : null
 
-  const isPex = useCallback((c: ClientRow) => c.channel.toUpperCase().includes('PEX'), [])
+  const isPex = useCallback((c: ClientRow) => pexSet.has(c.document), [pexSet])
 
   const filteredNaoByCity = useMemo(() => {
     if (pexFilter === 'all') return naoByCity
