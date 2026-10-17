@@ -809,11 +809,11 @@ const CRT_MONO = 'ui-monospace, SFMono-Regular, monospace'
 
 const CRT_STYLES = `
 .crt-wrap {
-  --r0: #5c2222;
-  --r1: #8b2828;
+  --r0: #ff7070;
+  --r1: #ed1c24;
   --r2: #c03030;
-  --r3: #ed1c24;
-  --r4: #ff7070;
+  --r3: #8b2828;
+  --r4: #5c2222;
   --r-soft: rgba(237, 28, 36, 0.15);
   display: flex;
   flex-direction: column;
