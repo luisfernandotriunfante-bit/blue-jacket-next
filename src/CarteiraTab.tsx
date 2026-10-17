@@ -940,7 +940,11 @@ const CRT_STYLES = `
 .crt-all small { font: 400 11px ${CRT_MONO}; opacity: .8; white-space: nowrap; align-self: center; }
 .crt-all:hover { background: var(--background); }
 .crt-all[aria-pressed="true"] { background: var(--red); color: #fff; }
-.crt-list { overflow: auto; padding: 0 6px 10px; flex: 1; }
+.crt-list { overflow: auto; padding: 0 6px 10px; flex: 1; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.crt-list::-webkit-scrollbar { width: 6px; }
+.crt-list::-webkit-scrollbar-track { background: transparent; }
+.crt-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.crt-list::-webkit-scrollbar-thumb:hover { background: var(--muted); }
 .crt-sup {
   font: 500 11px ${CRT_MONO};
   text-transform: uppercase;
@@ -1019,7 +1023,13 @@ const CRT_STYLES = `
   padding: 14px;
   max-height: calc(100vh - 220px);
   overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
 }
+.crt-side-panel::-webkit-scrollbar { width: 6px; }
+.crt-side-panel::-webkit-scrollbar-track { background: transparent; }
+.crt-side-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.crt-side-panel::-webkit-scrollbar-thumb:hover { background: var(--muted); }
 .crt-side {
   display: grid;
   gap: 12px;
@@ -1131,7 +1141,13 @@ const CRT_STYLES = `
   max-height: 340px;
   overflow: auto;
   border-left: 2px solid var(--r-soft);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
 }
+.crt-cli::-webkit-scrollbar { width: 6px; }
+.crt-cli::-webkit-scrollbar-track { background: transparent; }
+.crt-cli::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.crt-cli::-webkit-scrollbar-thumb:hover { background: var(--muted); }
 .crt-cli li {
   padding: 4px 8px;
   font-size: 12px;
