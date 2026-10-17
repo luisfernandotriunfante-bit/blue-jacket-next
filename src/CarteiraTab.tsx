@@ -153,7 +153,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
       }
       let lastDate = ''
       for (const m of allMovs) { const d = m.movementDate ?? ''; if (d > lastDate) lastDate = d }
-      const hasCadastro = c.sources.length > 0
+      const hasCadastro = c.sources.some(s => s !== 'Premissas')
       return {
         name: c.legalName ?? c.tradeName ?? c.document,
         document: c.document,
@@ -238,7 +238,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
   const naoByCity = useMemo(() => {
     const m: Record<string, ClientRow[]> = {}
     for (const c of filteredClients) {
-      if (c.routed) continue
+      if (c.routed && rcaMap.has(c.rcaCode)) continue
       if (!c.hasCadastro) continue
       const ck = matchCity(c.city)
       if (!ck) continue
@@ -246,7 +246,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
       m[ck].push(c)
     }
     return m
-  }, [filteredClients])
+  }, [filteredClients, rcaMap])
 
   const semByCity = useMemo(() => {
     const m: Record<string, ClientRow[]> = {}
