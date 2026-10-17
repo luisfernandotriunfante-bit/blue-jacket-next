@@ -37,7 +37,7 @@ export type CanonicalClient = {
 export type ClientMotorResult = {
   canonicalBase: CanonicalClient[]
   audit: AuditItem[]
-  indicators: { totalClients: number; internal: number; portfolio: number; premises: number; complete: number }
+  indicators: { totalClients: number; internal: number; portfolio: number; route: number; premises: number; complete: number }
 }
 
 type Row = unknown[]
@@ -69,6 +69,7 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
   const audit: AuditItem[] = []
   const internal = new Map<string, Partial<CanonicalClient>>()
   const portfolio = new Map<string, Partial<CanonicalClient>>()
+  const route = new Map<string, Partial<CanonicalClient>>()
   const premises = new Map<string, Partial<CanonicalClient>>()
   const candidateWorkbooks = await Promise.all(files.map(async file => ({ file, sheets: await readRows(file) })))
 
@@ -76,9 +77,10 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
     const hasPdvSheet = sheets.some(({ rows }) => headerAt(rows, { 0: 'semestrepremissa', 2: 'codcliente', 15: 'checkpdv' }) >= 0)
     for (const { rows } of sheets) {
       const internalHeader = headerAt(rows, { 0: 'codigo', 5: 'cpfcnpj', 10: 'codrca', 12: 'codsupervisor' })
-      const portfolioHeader = headerAt(rows, { 2: 'codigocliente', 3: 'cnpj', 10: 'recorrencia', 13: 'diadasemana' })
+      const portfolioHeader = headerAt(rows, { 0: 'codigocliente', 1: 'cnpj', 12: 'frequencia', 15: 'representante' })
+      const routeHeader = headerAt(rows, { 2: 'codigocliente', 3: 'cnpj', 10: 'recorrencia', 13: 'diadasemana' })
       const pdvHeader = headerAt(rows, { 0: 'semestrepremissa', 2: 'codcliente', 15: 'checkpdv' })
-      const fallbackStart = rows.findIndex(row => hasDocument(at(row, 3)) && text(at(row, 10)) && text(at(row, 13)))
+      const fallbackPortfolio = rows.findIndex(row => hasDocument(at(row, 1)) && text(at(row, 12)) && text(at(row, 13)) && text(at(row, 15)))
 
       if (internalHeader >= 0) {
         let accepted = 0
@@ -89,8 +91,8 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
         }
         audit.push({ id: 'internal-ok', level: 'ok', title: 'Cadastro interno reconhecido', instruction: `${accepted.toLocaleString('pt-BR')} clientes prontos para juntar.`, detail: 'Os dados de identificação e referência comercial foram lidos.', area: 'clientes' }); continue
       }
-      if (portfolioHeader >= 0 || fallbackStart >= 0) {
-        const start = portfolioHeader >= 0 ? portfolioHeader + 1 : fallbackStart
+      if (portfolioHeader >= 0 || fallbackPortfolio >= 0) {
+        const start = portfolioHeader >= 0 ? portfolioHeader + 1 : fallbackPortfolio
         if (hasPdvSheet) { audit.push({ id: `portfolio-ignored-${audit.length}`, level: 'ok', title: 'Aba auxiliar ignorada', instruction: 'Nada precisa ser feito.', detail: 'A carteira dentro da Base de Premissas não alterou a base de clientes.', area: 'clientes' }); continue }
         let accepted = 0
         for (const row of rows.slice(start)) {
@@ -99,6 +101,15 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
           portfolio.set(key, { document: key, winthorCode: text(at(row, 2)), legalName: text(at(row, 4)), tradeName: text(at(row, 5)), city: text(at(row, 6)), district: text(at(row, 7)), address: text(at(row, 8)), visitFrequency: text(at(row, 10)), visitDay: text(at(row, 13)), rcaCode: text(at(row, 0)), rcaName: text(at(row, 1)), sources: ['Roteiro geral'] }); accepted++
         }
         audit.push({ id: `portfolio-ok-${audit.length}`, level: 'ok', title: 'Roteiro geral reconhecido', instruction: `${accepted.toLocaleString('pt-BR')} clientes prontos para juntar.`, detail: 'Os dados de endereço, frequência de visita e RCA foram lidos.', area: 'clientes' }); continue
+      }
+      if (routeHeader >= 0) {
+        let accepted = 0
+        for (const row of rows.slice(routeHeader + 1)) {
+          const key = documentKey(at(row, 3)); if (!hasDocument(key)) continue
+          if (route.has(key)) continue
+          route.set(key, { document: key, winthorCode: text(at(row, 2)), legalName: text(at(row, 4)), tradeName: text(at(row, 5)), city: text(at(row, 6)), district: text(at(row, 7)), address: text(at(row, 8)), visitFrequency: text(at(row, 10)), visitDay: text(at(row, 13)), rcaCode: text(at(row, 0)), rcaName: text(at(row, 1)), sources: ['Roteiro geral'] }); accepted++
+        }
+        audit.push({ id: `route-ok-${audit.length}`, level: 'ok', title: 'Roteiro geral reconhecido', instruction: `${accepted.toLocaleString('pt-BR')} clientes prontos para juntar.`, detail: 'Os dados de roteiro, frequência de visita e RCA foram lidos.', area: 'clientes' }); continue
       }
       if (pdvHeader >= 0) {
         let accepted = 0
@@ -110,24 +121,24 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
         }
         audit.push({ id: 'premises-ok', level: 'ok', title: 'Premissas reconhecidas', instruction: `${accepted.toLocaleString('pt-BR')} clientes prontos para juntar.`, detail: 'Os dados de faixa, ambiente, perfil e rede foram lidos.', area: 'clientes' }); continue
       }
-      const warning = nearbyLayoutWarning(rows, { 0: 'codigo', 5: 'cpfcnpj', 10: 'codrca' }, 'clientes') ?? nearbyLayoutWarning(rows, { 2: 'codigocliente', 3: 'cnpj', 10: 'recorrencia', 13: 'diadasemana' }, 'roteiro') ?? nearbyLayoutWarning(rows, { 0: 'semestrepremissa', 2: 'codcliente', 15: 'checkpdv' }, 'premissas')
+      const warning = nearbyLayoutWarning(rows, { 0: 'codigo', 5: 'cpfcnpj', 10: 'codrca' }, 'clientes') ?? nearbyLayoutWarning(rows, { 0: 'codigocliente', 1: 'cnpj', 12: 'frequencia', 15: 'representante' }, 'carteira') ?? nearbyLayoutWarning(rows, { 2: 'codigocliente', 3: 'cnpj', 10: 'recorrencia', 13: 'diadasemana' }, 'roteiro') ?? nearbyLayoutWarning(rows, { 0: 'semestrepremissa', 2: 'codcliente', 15: 'checkpdv' }, 'premissas')
       if (warning) audit.push(warning)
     }
   }
 
-  if (!internal.size && !portfolio.size && !premises.size) audit.push({ id: 'no-client-source', level: 'action', title: 'Nenhum arquivo de clientes foi reconhecido', instruction: 'Envie o cadastro interno, o roteiro geral ou as premissas.', detail: 'O sistema não encontrou a estrutura esperada nos arquivos enviados. Nenhum dado foi usado.', area: 'clientes' })
-  const allKeys = new Set([...internal.keys(), ...portfolio.keys(), ...premises.keys()])
+  if (!internal.size && !portfolio.size && !route.size && !premises.size) audit.push({ id: 'no-client-source', level: 'action', title: 'Nenhum arquivo de clientes foi reconhecido', instruction: 'Envie o cadastro interno, a carteira, o roteiro geral ou as premissas.', detail: 'O sistema não encontrou a estrutura esperada nos arquivos enviados. Nenhum dado foi usado.', area: 'clientes' })
+  const allKeys = new Set([...internal.keys(), ...portfolio.keys(), ...route.keys(), ...premises.keys()])
   const canonicalBase = [...allKeys].map(document => {
     const current: CanonicalClient = { document, sources: [] }
     const merge = (input?: Partial<CanonicalClient>) => { if (!input) return; for (const [key, value] of Object.entries(input)) { if (key === 'sources') continue; if (value !== undefined && (current as Record<string, unknown>)[key] === undefined) (current as Record<string, unknown>)[key] = value }; for (const source of input.sources ?? []) if (!current.sources.includes(source)) current.sources.push(source) }
-    const internalData = internal.get(document); const portfolioData = portfolio.get(document); const premisesData = premises.get(document)
-    merge(internalData); merge(portfolioData); merge(premisesData)
-    // RCA vem do Roteiro geral (responsável atual do cliente)
-    current.rcaCode = portfolioData?.rcaCode
-    delete current.rcaName
+    const internalData = internal.get(document); const portfolioData = portfolio.get(document); const routeData = route.get(document); const premisesData = premises.get(document)
+    merge(internalData); merge(routeData); merge(portfolioData); merge(premisesData)
+    // RCA: prioriza Roteiro geral > Carteira > Cadastro interno
+    if (routeData?.rcaCode) { current.rcaCode = routeData.rcaCode; current.rcaName = routeData.rcaName }
+    else if (portfolioData?.rcaCode) { current.rcaCode = portfolioData.rcaCode; delete current.rcaName }
     return current
   }).sort((a, b) => a.document.localeCompare(b.document))
-  const indicators = { totalClients: canonicalBase.length, internal: internal.size, portfolio: portfolio.size, premises: premises.size, complete: canonicalBase.filter(client => client.sources.length >= 3).length }
+  const indicators = { totalClients: canonicalBase.length, internal: internal.size, portfolio: portfolio.size, route: route.size, premises: premises.size, complete: canonicalBase.filter(client => client.sources.length >= 3).length }
   audit.push({ id: 'client-base-ready', level: 'ok', title: 'Base de clientes criada', instruction: `${indicators.totalClients.toLocaleString('pt-BR')} clientes na base única.`, detail: 'A base reuniu todos os clientes encontrados, mesmo quando uma fonte não tinha todas as informações.', area: 'clientes' })
   return { canonicalBase, audit, indicators }
 }
