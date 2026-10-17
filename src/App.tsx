@@ -34,7 +34,8 @@ const motors: Array<{ id: Exclude<SourceArea, 'diario'>; name: string }> = [
 const areaName: Record<SourceArea, string> = { diario: 'Diários', produtos: 'Produtos', clientes: 'Clientes', movimentacoes: 'Movimentações', recebimentos: 'Chegada de notas', historico: 'Histórico' }
 const clientSources = [
   { id: 'internal', label: 'Cadastro de clientes (1203)' },
-  { id: 'portfolio', label: 'Roteiro geral' },
+  { id: 'portfolio', label: 'Carteira de clientes' },
+  { id: 'route', label: 'Roteiro geral' },
   { id: 'premises', label: 'Premissas de clientes' },
 ] as const
 const productSources = [
@@ -47,7 +48,7 @@ const movementSources = [
   { id: 'sales', label: 'Vendas atuais (8022)' }, { id: 'cuts', label: 'Corte de mercadorias (1454)' },
 ] as const
 const receiptSources = [{ id: 'legacy', label: 'Relação de notas fiscais (.txt)' }, { id: 'current', label: 'Entrada de mercadoria (218)' }, { id: 'portfolio', label: 'Carteira SAP (Excel)' }] as const
-type ClientIndicators = { totalClients: number; internal: number; portfolio: number; premises: number; complete: number }
+type ClientIndicators = { totalClients: number; internal: number; portfolio: number; route: number; premises: number; complete: number }
 type SavedClientMotor = { base: CanonicalClient[]; audit: AuditItem[]; indicators: ClientIndicators | null; slots: Partial<Record<(typeof clientSources)[number]['id'], UploadedFile>> }
 type SavedProductMotor = { base: CanonicalProduct[]; audit: AuditItem[]; indicators: ProductIndicators | null; slots: Partial<Record<(typeof productSources)[number]['id'], UploadedFile>> }
 type SavedHistoryMotor = { base: CanonicalHistory[]; audit: AuditItem[]; indicators: HistoryIndicators | null; slots: Partial<Record<(typeof historySources)[number]['id'], UploadedFile[]>> }
