@@ -764,9 +764,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
                 <path
                   key={ck}
                   d={geo.d}
-                  fill={color ?? 'var(--surface-raised)'}
-                  stroke={isSelected ? 'var(--text)' : 'var(--border)'}
-                  strokeWidth={isSelected ? 2.5 : 0.8}
+                  style={{ fill: color ?? 'var(--surface-raised)', stroke: isSelected ? 'var(--text)' : undefined, strokeWidth: isSelected ? 2.5 : undefined }}
                   className={`crt-m${color ? ' on' : ''}${isSelected ? ' pick' : ''}`}
                   onMouseMove={e => showTip(e, ck)}
                   onMouseLeave={hideTip}
@@ -955,7 +953,7 @@ const CRT_STYLES = `
 }
 .crt-mapcard { padding: 8px; position: relative; }
 .crt-svg { display: block; width: 100%; height: auto; max-height: calc(100vh - 280px); }
-.crt-m { fill: var(--surface-raised); stroke: var(--border); stroke-width: .8; transition: fill .15s; }
+.crt-m { stroke: var(--border); stroke-width: .8; transition: fill .15s; }
 .crt-m.on { cursor: pointer; }
 .crt-m.pick { stroke: var(--text); stroke-width: 2.6; }
 .crt-m:hover { stroke: var(--text); stroke-width: 1.6; }
