@@ -59,6 +59,8 @@ interface ClientRow {
   range: string
   network: string
   cluster: string
+  profile: string
+  sources: string[]
   fat: number
   fat3m: number
   avg3m: number
@@ -84,6 +86,12 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
   const [rcas, setRcas] = useState<RcaRecord[]>([])
   const [assignments, setAssignments] = useState<Record<string, string>>({})
   const [pexFilter, setPexFilter] = useState<PexFilter>('all')
+  const [filterRange, setFilterRange] = useState<string[]>([])
+  const [filterNetwork, setFilterNetwork] = useState<string[]>([])
+  const [filterProfile, setFilterProfile] = useState<string[]>([])
+  const [filterSource, setFilterSource] = useState<string[]>([])
+  const [filterChannel, setFilterChannel] = useState<string[]>([])
+  const [openFilter, setOpenFilter] = useState<string | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const tipRef = useRef<HTMLDivElement>(null)
 
@@ -94,7 +102,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
     return () => window.removeEventListener('rj-rcas-changed', h)
   }, [])
 
-  useEffect(() => { setSelectedSeller(null); setSelectedCity(null); setExpandedClient(null); setPexFilter('all') }, [mode])
+  useEffect(() => { setSelectedSeller(null); setSelectedCity(null); setExpandedClient(null); setPexFilter('all'); setFilterRange([]); setFilterNetwork([]); setFilterProfile([]); setFilterSource([]); setFilterChannel([]); setOpenFilter(null) }, [mode])
 
   const rcaMap = useMemo(() => {
     const m = new Map<string, RcaRecord>()
@@ -155,6 +163,8 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
         range: c.premiseRange ?? '',
         network: c.premiseNetwork ?? '',
         cluster: c.premiseCluster ?? '',
+        profile: c.premiseProfile ?? '',
+        sources: c.sources ?? [],
         fat,
         fat3m,
         avg3m: fat3m / 3,
@@ -168,9 +178,31 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
     })
   }, [clientBase, movsByCustomer, monthStart, monthEnd, threeMonthRange])
 
+  const availableRanges = useMemo(() => [...new Set(allClients.map(c => c.range).filter(Boolean))].sort(), [allClients])
+  const availableNetworks = useMemo(() => [...new Set(allClients.map(c => c.network).filter(Boolean))].sort(), [allClients])
+  const availableProfiles = useMemo(() => [...new Set(allClients.map(c => c.profile).filter(Boolean))].sort(), [allClients])
+  const availableSources = useMemo(() => [...new Set(allClients.flatMap(c => c.sources))].sort(), [allClients])
+  const availableChannels = useMemo(() => [...new Set(allClients.map(c => c.channel).filter(Boolean))].sort(), [allClients])
+
+  const hasActiveFilter = filterRange.length > 0 || filterNetwork.length > 0 || filterProfile.length > 0 || filterSource.length > 0 || filterChannel.length > 0
+
+  const applyFilters = useCallback((list: ClientRow[]) => {
+    if (!hasActiveFilter) return list
+    return list.filter(c => {
+      if (filterRange.length && !filterRange.includes(c.range)) return false
+      if (filterNetwork.length && !filterNetwork.includes(c.network)) return false
+      if (filterProfile.length && !filterProfile.includes(c.profile)) return false
+      if (filterSource.length && !filterSource.some(s => c.sources.includes(s))) return false
+      if (filterChannel.length && !filterChannel.includes(c.channel)) return false
+      return true
+    })
+  }, [hasActiveFilter, filterRange, filterNetwork, filterProfile, filterSource, filterChannel])
+
+  const filteredClients = useMemo(() => hasActiveFilter ? applyFilters(allClients) : allClients, [allClients, hasActiveFilter, applyFilters])
+
   const sellers = useMemo<SellerData[]>(() => {
     const map = new Map<string, SellerData>()
-    for (const c of allClients) {
+    for (const c of filteredClients) {
       if (!c.routed || !c.rcaCode) continue
       if (!rcaMap.has(c.rcaCode)) continue
       const code = c.rcaCode
@@ -200,11 +232,11 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
       const cmp = a.supervisor.localeCompare(b.supervisor)
       return cmp !== 0 ? cmp : a.name.localeCompare(b.name)
     })
-  }, [allClients, rcaMap])
+  }, [filteredClients, rcaMap])
 
   const naoByCity = useMemo(() => {
     const m: Record<string, ClientRow[]> = {}
-    for (const c of allClients) {
+    for (const c of filteredClients) {
       if (c.routed) continue
       if (!c.hasCadastro) continue
       const ck = matchCity(c.city)
@@ -213,11 +245,11 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
       m[ck].push(c)
     }
     return m
-  }, [allClients])
+  }, [filteredClients])
 
   const semByCity = useMemo(() => {
     const m: Record<string, ClientRow[]> = {}
-    for (const c of allClients) {
+    for (const c of filteredClients) {
       if (c.hasCadastro) continue
       const ck = matchCity(c.city)
       if (!ck) continue
@@ -225,7 +257,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
       m[ck].push(c)
     }
     return m
-  }, [allClients])
+  }, [filteredClients])
 
   const sellersByCity = useMemo(() => {
     const m: Record<string, SellerData[]> = {}
@@ -431,7 +463,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
   /* division table data */
   const divisionTable = useMemo(() => {
     const divs = new Map<string, { total: number; rot: number; nao: number; sem: number }>()
-    for (const c of allClients) {
+    for (const c of filteredClients) {
       const div = c.channel || 'Outros'
       if (!divs.has(div)) divs.set(div, { total: 0, rot: 0, nao: 0, sem: 0 })
       const d = divs.get(div)!
@@ -441,7 +473,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
       else d.sem++
     }
     return [...divs.entries()].sort((a, b) => b[1].total - a[1].total)
-  }, [allClients, rcaMap])
+  }, [filteredClients, rcaMap])
 
   /* side panel */
   const renderSide = () => {
@@ -709,6 +741,28 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
           </div>
         )}
       </div>
+      <div className="pf-filters-row" style={{ padding: '0 16px' }} onClick={() => setOpenFilter(null)}>
+        {availableRanges.length > 0 && (
+          <FilterDrop label="Faixa" options={availableRanges} selected={filterRange} onSelect={setFilterRange} open={openFilter === 'range'} onToggle={() => setOpenFilter(openFilter === 'range' ? null : 'range')} />
+        )}
+        {availableNetworks.length > 0 && (
+          <FilterDrop label="Rede" options={availableNetworks} selected={filterNetwork} onSelect={setFilterNetwork} open={openFilter === 'network'} onToggle={() => setOpenFilter(openFilter === 'network' ? null : 'network')} />
+        )}
+        {availableProfiles.length > 0 && (
+          <FilterDrop label="Perfil" options={availableProfiles} selected={filterProfile} onSelect={setFilterProfile} open={openFilter === 'profile'} onToggle={() => setOpenFilter(openFilter === 'profile' ? null : 'profile')} />
+        )}
+        {availableChannels.length > 0 && (
+          <FilterDrop label="Canal" options={availableChannels} selected={filterChannel} onSelect={setFilterChannel} open={openFilter === 'channel'} onToggle={() => setOpenFilter(openFilter === 'channel' ? null : 'channel')} />
+        )}
+        {availableSources.length > 0 && (
+          <FilterDrop label="Fonte" options={availableSources} selected={filterSource} onSelect={setFilterSource} open={openFilter === 'source'} onToggle={() => setOpenFilter(openFilter === 'source' ? null : 'source')} />
+        )}
+        {hasActiveFilter && (
+          <button type="button" className="crt-clear-filters" onClick={e => { e.stopPropagation(); setFilterRange([]); setFilterNetwork([]); setFilterProfile([]); setFilterSource([]); setFilterChannel([]) }}>
+            Limpar filtros
+          </button>
+        )}
+      </div>
 
       {/* Grid: rail | map | side */}
       <div className="crt-grid">
@@ -820,6 +874,56 @@ export function CarteiraTab({ clientBase, movementBase, activeComp }: {
       </div>
 
       <style>{CRT_STYLES}</style>
+    </div>
+  )
+}
+
+function FilterDrop({ label, options, selected, onSelect, single, open, onToggle }: {
+  label: string
+  options: string[]
+  selected: string[]
+  onSelect: (vals: string[]) => void
+  single?: boolean
+  open: boolean
+  onToggle: () => void
+}) {
+  const [q, setQ] = useState('')
+  const fq = q.toLowerCase()
+  const vis = fq ? options.filter(o => o.toLowerCase().includes(fq)) : options
+  return (
+    <div className="pf-filter-drop" onClick={e => e.stopPropagation()}>
+      <button type="button" className={`pf-filter-btn${selected.length > 0 ? ' has-value' : ''}${open ? ' open' : ''}`} onClick={onToggle}>
+        {label}
+        {selected.length > 0 && <span className="pf-filter-count">{selected.length}</span>}
+        <span className="pf-arrow">▼</span>
+      </button>
+      {open && (
+        <div className="pf-filter-panel" onClick={e => e.stopPropagation()}>
+          {options.length > 8 && (
+            <input className="pf-panel-search" placeholder="Filtrar..." value={q} onChange={e => setQ(e.target.value)} autoFocus />
+          )}
+          {single ? (
+            <>
+              <label><input type="radio" name={`fd-${label}`} checked={selected.length === 0} onChange={() => { onSelect([]); onToggle() }} /> Todos</label>
+              {vis.map(o => (
+                <label key={o}><input type="radio" name={`fd-${label}`} checked={selected.includes(o)} onChange={() => { onSelect([o]); onToggle() }} /> {o}</label>
+              ))}
+            </>
+          ) : (
+            <>
+              {selected.length > 0 && (
+                <label style={{ color: 'var(--red)', fontWeight: 600 }}><input type="checkbox" checked={false} onChange={() => onSelect([])} /> Limpar</label>
+              )}
+              {vis.map(o => (
+                <label key={o}><input type="checkbox" checked={selected.includes(o)} onChange={() => {
+                  const next = selected.includes(o) ? selected.filter(x => x !== o) : [...selected, o]
+                  onSelect(next)
+                }} /> {o}</label>
+              ))}
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -1274,6 +1378,96 @@ const CRT_STYLES = `
   text-align: center;
 }
 .crt-report-btn:hover { background: rgba(34, 197, 94, 0.2); }
+.crt-clear-filters {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  padding: 5px 10px;
+  border: 1px solid var(--red);
+  border-radius: 4px;
+  font: 400 12px system-ui, sans-serif;
+  color: var(--red);
+  background: none;
+}
+.crt-clear-filters:hover { background: rgba(237, 28, 36, 0.08); }
+.pf-filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: flex-start;
+}
+.pf-filter-drop { position: relative; }
+.pf-filter-btn {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font: 400 12px system-ui, sans-serif;
+  color: var(--muted);
+  background: var(--surface);
+  white-space: nowrap;
+}
+.pf-filter-btn:hover { border-color: var(--red); color: var(--text); }
+.pf-filter-btn.has-value { border-color: var(--red); color: var(--red); font-weight: 600; }
+.pf-filter-btn.open { border-color: var(--red); }
+.pf-filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--red);
+  color: #fff;
+  font: 600 10px ${CRT_MONO};
+  padding: 0 4px;
+}
+.pf-arrow { font-size: 8px; opacity: .5; }
+.pf-filter-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  min-width: 160px;
+  max-height: 260px;
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.25);
+  padding: 6px 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.pf-filter-panel::-webkit-scrollbar { width: 6px; }
+.pf-filter-panel::-webkit-scrollbar-track { background: transparent; }
+.pf-filter-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.pf-filter-panel label {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pf-filter-panel label:hover { background: var(--background); }
+.pf-panel-search {
+  width: calc(100% - 16px);
+  margin: 4px 8px 6px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--background);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
 @media (max-width: 1000px) {
   .crt-grid { grid-template-columns: 1fr !important; }
   .crt-rail { max-height: 300px; }
