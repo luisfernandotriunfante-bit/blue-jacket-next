@@ -34,7 +34,7 @@ const motors: Array<{ id: Exclude<SourceArea, 'diario'>; name: string }> = [
 const areaName: Record<SourceArea, string> = { diario: 'Diários', produtos: 'Produtos', clientes: 'Clientes', movimentacoes: 'Movimentações', recebimentos: 'Chegada de notas', historico: 'Histórico' }
 const clientSources = [
   { id: 'internal', label: 'Cadastro de clientes (1203)' },
-  { id: 'portfolio', label: 'Carteira de clientes' },
+  { id: 'portfolio', label: 'Roteiro geral' },
   { id: 'premises', label: 'Premissas de clientes' },
 ] as const
 const productSources = [
@@ -134,8 +134,12 @@ export function App() {
   const [section, setSection] = useState<'sellout' | 'estoque' | 'clientes' | 'campanhas' | 'administracao'>('sellout')
   const [selloutTab, setSelloutTab] = useState<'dashboard' | 'gerencial' | 'clientes'>('dashboard')
   const [clientesTab, setClientesTab] = useState<'carteira' | 'cadastro' | 'piramide'>('carteira')
-  const [pexSet, setPexSet] = useState<Set<string>>(new Set())
+  const [pexSet, setPexSet] = useState<Set<string>>(() => {
+    try { const v = localStorage.getItem('rj-pex-set'); return v ? new Set(JSON.parse(v) as string[]) : new Set() }
+    catch { return new Set() }
+  })
   const [tab, setTab] = useState<'uploads' | 'auditoria' | 'config' | 'rcas' | 'dados'>('uploads')
+  useEffect(() => { try { localStorage.setItem('rj-pex-set', JSON.stringify([...pexSet])) } catch {} }, [pexSet])
 
   const monthLabel = useMemo(() => fmtCompetencia(viewingComp ?? activeComp).toUpperCase(), [viewingComp, activeComp])
   const displayComp = viewingComp ?? activeComp

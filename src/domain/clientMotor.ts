@@ -76,9 +76,9 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
     const hasPdvSheet = sheets.some(({ rows }) => headerAt(rows, { 0: 'semestrepremissa', 2: 'codcliente', 15: 'checkpdv' }) >= 0)
     for (const { rows } of sheets) {
       const internalHeader = headerAt(rows, { 0: 'codigo', 5: 'cpfcnpj', 10: 'codrca', 12: 'codsupervisor' })
-      const portfolioHeader = headerAt(rows, { 0: 'codigocliente', 1: 'cnpj', 12: 'frequencia', 15: 'representante' })
+      const portfolioHeader = headerAt(rows, { 2: 'codigocliente', 3: 'cnpj', 10: 'recorrencia', 13: 'diadasemana' })
       const pdvHeader = headerAt(rows, { 0: 'semestrepremissa', 2: 'codcliente', 15: 'checkpdv' })
-      const fallbackStart = rows.findIndex(row => hasDocument(at(row, 1)) && text(at(row, 12)) && text(at(row, 13)) && text(at(row, 15)))
+      const fallbackStart = rows.findIndex(row => hasDocument(at(row, 3)) && text(at(row, 10)) && text(at(row, 13)))
 
       if (internalHeader >= 0) {
         let accepted = 0
@@ -94,11 +94,11 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
         if (hasPdvSheet) { audit.push({ id: `portfolio-ignored-${audit.length}`, level: 'ok', title: 'Aba auxiliar ignorada', instruction: 'Nada precisa ser feito.', detail: 'A carteira dentro da Base de Premissas não alterou a base de clientes.', area: 'clientes' }); continue }
         let accepted = 0
         for (const row of rows.slice(start)) {
-          const key = documentKey(at(row, 1)); if (!hasDocument(key)) continue
+          const key = documentKey(at(row, 3)); if (!hasDocument(key)) continue
           if (portfolio.has(key)) continue
-          portfolio.set(key, { document: key, winthorCode: text(at(row, 0)), legalName: text(at(row, 2)), tradeName: text(at(row, 3)), commercialActivity: text(at(row, 4)), city: text(at(row, 5)), district: text(at(row, 6)), address: text(at(row, 7)), latitude: text(at(row, 8)), longitude: text(at(row, 9)), visitFrequency: text(at(row, 12)), visitDay: text(at(row, 13)), daysWithoutPurchase: text(at(row, 14)), representative: text(at(row, 15)), rcaCode: text(at(row, 15)), sources: ['Carteira de clientes'] }); accepted++
+          portfolio.set(key, { document: key, winthorCode: text(at(row, 2)), legalName: text(at(row, 4)), tradeName: text(at(row, 5)), city: text(at(row, 6)), district: text(at(row, 7)), address: text(at(row, 8)), visitFrequency: text(at(row, 10)), visitDay: text(at(row, 13)), rcaCode: text(at(row, 0)), rcaName: text(at(row, 1)), sources: ['Roteiro geral'] }); accepted++
         }
-        audit.push({ id: `portfolio-ok-${audit.length}`, level: 'ok', title: 'Carteira de clientes reconhecida', instruction: `${accepted.toLocaleString('pt-BR')} clientes prontos para juntar.`, detail: 'Os dados de endereço, frequência e visita foram lidos.', area: 'clientes' }); continue
+        audit.push({ id: `portfolio-ok-${audit.length}`, level: 'ok', title: 'Roteiro geral reconhecido', instruction: `${accepted.toLocaleString('pt-BR')} clientes prontos para juntar.`, detail: 'Os dados de endereço, frequência de visita e RCA foram lidos.', area: 'clientes' }); continue
       }
       if (pdvHeader >= 0) {
         let accepted = 0
@@ -110,21 +110,19 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
         }
         audit.push({ id: 'premises-ok', level: 'ok', title: 'Premissas reconhecidas', instruction: `${accepted.toLocaleString('pt-BR')} clientes prontos para juntar.`, detail: 'Os dados de faixa, ambiente, perfil e rede foram lidos.', area: 'clientes' }); continue
       }
-      const warning = nearbyLayoutWarning(rows, { 0: 'codigo', 5: 'cpfcnpj', 10: 'codrca' }, 'clientes') ?? nearbyLayoutWarning(rows, { 0: 'codigocliente', 1: 'cnpj', 15: 'representante' }, 'carteira') ?? nearbyLayoutWarning(rows, { 0: 'semestrepremissa', 2: 'codcliente', 15: 'checkpdv' }, 'premissas')
+      const warning = nearbyLayoutWarning(rows, { 0: 'codigo', 5: 'cpfcnpj', 10: 'codrca' }, 'clientes') ?? nearbyLayoutWarning(rows, { 2: 'codigocliente', 3: 'cnpj', 10: 'recorrencia', 13: 'diadasemana' }, 'roteiro') ?? nearbyLayoutWarning(rows, { 0: 'semestrepremissa', 2: 'codcliente', 15: 'checkpdv' }, 'premissas')
       if (warning) audit.push(warning)
     }
   }
 
-  if (!internal.size && !portfolio.size && !premises.size) audit.push({ id: 'no-client-source', level: 'action', title: 'Nenhum arquivo de clientes foi reconhecido', instruction: 'Envie o cadastro interno, a carteira ou as premissas.', detail: 'O sistema não encontrou a estrutura esperada nos arquivos enviados. Nenhum dado foi usado.', area: 'clientes' })
+  if (!internal.size && !portfolio.size && !premises.size) audit.push({ id: 'no-client-source', level: 'action', title: 'Nenhum arquivo de clientes foi reconhecido', instruction: 'Envie o cadastro interno, o roteiro geral ou as premissas.', detail: 'O sistema não encontrou a estrutura esperada nos arquivos enviados. Nenhum dado foi usado.', area: 'clientes' })
   const allKeys = new Set([...internal.keys(), ...portfolio.keys(), ...premises.keys()])
   const canonicalBase = [...allKeys].map(document => {
     const current: CanonicalClient = { document, sources: [] }
     const merge = (input?: Partial<CanonicalClient>) => { if (!input) return; for (const [key, value] of Object.entries(input)) { if (key === 'sources') continue; if (value !== undefined && (current as Record<string, unknown>)[key] === undefined) (current as Record<string, unknown>)[key] = value }; for (const source of input.sources ?? []) if (!current.sources.includes(source)) current.sources.push(source) }
     const internalData = internal.get(document); const portfolioData = portfolio.get(document); const premisesData = premises.get(document)
     merge(internalData); merge(portfolioData); merge(premisesData)
-    // Hierarquia padrão: 1203, Carteira e Premissas. RCA é a única exceção:
-    // a Carteira define o responsável atual; o nome do 1203 não é preservado
-    // para não associar um nome antigo ao código atual.
+    // RCA vem do Roteiro geral (responsável atual do cliente)
     current.rcaCode = portfolioData?.rcaCode
     delete current.rcaName
     return current
