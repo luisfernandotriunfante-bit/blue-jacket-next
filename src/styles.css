@@ -564,10 +564,10 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 
 /* ── Cadastro Cliente Tab ───────────────────────────────────── */
 .stock-list--cadastro .stock-head,
-.stock-list--cadastro .stock-row { grid-template-columns: minmax(0,1fr) 100px 100px; }
+.stock-list--cadastro .stock-row { grid-template-columns: minmax(0,1fr) 100px 100px 100px 70px; }
 @media (max-width: 600px) {
   .stock-list--cadastro .stock-head,
-  .stock-list--cadastro .stock-row { grid-template-columns: minmax(0,1fr) 80px 80px; }
+  .stock-list--cadastro .stock-row { grid-template-columns: minmax(0,1fr) 75px 75px 75px 55px; }
 }
 
 .cad-badge-range { background: rgba(59,130,246,.10); color: var(--blue); border: 1px solid rgba(59,130,246,.25); padding: 0 5px; border-radius: 4px; font-weight: 700; font-size: 10px; }

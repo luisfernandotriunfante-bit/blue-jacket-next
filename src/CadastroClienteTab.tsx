@@ -321,8 +321,8 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
           <div className="stock-head">
             <span>Cliente</span>
             <span className="sc-num">Média Anual</span>
-            <span className="sc-num">CG Mercado 3m</span>
             <span className="sc-num">Fat. 3m Interno</span>
+            <span className="sc-num">CG Mercado 3m</span>
             <span className="sc-num">Dias s/ compra</span>
           </div>
           {filtered.length === 0 && (
@@ -361,13 +361,13 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
                     : <strong className="c-muted">—</strong>}
                 </span>
                 <span className="sc-num">
-                  {r.premiseAvg12m != null && r.premiseAvg12m > 0
-                    ? <strong style={{ color: '#4caf50' }}>{kpiCurrency(r.premiseAvg12m)}</strong>
+                  {r.fatTotal3m > 0
+                    ? <strong className="c-blue">{kpiCurrency(r.fatTotal3m)}</strong>
                     : <strong className="c-muted">—</strong>}
                 </span>
                 <span className="sc-num">
-                  {r.fatTotal3m > 0
-                    ? <strong className="c-blue">{kpiCurrency(r.fatTotal3m)}</strong>
+                  {r.premiseAvg12m != null && r.premiseAvg12m > 0
+                    ? <strong style={{ color: '#4caf50' }}>{kpiCurrency(r.premiseAvg12m)}</strong>
                     : <strong className="c-muted">—</strong>}
                 </span>
                 <span className="sc-num">
@@ -424,9 +424,10 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
                 <h4>Indicadores</h4>
                 <div className="cad-fields">
                   <Field label="Média Anual" value={selectedRow.avgAnual > 0 ? brlFull(selectedRow.avgAnual) : '—'} highlight={selectedRow.avgAnual > 0} />
+                  <Field label="Fat. Total Ano" value={selectedRow.fatAno > 0 ? brlFull(selectedRow.fatAno) : '—'} highlight={selectedRow.fatAno > 0} />
                   <Field label="Meses c/ Dados" value={`${selectedRow.mesesAno}`} />
-                  <Field label="Colgate Mercado 3m" value={selectedRow.premiseAvg12m != null ? brlFull(selectedRow.premiseAvg12m) : '—'} />
                   <Field label="Fat. 3m Interno" value={selectedRow.fatTotal3m > 0 ? brlFull(selectedRow.fatTotal3m) : '—'} highlight={selectedRow.fatTotal3m > 0} />
+                  <Field label="CG Mercado 3m" value={selectedRow.premiseAvg12m != null ? brlFull(selectedRow.premiseAvg12m) : '—'} />
                   <Field label="Dias sem Compra" value={selectedRow.daysSincePurchase >= 0 ? `${selectedRow.daysSincePurchase} dias` : 'Nunca comprou'} warn={selectedRow.daysSincePurchase > 90} />
                   <Field label="Última Compra" value={selectedRow.lastPurchaseDate ? fmtDay(selectedRow.lastPurchaseDate) : 'Nunca'} />
                   <Field label="Compra Todo Mês" value={selectedRow.purchasedEveryMonth ? 'Sim' : 'Não'} highlight={selectedRow.purchasedEveryMonth} />
