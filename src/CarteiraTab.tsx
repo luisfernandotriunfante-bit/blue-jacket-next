@@ -144,7 +144,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
   const allClients = useMemo<ClientRow[]>(() => {
     return clientBase.map(c => {
       const code = c.winthorCode ?? c.document
-      const allMovs = movsByCustomer.get(code) ?? movsByCustomer.get(c.document) ?? []
+      const allMovs = [...(movsByCustomer.get(code) ?? []), ...(code !== c.document ? (movsByCustomer.get(c.document) ?? []) : [])]
       const monthMovs = allMovs.filter(m => { const d = m.movementDate ?? ''; return d >= monthStart && d <= monthEnd })
       let fat = 0
       for (const m of monthMovs) {
@@ -482,7 +482,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
   }, [mode, sel, selectedCity, expandedClient, sellersByCity])
 
   const clientHistory = useCallback((code: string, doc: string) => {
-    return (movsByCustomer.get(code) ?? movsByCustomer.get(doc) ?? []).sort((a, b) => (b.movementDate ?? '').localeCompare(a.movementDate ?? '')).slice(0, 30)
+    return [...(movsByCustomer.get(code) ?? []), ...(code !== doc ? (movsByCustomer.get(doc) ?? []) : [])].sort((a, b) => (b.movementDate ?? '').localeCompare(a.movementDate ?? '')).slice(0, 30)
   }, [movsByCustomer])
 
   const MOV_LABEL: Record<string, string> = { venda_faturada: 'Faturado', a_faturar: 'A faturar', devolucao: 'Devolução', bonificacao: 'Bonificação', corte: 'Corte', entrada: 'Entrada' }
