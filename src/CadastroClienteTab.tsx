@@ -112,11 +112,12 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
 
   const movsByCustomer = useMemo(() => {
     const map = new Map<string, CanonicalMovement[]>()
+    const add = (key: string, m: CanonicalMovement) => { if (!map.has(key)) map.set(key, []); map.get(key)!.push(m) }
     for (const m of movementBase) {
-      const key = m.customerCode ?? m.customerDocument
-      if (!key) continue
-      if (!map.has(key)) map.set(key, [])
-      map.get(key)!.push(m)
+      const code = m.customerCode; const doc = m.customerDocument
+      if (code) add(code, m)
+      if (doc && doc !== code) add(doc, m)
+      if (!code && !doc) continue
     }
     return map
   }, [movementBase])

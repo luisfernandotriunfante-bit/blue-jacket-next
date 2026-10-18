@@ -124,12 +124,12 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
 
   const movsByCustomer = useMemo(() => {
     const m = new Map<string, CanonicalMovement[]>()
+    const add = (key: string, mv: CanonicalMovement) => { const arr = m.get(key) ?? []; arr.push(mv); m.set(key, arr) }
     for (const mv of movementBase) {
-      const key = mv.customerCode ?? mv.customerDocument ?? ''
-      if (!key) continue
-      const arr = m.get(key) ?? []
-      arr.push(mv)
-      m.set(key, arr)
+      const code = mv.customerCode; const doc = mv.customerDocument
+      if (code) add(code, mv)
+      if (doc && doc !== code) add(doc, mv)
+      if (!code && !doc) continue
     }
     return m
   }, [movementBase])
