@@ -52,6 +52,10 @@ interface CadastroRow {
   fatAno: number
   mesesAno: number
   avgAnual: number
+  fatAnoAnterior: number
+  mesesAnoAnterior: number
+  avgAnualAnterior: number
+  crescimento: number | null
   lastPurchaseDate: string
   daysSincePurchase: number
   monthsWithPurchase: number
@@ -108,6 +112,13 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
     return { start, end: monthEnd }
   }, [y, monthEnd])
 
+  const prevYearRange = useMemo(() => {
+    const py = y - 1
+    const start = `${py}-01-01`
+    const end = `${py}-${String(mo).padStart(2, '0')}-${String(new Date(py, mo, 0).getDate()).padStart(2, '0')}`
+    return { start, end }
+  }, [y, mo])
+
   const threeMonths = useMemo(() => {
     const months: string[] = []
     for (let i = 2; i >= 0; i--) {
@@ -156,6 +167,18 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
       }
       const nMesesAno = mesesAno.size || 1
 
+      const movsAnoAnterior = allMovs.filter(m => { const d = m.movementDate ?? ''; return d >= prevYearRange.start && d <= prevYearRange.end })
+      let fatAnoAnterior = 0
+      const mesesAnoAnterior = new Set<string>()
+      for (const m of movsAnoAnterior) {
+        if (m.movementType === 'venda_faturada') { fatAnoAnterior += m.value ?? 0; if (m.movementDate) mesesAnoAnterior.add(m.movementDate.slice(0, 7)) }
+        else if (m.movementType === 'devolucao') fatAnoAnterior -= m.value ?? 0
+      }
+      const nMesesAnoAnterior = mesesAnoAnterior.size || 1
+      const avgAnualAnterior = fatAnoAnterior / nMesesAnoAnterior
+      const avgAnual = fatAno / nMesesAno
+      const crescimento = avgAnualAnterior > 0 ? ((avgAnual - avgAnualAnterior) / avgAnualAnterior) * 100 : null
+
       const purchaseMonths = new Set<string>()
       for (const m of movs3m) {
         if (m.movementType === 'venda_faturada' && m.movementDate) {
@@ -192,14 +215,18 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
         avgMonth3m: fatTotal3m / 3,
         fatAno,
         mesesAno: mesesAno.size,
-        avgAnual: fatAno / nMesesAno,
+        avgAnual,
+        fatAnoAnterior,
+        mesesAnoAnterior: mesesAnoAnterior.size,
+        avgAnualAnterior,
+        crescimento,
         lastPurchaseDate,
         daysSincePurchase: daysSince(lastPurchaseDate),
         monthsWithPurchase,
         purchasedEveryMonth: monthsWithPurchase === 3,
       }
     }).sort((a, b) => b.fatTotal3m - a.fatTotal3m)
-  }, [clientBase, movsByCustomer, threeMonthRange, yearRange, threeMonths])
+  }, [clientBase, movsByCustomer, threeMonthRange, yearRange, prevYearRange, threeMonths])
 
   const availableRanges = useMemo(() => {
     const set = new Set<string>()
@@ -320,6 +347,7 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
         <div className="stock-list stock-list--cadastro">
           <div className="stock-head">
             <span>Cliente</span>
+            <span className="sc-num">Var. YoY</span>
             <span className="sc-num">Média Anual</span>
             <span className="sc-num">Fat. 3m Interno</span>
             <span className="sc-num">CG Mercado 3m</span>
@@ -354,6 +382,11 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
                     {r.routed && <span className="cad-badge-rot">Roteirizado</span>}
                     {!r.hasCadastro && <span className="cad-badge-ext">Sem cadastro</span>}
                   </span>
+                </span>
+                <span className="sc-num">
+                  {r.crescimento != null
+                    ? <strong style={{ color: r.crescimento >= 0 ? '#4caf50' : '#ef5350', fontSize: 12 }}>{r.crescimento >= 0 ? '▲' : '▼'} {Math.abs(r.crescimento).toFixed(0)}%</strong>
+                    : <strong className="c-muted" style={{ fontSize: 11 }}>—</strong>}
                 </span>
                 <span className="sc-num">
                   {r.avgAnual > 0
@@ -423,7 +456,9 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
               <div className="cad-section">
                 <h4>Indicadores</h4>
                 <div className="cad-fields">
+                  <Field label={`Média ${y - 1} (mesmo período)`} value={selectedRow.avgAnualAnterior > 0 ? brlFull(selectedRow.avgAnualAnterior) : '—'} />
                   <Field label="Média Anual" value={selectedRow.avgAnual > 0 ? brlFull(selectedRow.avgAnual) : '—'} highlight={selectedRow.avgAnual > 0} />
+                  <Field label="Variação YoY" value={selectedRow.crescimento != null ? `${selectedRow.crescimento >= 0 ? '+' : ''}${selectedRow.crescimento.toFixed(1)}%` : '—'} highlight={selectedRow.crescimento != null && selectedRow.crescimento >= 0} warn={selectedRow.crescimento != null && selectedRow.crescimento < 0} />
                   <Field label="Fat. Total Ano" value={selectedRow.fatAno > 0 ? brlFull(selectedRow.fatAno) : '—'} highlight={selectedRow.fatAno > 0} />
                   <Field label="Meses c/ Dados" value={`${selectedRow.mesesAno}`} />
                   <Field label="Fat. 3m Interno" value={selectedRow.fatTotal3m > 0 ? brlFull(selectedRow.fatTotal3m) : '—'} highlight={selectedRow.fatTotal3m > 0} />

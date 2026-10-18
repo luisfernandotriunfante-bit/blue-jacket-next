@@ -19,6 +19,7 @@ import { CampaignTab } from './CampaignTab'
 import { CarteiraTab } from './CarteiraTab'
 import { CadastroClienteTab } from './CadastroClienteTab'
 import { PiramideTab } from './PiramideTab'
+import { SortimentoTab } from './SortimentoTab'
 import { saveCompetenciaSnap, loadCompetenciaSnap, listClosedCompetencias, fmtCompetencia, getActiveComp, setActiveComp, type CompetenciaSnapshot } from './domain/competenciaEngine'
 import { exportBundle, importBundle, downloadBundle, validateBundle } from './domain/syncEngine'
 import { pushToCloud, pullFromCloud, listenForChanges, schedulePush, onSyncStatus, getSyncDetail } from './domain/cloudSync'
@@ -134,7 +135,7 @@ export function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
   const [section, setSection] = useState<'sellout' | 'estoque' | 'clientes' | 'campanhas' | 'administracao'>('sellout')
   const [selloutTab, setSelloutTab] = useState<'dashboard' | 'gerencial' | 'clientes'>('dashboard')
-  const [clientesTab, setClientesTab] = useState<'carteira' | 'cadastro' | 'piramide'>('carteira')
+  const [clientesTab, setClientesTab] = useState<'carteira' | 'cadastro' | 'piramide' | 'sortimento'>('carteira')
   const [pexSet, setPexSet] = useState<Set<string>>(() => {
     try { const v = localStorage.getItem('rj-pex-set'); return v ? new Set(JSON.parse(v) as string[]) : new Set() }
     catch { return new Set() }
@@ -590,6 +591,7 @@ export function App() {
             <button type="button" className={`stock-nav-btn${clientesTab === 'carteira' ? ' on' : ''}`} onClick={() => setClientesTab('carteira')}>Carteira</button>
             <button type="button" className={`stock-nav-btn${clientesTab === 'cadastro' ? ' on' : ''}`} onClick={() => setClientesTab('cadastro')}>Cadastro</button>
             <button type="button" className={`stock-nav-btn${clientesTab === 'piramide' ? ' on' : ''}`} onClick={() => setClientesTab('piramide')}>Pirâmide</button>
+            <button type="button" className={`stock-nav-btn${clientesTab === 'sortimento' ? ' on' : ''}`} onClick={() => setClientesTab('sortimento')}>Sortimento</button>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 16 }}>
             <span className="so-month-label">{monthLabel}</span>
@@ -598,6 +600,7 @@ export function App() {
         {clientesTab === 'carteira' && <CarteiraTab clientBase={effectiveClients} movementBase={effectiveMovements} activeComp={displayComp} pexSet={pexSet} />}
         {clientesTab === 'cadastro' && <CadastroClienteTab clientBase={effectiveClients} movementBase={effectiveMovements} activeComp={displayComp} pexSet={pexSet} onPexChange={setPexSet} historyCount={historyBase.length} historySample={historyBase.length > 0 ? historyBase[0].customerCode : undefined} />}
         {clientesTab === 'piramide' && <PiramideTab clientBase={effectiveClients} movementBase={effectiveMovements} activeComp={displayComp} pexSet={pexSet} onPexChange={setPexSet} />}
+        {clientesTab === 'sortimento' && <SortimentoTab clientBase={effectiveClients} productBase={effectiveProducts} movementBase={effectiveMovements} activeComp={displayComp} pexSet={pexSet} />}
       </>) : section === 'campanhas' ? <>
         <CampaignTab />
       </> : <>
