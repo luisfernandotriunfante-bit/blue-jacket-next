@@ -372,7 +372,38 @@ export function App() {
     }
   }
 
-  const effectiveMovements = snap ? snap.movements : movementBase
+  const combinedMovements = useMemo<CanonicalMovement[]>(() => {
+    const histAsMovs: CanonicalMovement[] = historyBase.map(h => ({
+      id: h.id,
+      movementDate: h.date,
+      movementType: 'venda_faturada' as const,
+      customerCode: h.customerCode,
+      productCode: h.productCode,
+      quantity: h.quantity,
+      value: h.netValue,
+      sellerCode: h.sellerCode,
+      invoiceNumber: h.invoiceNumber,
+      sources: ['Histórico'],
+    }))
+    return [...movementBase, ...histAsMovs]
+  }, [movementBase, historyBase])
+  const snapCombined = useMemo<CanonicalMovement[] | null>(() => {
+    if (!snap) return null
+    const histAsMovs: CanonicalMovement[] = (snap.history ?? []).map(h => ({
+      id: h.id,
+      movementDate: h.date,
+      movementType: 'venda_faturada' as const,
+      customerCode: h.customerCode,
+      productCode: h.productCode,
+      quantity: h.quantity,
+      value: h.netValue,
+      sellerCode: h.sellerCode,
+      invoiceNumber: h.invoiceNumber,
+      sources: ['Histórico'],
+    }))
+    return [...snap.movements, ...histAsMovs]
+  }, [snap])
+  const effectiveMovements = snapCombined ?? combinedMovements
   const effectiveProducts = snap ? snap.products : productBase
   const effectiveClients = snap ? snap.clients : clientBase
   const effectiveReceipts = snap ? snap.receipts : receiptBase
