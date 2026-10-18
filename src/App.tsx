@@ -373,12 +373,14 @@ export function App() {
   }
 
   const combinedMovements = useMemo<CanonicalMovement[]>(() => {
+    const normDoc = (v: string) => { let d = v.replace(/\D/g, ''); if (d.length >= 12 && d.length < 14) d = d.padStart(14, '0'); else if (d.length >= 9 && d.length < 11) d = d.padStart(11, '0'); return d }
     const histAsMovs: CanonicalMovement[] = historyBase.map(h => ({
       id: h.id,
       movementDate: h.date,
       movementType: 'venda_faturada' as const,
       customerCode: h.customerCode,
-      productCode: h.productCode,
+      customerDocument: normDoc(h.customerCode),
+      productCode: h.winthorCode ?? h.productCode,
       quantity: h.quantity,
       value: h.netValue,
       sellerCode: h.sellerCode,
@@ -389,12 +391,14 @@ export function App() {
   }, [movementBase, historyBase])
   const snapCombined = useMemo<CanonicalMovement[] | null>(() => {
     if (!snap) return null
+    const normDoc = (v: string) => { let d = v.replace(/\D/g, ''); if (d.length >= 12 && d.length < 14) d = d.padStart(14, '0'); else if (d.length >= 9 && d.length < 11) d = d.padStart(11, '0'); return d }
     const histAsMovs: CanonicalMovement[] = (snap.history ?? []).map(h => ({
       id: h.id,
       movementDate: h.date,
       movementType: 'venda_faturada' as const,
       customerCode: h.customerCode,
-      productCode: h.productCode,
+      customerDocument: normDoc(h.customerCode),
+      productCode: h.winthorCode ?? h.productCode,
       quantity: h.quantity,
       value: h.netValue,
       sellerCode: h.sellerCode,
@@ -411,10 +415,11 @@ export function App() {
   function downloadClientBase() { const url = URL.createObjectURL(new Blob([JSON.stringify(clientBase, null, 2)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = 'base-canonica-clientes.json'; link.click(); URL.revokeObjectURL(url) }
   function downloadClientExcel() {
     const movsByClient = new Map<string, typeof effectiveMovements>()
+    const addE = (key: string, m: CanonicalMovement) => { if (!movsByClient.has(key)) movsByClient.set(key, []); movsByClient.get(key)!.push(m) }
     for (const m of effectiveMovements) {
-      const key = m.customerCode ?? m.customerDocument; if (!key) continue
-      if (!movsByClient.has(key)) movsByClient.set(key, [])
-      movsByClient.get(key)!.push(m)
+      const code = m.customerCode; const doc = m.customerDocument
+      if (code) addE(code, m)
+      if (doc && doc !== code) addE(doc, m)
     }
     const now = new Date()
     const curComp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
