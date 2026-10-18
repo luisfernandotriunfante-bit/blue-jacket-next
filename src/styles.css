@@ -661,16 +661,14 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 @media (max-width: 900px) { .cad-layout.has-detail { grid-template-columns: 1fr; } .cad-side-panel { position: static; max-height: none; } }
 
 /* ── Sortimento Tab ── */
-.sort-client-results { display: grid; grid-template-columns: 260px minmax(0,1fr); gap: 0; min-height: 400px; }
-.sort-client-results > :first-child { border-right: 1px solid var(--border); overflow-y: auto; max-height: calc(100vh - 180px); }
-.sort-client-results > :last-child { overflow-y: auto; max-height: calc(100vh - 180px); padding: 0 16px 16px; }
-@media (max-width: 700px) { .sort-client-results { grid-template-columns: 1fr; } .sort-client-results > :first-child { max-height: 200px; border-right: none; border-bottom: 1px solid var(--border); } .sort-client-results > :last-child { max-height: none; } }
+.sort-dropdown { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; max-height: 320px; overflow-y: auto; margin-top: 4px; box-shadow: 0 4px 16px rgba(0,0,0,.15); }
+.sort-dropdown-item { display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; padding: 10px 14px; cursor: pointer; border: none; background: none; border-bottom: 1px solid var(--border); color: var(--text); font: inherit; transition: background 0.12s; }
+.sort-dropdown-item:last-child { border-bottom: none; }
+.sort-dropdown-item:hover { background: rgba(59,130,246,.08); }
+.sort-dropdown-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sort-dropdown-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 11px; color: var(--muted); }
 
-.sort-client-item { padding: 10px 14px; cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.12s; }
-.sort-client-item:hover { background: var(--surface-2, rgba(0,0,0,.03)); }
-.sort-client-selected { background: var(--blue-bg, rgba(59,130,246,.08)) !important; border-left: 3px solid var(--blue); }
-.sort-client-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sort-client-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.sort-client-selected { padding: 10px 14px; background: rgba(59,130,246,.06); border-radius: 8px; border: 1px solid rgba(59,130,246,.2); }
 
 .sort-header-info { margin-bottom: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
 .sort-channel-select { padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); font-size: 12px; margin-left: 8px; }
