@@ -379,14 +379,45 @@ export function App() {
   const effectiveRcas = snap ? snap.rcas : rcas
   function downloadClientBase() { const url = URL.createObjectURL(new Blob([JSON.stringify(clientBase, null, 2)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = 'base-canonica-clientes.json'; link.click(); URL.revokeObjectURL(url) }
   function downloadClientExcel() {
-    const rows = clientBase.map(client => ({
-      Documento: client.document, Código: client.winthorCode ?? '', Cliente: client.legalName ?? '', Fantasia: client.tradeName ?? '', Cidade: client.city ?? '',
-      Filial: client.branch ?? '', Cobrança: client.billingType ?? '', 'Bloqueio SEFAZ': client.fiscalBlock ?? '',
-      'Código RCA': client.rcaCode ?? '', Atividade: client.commercialActivity ?? '', Bairro: client.district ?? '', Endereço: client.address ?? '',
-      Latitude: client.latitude ?? '', Longitude: client.longitude ?? '', Frequência: client.visitFrequency ?? '', Visita: client.visitDay ?? '', 'Dias sem comprar': client.daysWithoutPurchase ?? '',
-      Semestre: client.premiseSemester ?? '', Canal: client.channelType ?? '', Faixa: client.premiseRange ?? '', Estado: client.premiseState ?? '',
-      Cluster: client.premiseCluster ?? '', 'Média 12 meses': client.premiseAverage12Months ?? '', Perfil: client.premiseProfile ?? '', Rede: client.premiseNetwork ?? '',
-    }))
+    const movsByClient = new Map<string, typeof effectiveMovements>()
+    for (const m of effectiveMovements) {
+      const key = m.customerCode ?? m.customerDocument; if (!key) continue
+      if (!movsByClient.has(key)) movsByClient.set(key, [])
+      movsByClient.get(key)!.push(m)
+    }
+    const now = new Date()
+    const curComp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const rows = clientBase.map(client => {
+      const code = client.winthorCode ?? client.document
+      const allMovs = movsByClient.get(code) ?? movsByClient.get(client.document) ?? []
+      const sales = allMovs.filter(m => m.movementType === 'venda_faturada' || m.movementType === 'devolucao')
+      let totalFat = 0
+      const months = new Set<string>()
+      const last3 = new Set<string>()
+      const d3 = new Date(now.getFullYear(), now.getMonth() - 2, 1)
+      const start3m = `${d3.getFullYear()}-${String(d3.getMonth() + 1).padStart(2, '0')}-01`
+      let fat3m = 0
+      for (const m of sales) {
+        const v = m.movementType === 'venda_faturada' ? (m.value ?? 0) : -(m.value ?? 0)
+        totalFat += v
+        if (m.movementDate) {
+          months.add(m.movementDate.slice(0, 7))
+          if (m.movementDate >= start3m) { fat3m += v; last3.add(m.movementDate.slice(0, 7)) }
+        }
+      }
+      const nMonths = months.size || 1
+      return {
+        Documento: client.document, Código: client.winthorCode ?? '', Cliente: client.legalName ?? '', Fantasia: client.tradeName ?? '', Cidade: client.city ?? '',
+        Filial: client.branch ?? '', Cobrança: client.billingType ?? '', 'Bloqueio SEFAZ': client.fiscalBlock ?? '',
+        'Código RCA': client.rcaCode ?? '', Atividade: client.commercialActivity ?? '', Bairro: client.district ?? '', Endereço: client.address ?? '',
+        Latitude: client.latitude ?? '', Longitude: client.longitude ?? '', Frequência: client.visitFrequency ?? '', Visita: client.visitDay ?? '', 'Dias sem comprar': client.daysWithoutPurchase ?? '',
+        Semestre: client.premiseSemester ?? '', Canal: client.channelType ?? '', Faixa: client.premiseRange ?? '', Estado: client.premiseState ?? '',
+        Cluster: client.premiseCluster ?? '', Perfil: client.premiseProfile ?? '', Rede: client.premiseNetwork ?? '',
+        'Fat. Total Interno': totalFat > 0 ? totalFat : '', 'Meses c/ Dados': months.size, 'Média Mensal Interno': totalFat > 0 ? totalFat / nMonths : '',
+        'Fat. 3m Interno': fat3m > 0 ? fat3m : '', 'Média 3m Interno': fat3m > 0 ? fat3m / 3 : '',
+        'Colgate Mercado 3m': client.premiseAverage12Months ?? '',
+      }
+    })
     const sheet = XLSX.utils.json_to_sheet(rows)
     sheet['!cols'] = Object.keys(rows[0] ?? {}).map(header => ({ wch: Math.max(14, Math.min(36, header.length + 7)) }))
     const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, sheet, 'Clientes'); XLSX.writeFile(book, 'base-canonica-clientes.xlsx')

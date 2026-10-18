@@ -47,6 +47,9 @@ interface PiramideRow {
   routed: boolean
   hasCadastro: boolean
   sources: string[]
+  fatTotal: number
+  avgMensal: number
+  mesesComDados: number
   fatTotal3m: number
   avgMonth3m: number
   lastPurchaseDate: string
@@ -129,12 +132,16 @@ export function PiramideTab({ clientBase, movementBase, activeComp, pexSet, onPe
         else if (m.movementType === 'devolucao') fatTotal3m -= m.value ?? 0
       }
 
+      let fatTotal = 0
       let lastPurchaseDate = ''
+      const activeMonths = new Set<string>()
       for (const m of allMovs) {
-        if (m.movementType !== 'venda_faturada') continue
         const d = m.movementDate ?? ''
-        if (d > lastPurchaseDate) lastPurchaseDate = d
+        if (d > lastPurchaseDate && m.movementType === 'venda_faturada') lastPurchaseDate = d
+        if (m.movementType === 'venda_faturada') { fatTotal += m.value ?? 0; if (d) activeMonths.add(d.slice(0, 7)) }
+        else if (m.movementType === 'devolucao') fatTotal -= m.value ?? 0
       }
+      const mesesComDados = activeMonths.size || 1
 
       const purchaseMonths = new Set<string>()
       for (const m of movs3m) {
@@ -168,6 +175,9 @@ export function PiramideTab({ clientBase, movementBase, activeComp, pexSet, onPe
         routed: !!(c.visitFrequency || c.visitDay),
         hasCadastro: c.sources.includes('Cadastro interno'),
         sources: c.sources,
+        fatTotal,
+        avgMensal: fatTotal / mesesComDados,
+        mesesComDados,
         fatTotal3m,
         avgMonth3m: fatTotal3m / 3,
         lastPurchaseDate,
@@ -343,7 +353,7 @@ export function PiramideTab({ clientBase, movementBase, activeComp, pexSet, onPe
                   {r.fatTotal3m > 0
                     ? <strong className="c-blue">{kpiCurrency(r.fatTotal3m)}</strong>
                     : r.premiseAvg12m != null && r.premiseAvg12m > 0
-                      ? <strong style={{ color: 'var(--muted)', fontSize: 11 }}>Pir. {kpiCurrency(r.premiseAvg12m)}</strong>
+                      ? <strong style={{ color: 'var(--muted)', fontSize: 11 }}>CG {kpiCurrency(r.premiseAvg12m)}</strong>
                       : <strong className="c-muted">—</strong>}
                 </span>
                 <span className="sc-num">
@@ -398,9 +408,12 @@ export function PiramideTab({ clientBase, movementBase, activeComp, pexSet, onPe
               <div className="cad-section">
                 <h4>Indicadores</h4>
                 <div className="cad-fields">
-                  <Field label="Fat. 3 Meses" value={selectedRow.fatTotal3m > 0 ? brlFull(selectedRow.fatTotal3m) : '—'} highlight={selectedRow.fatTotal3m > 0} />
-                  <Field label="Média Mensal 3m" value={selectedRow.avgMonth3m > 0 ? brlFull(selectedRow.avgMonth3m) : '—'} highlight={selectedRow.avgMonth3m > 0} />
-                  <Field label="Média Pirâmide 12m" value={selectedRow.premiseAvg12m != null ? brlFull(selectedRow.premiseAvg12m) : '—'} />
+                  <Field label="Fat. Total Interno" value={selectedRow.fatTotal > 0 ? brlFull(selectedRow.fatTotal) : '—'} highlight={selectedRow.fatTotal > 0} />
+                  <Field label="Média Mensal Interno" value={selectedRow.avgMensal > 0 ? brlFull(selectedRow.avgMensal) : '—'} highlight={selectedRow.avgMensal > 0} />
+                  <Field label="Meses c/ Dados" value={`${selectedRow.mesesComDados}`} />
+                  <Field label="Fat. 3m Interno" value={selectedRow.fatTotal3m > 0 ? brlFull(selectedRow.fatTotal3m) : '—'} highlight={selectedRow.fatTotal3m > 0} />
+                  <Field label="Média 3m Interno" value={selectedRow.avgMonth3m > 0 ? brlFull(selectedRow.avgMonth3m) : '—'} highlight={selectedRow.avgMonth3m > 0} />
+                  <Field label="Colgate Mercado 3m" value={selectedRow.premiseAvg12m != null ? brlFull(selectedRow.premiseAvg12m) : '—'} />
                   <Field label="Dias sem Compra" value={selectedRow.daysSincePurchase >= 0 ? `${selectedRow.daysSincePurchase} dias` : 'Nunca comprou'} warn={selectedRow.daysSincePurchase > 90} />
                   <Field label="Última Compra" value={selectedRow.lastPurchaseDate ? fmtDay(selectedRow.lastPurchaseDate) : 'Nunca'} />
                   <Field label="Compra Todo Mês" value={selectedRow.purchasedEveryMonth ? 'Sim' : 'Não'} highlight={selectedRow.purchasedEveryMonth} />
