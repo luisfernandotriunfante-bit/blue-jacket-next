@@ -64,6 +64,9 @@ interface ClientRow {
   fat: number
   fat3m: number
   avg3m: number
+  fatTotal: number
+  avgMensal: number
+  mesesComDados: number
   premiseAvg12m: number | undefined
   lastDate: string
   routed: boolean
@@ -155,7 +158,15 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
         else if (m.movementType === 'devolucao') fat3m -= m.value ?? 0
       }
       let lastDate = ''
-      for (const m of allMovs) { const d = m.movementDate ?? ''; if (d > lastDate) lastDate = d }
+      let fatTotal = 0
+      const activeMonths = new Set<string>()
+      for (const m of allMovs) {
+        const d = m.movementDate ?? ''
+        if (d > lastDate) lastDate = d
+        if (m.movementType === 'venda_faturada') { fatTotal += m.value ?? 0; if (d) activeMonths.add(d.slice(0, 7)) }
+        else if (m.movementType === 'devolucao') fatTotal -= m.value ?? 0
+      }
+      const mesesComDados = activeMonths.size || 1
       const hasCadastro = c.sources.some(s => s !== 'Pirâmide')
       const resolvedRca = c.rcaCodes?.find(r => rcaMap.has(r.code))
       return {
@@ -173,6 +184,9 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
         fat,
         fat3m,
         avg3m: fat3m / 3,
+        fatTotal,
+        avgMensal: fatTotal / mesesComDados,
+        mesesComDados: activeMonths.size,
         premiseAvg12m: c.premiseAverage12Months,
         lastDate,
         routed: c.sources.includes('Roteiro geral'),
@@ -337,13 +351,13 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
   }, [])
 
   const downloadReport = useCallback(() => {
-    const rows: string[][] = [['Cliente', 'CNPJ', 'Cidade', 'Canal', 'Faixa', 'Rede', 'Vendedor Atribuído', 'Cód. Vendedor', 'Supervisor', 'Fat. Mês Atual', 'Fat. 3 Meses', 'Média Mensal 3M', 'Média Pirâmide 12M']]
+    const rows: string[][] = [['Cliente', 'CNPJ', 'Cidade', 'Canal', 'Faixa', 'Rede', 'Vendedor Atribuído', 'Cód. Vendedor', 'Supervisor', 'Fat. Mês Atual', 'Fat. 3m Interno', 'Média 3m Interno', 'Média Mensal Interno', 'Meses c/ Dados', 'Colgate Mercado 3m']]
     for (const [ck, clients] of Object.entries(activeData)) {
       for (const c of clients) {
         const selCode = assignments[c.document]
         if (!selCode) continue
         const seller = sellers.find(s => s.code === selCode)
-        rows.push([c.name, c.document, msGeo[ck]?.n ?? ck, c.channel, c.range, c.network, seller?.name ?? '', selCode, seller?.supervisor ?? '', c.fat.toFixed(2), c.fat3m.toFixed(2), c.avg3m.toFixed(2), c.premiseAvg12m != null ? c.premiseAvg12m.toFixed(2) : ''])
+        rows.push([c.name, c.document, msGeo[ck]?.n ?? ck, c.channel, c.range, c.network, seller?.name ?? '', selCode, seller?.supervisor ?? '', c.fat.toFixed(2), c.fat3m.toFixed(2), c.avg3m.toFixed(2), c.avgMensal.toFixed(2), String(c.mesesComDados), c.premiseAvg12m != null ? c.premiseAvg12m.toFixed(2) : ''])
       }
     }
     if (rows.length <= 1) return
@@ -525,7 +539,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
                       {clients.map(c => (
                         <li key={c.document}>
                           <span>{c.name}<br /><small>{c.document}</small></span>
-                          <span className="crt-v">{c.fat > 0 ? kpiCurrency(c.fat) : c.premiseAvg12m != null && c.premiseAvg12m > 0 ? `Pir. ${kpiCurrency(c.premiseAvg12m)}` : '—'}</span>
+                          <span className="crt-v">{c.fat > 0 ? kpiCurrency(c.fat) : c.premiseAvg12m != null && c.premiseAvg12m > 0 ? `CG ${kpiCurrency(c.premiseAvg12m)}` : '—'}</span>
                         </li>
                       ))}
                     </ul>
@@ -633,7 +647,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
                 <div key={c.document} className="crt-assign-row">
                   <div className="crt-assign-info">
                     <span className={assigned ? 'crt-assigned' : ''}>{c.name}</span>
-                    <small>{c.document}{c.channel ? ` · ${c.channel}` : ''}{c.fat > 0 ? ` · ${kpiCurrency(c.fat)}` : ''}{c.avg3m > 0 ? ` · Méd.3m ${kpiCurrency(c.avg3m)}` : ''}{c.premiseAvg12m != null && c.premiseAvg12m > 0 && c.fat === 0 ? ` · Pirâm.12m ${kpiCurrency(c.premiseAvg12m)}` : ''}</small>
+                    <small>{c.document}{c.channel ? ` · ${c.channel}` : ''}{c.fat > 0 ? ` · ${kpiCurrency(c.fat)}` : ''}{c.avg3m > 0 ? ` · Méd.3m ${kpiCurrency(c.avg3m)}` : ''}{c.premiseAvg12m != null && c.premiseAvg12m > 0 && c.fat === 0 ? ` · CG.3m ${kpiCurrency(c.premiseAvg12m)}` : ''}</small>
                   </div>
                   <select
                     className="crt-select"
