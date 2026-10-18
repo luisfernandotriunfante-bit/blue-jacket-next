@@ -113,9 +113,17 @@ export async function processProductMotor(files: File[]): Promise<ProductMotorRe
     const hCart = headerAt(rows, { 0: 'orderdate', 4: 'material', 5: 'description', 6: 'orderqty', 7: 'billqty' })
     const h105 = headerAt(rows, { 1: 'codigo', 2: 'descricao', 6: 'qtestoque', 23: 'codfab' })
     const hSortiment = headerAt(rows, { 0: 'materialsap', 16: 'st', 18: 'lifestage' })
-    const hSortimentAgo = headerAt(rows, { 0: 'status', 1: 'cod', 4: 'categoriamaster', 16: 'hiper' })
-    const hSortimentJul = headerAt(rows, { 0: 'status', 2: 'cod', 5: 'categoriamaster', 17: 'hiper' })
-    const hSortBase = hSortimentAgo >= 0 ? { h: hSortimentAgo, codCol: 1, descCol: 3, catCol: 4, subCatCol: 5, brandCol: 6, chanStart: 16 } : hSortimentJul >= 0 ? { h: hSortimentJul, codCol: 2, descCol: 4, catCol: 5, subCatCol: 6, brandCol: 7, chanStart: 17 } : null
+    let hSortBase: { h: number; codCol: number; descCol: number; catCol: number; subCatCol: number; brandCol: number; chanStart: number } | null = null
+    for (let ri = 0; ri < Math.min(rows.length, 30) && !hSortBase; ri++) {
+      const norms = (rows[ri] as unknown[]).map(c => norm(c))
+      const catIdx = norms.findIndex(n => n === 'categoriamaster')
+      if (catIdx < 0) continue
+      const hiperIdx = norms.findIndex(n => n === 'hiper' || n === 'hipermercado')
+      if (hiperIdx < 0) continue
+      const codIdx = norms.findIndex(n => n === 'cod' || n === 'codigo' || n === 'codigosap')
+      const descIdx = norms.findIndex(n => n === 'descricao' || n === 'descricaodoproduto' || n === 'descricaodoskusap')
+      hSortBase = { h: ri, codCol: codIdx >= 0 ? codIdx : catIdx - 3, descCol: descIdx >= 0 ? descIdx : catIdx - 1, catCol: catIdx, subCatCol: catIdx + 1, brandCol: catIdx + 2, chanStart: hiperIdx }
+    }
     const h8013 = headerAt(rows, { 0: 'nomedistribuidor', 3: 'subbrands', 4: 'codigodoprodutoean13' })
     if (h286 >= 0) { let count = 0; for (const row of rows.slice(h286 + 1)) { const key = code(row[1]); if (!key || internal.has(key)) continue; internal.set(key, { id: `WINTHOR:${key}`, internalCode: key, description: text(row[2]), package: text(row[3]), totalStock: number(row[4]), blockedStock: number(row[6]), damagedStock: number(row[7]), reservedStock: number(row[8]), availableStock: number(row[9]), department: text(row[13]), realCost: number(row[15]), financialCost: number(row[16]), lastEntryCost: number(row[18]), monthlySales: number(row[20]), monthlySales1: number(row[21]), monthlySales2: number(row[22]), monthlySales3: number(row[23]), unit: text(row[24]), ean: code(row[25]), manufacturerCode: code(row[26]), dailyTurnover: number(row[29]), merchandiseType: text(row[32]), masterPackage: text(row[33]), taxClassification: text(row[35]), buyer: text(row[37]), productLine: text(row[39]), discontinued: text(row[41]), brand: text(row[42]), supplierCode: code(row[44]), sources: ['Cadastro interno'] }); count++ } results.push(audit('prod-internal', 'Cadastro de produtos reconhecido', `${count.toLocaleString('pt-BR')} itens prontos para juntar.`, 'Os dados internos de produtos foram lidos.')); continue }
     if (hIndustry >= 0) { let count = 0; for (const row of rows.slice(hIndustry + 1)) { const sku = code(row[8]); const ean = code(row[10]); const key = sku ?? ean; if (!key || industry.has(key)) continue; industry.set(key, { id: `INDUSTRIA:${key}`, manufacturerCode: sku, ean, description: text(row[9]), dun: code(row[11]), taxClassification: text(row[13]), unitsPerBox: number(row[17]), boxesPerPallet: number(row[18]), boxesPerLayer: number(row[19]), grossWeightUnit: number(row[24]), netWeightUnit: number(row[25]), grossWeightBox: number(row[29]), netWeightBox: number(row[30]), category: text(row[39]), subcategory: text(row[40]), brand: text(row[41]), industryBasePrice: number(row[44]), industryBoxValue: number(row[55]), sources: ['Lista da indústria'] }); count++ } results.push(audit('prod-industry', 'Lista da indústria reconhecida', `${count.toLocaleString('pt-BR')} itens prontos para juntar.`, 'Os dados de identificação, categoria e embalagem foram lidos.')); continue }
