@@ -107,7 +107,10 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
 
   const rcaMap = useMemo(() => {
     const m = new Map<string, RcaRecord>()
-    for (const r of rcas) if (r.active) m.set(r.code, r)
+    for (const r of rcas) if (r.active) {
+      const key = r.code.replace(/\D/g, '').replace(/^0+/, '') || r.code
+      m.set(key, r)
+    }
     return m
   }, [rcas])
 
@@ -471,14 +474,17 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
 
   /* division table data */
   const divisionTable = useMemo(() => {
-    const divs = new Map<string, { total: number; rot: number; nao: number; sem: number }>()
+    const divs = new Map<string, { total: number; rot: number; noRoute: number; noRca: number; sem: number }>()
     for (const c of filteredClients) {
       const div = c.channel || 'Outros'
-      if (!divs.has(div)) divs.set(div, { total: 0, rot: 0, nao: 0, sem: 0 })
+      if (!divs.has(div)) divs.set(div, { total: 0, rot: 0, noRoute: 0, noRca: 0, sem: 0 })
       const d = divs.get(div)!
       d.total++
       if (c.routed && rcaMap.has(c.rcaCode)) d.rot++
-      else if (c.hasCadastro) d.nao++
+      else if (c.hasCadastro) {
+        if (c.routed) d.noRca++
+        else d.noRoute++
+      }
       else d.sem++
     }
     return [...divs.entries()].sort((a, b) => b[1].total - a[1].total)
@@ -547,7 +553,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
       /* overview */
       const topCities = cityKeys.map(ck => ({ ck, n: (sellersByCity[ck] ?? []).length })).filter(x => x.n > 0).sort((a, b) => b.n - a.n).slice(0, 8)
       const coveredCities = cityKeys.filter(ck => sellersByCity[ck]?.length).length
-      const totDiv = divisionTable.reduce((a, [, d]) => ({ total: a.total + d.total, rot: a.rot + d.rot, nao: a.nao + d.nao, sem: a.sem + d.sem }), { total: 0, rot: 0, nao: 0, sem: 0 })
+      const totDiv = divisionTable.reduce((a, [, d]) => ({ total: a.total + d.total, rot: a.rot + d.rot, noRoute: a.noRoute + d.noRoute, noRca: a.noRca + d.noRca, sem: a.sem + d.sem }), { total: 0, rot: 0, noRoute: 0, noRca: 0, sem: 0 })
       return (
         <div className="crt-side">
           <h2 className="crt-side-h2">Visão geral</h2>
@@ -568,13 +574,13 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
           <h3 className="crt-h3">Clientes na carteira</h3>
           <table className="crt-tb">
             <thead>
-              <tr><th>Canal</th><th>Total</th><th>Rot.</th><th>Sem rot.</th><th>Sem cad.</th></tr>
+              <tr><th>Canal</th><th>Total</th><th>Rot.</th><th title="Não aparece no Roteiro">Fora rot.</th><th title="No Roteiro mas RCA não cadastrado">RCA n/cad.</th><th>Sem cad.</th></tr>
             </thead>
             <tbody>
               {divisionTable.map(([div, d]) => (
-                <tr key={div}><td>{div}</td><td>{d.total}</td><td>{d.rot}</td><td>{d.nao}</td><td>{d.sem}</td></tr>
+                <tr key={div}><td>{div}</td><td>{d.total}</td><td>{d.rot}</td><td>{d.noRoute}</td><td>{d.noRca}</td><td>{d.sem}</td></tr>
               ))}
-              <tr className="crt-tb-total"><td><b>Total</b></td><td><b>{totDiv.total}</b></td><td><b>{totDiv.rot}</b></td><td><b>{totDiv.nao}</b></td><td><b>{totDiv.sem}</b></td></tr>
+              <tr className="crt-tb-total"><td><b>Total</b></td><td><b>{totDiv.total}</b></td><td><b>{totDiv.rot}</b></td><td><b>{totDiv.noRoute}</b></td><td><b>{totDiv.noRca}</b></td><td><b>{totDiv.sem}</b></td></tr>
             </tbody>
           </table>
           <p className="crt-note">Escolha um vendedor para ver onde ele atua e quais clientes atende em cada cidade.</p>
