@@ -423,10 +423,10 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
               <div className="cad-section">
                 <h4>Indicadores</h4>
                 <div className="cad-fields">
-                  <Field label="Fat. 3m Interno" value={selectedRow.fatTotal3m > 0 ? brlFull(selectedRow.fatTotal3m) : '—'} highlight={selectedRow.fatTotal3m > 0} />
-                  <Field label="Colgate Mercado 3m" value={selectedRow.premiseAvg12m != null ? brlFull(selectedRow.premiseAvg12m) : '—'} />
                   <Field label="Média Anual" value={selectedRow.avgAnual > 0 ? brlFull(selectedRow.avgAnual) : '—'} highlight={selectedRow.avgAnual > 0} />
                   <Field label="Meses c/ Dados" value={`${selectedRow.mesesAno}`} />
+                  <Field label="Colgate Mercado 3m" value={selectedRow.premiseAvg12m != null ? brlFull(selectedRow.premiseAvg12m) : '—'} />
+                  <Field label="Fat. 3m Interno" value={selectedRow.fatTotal3m > 0 ? brlFull(selectedRow.fatTotal3m) : '—'} highlight={selectedRow.fatTotal3m > 0} />
                   <Field label="Dias sem Compra" value={selectedRow.daysSincePurchase >= 0 ? `${selectedRow.daysSincePurchase} dias` : 'Nunca comprou'} warn={selectedRow.daysSincePurchase > 90} />
                   <Field label="Última Compra" value={selectedRow.lastPurchaseDate ? fmtDay(selectedRow.lastPurchaseDate) : 'Nunca'} />
                   <Field label="Compra Todo Mês" value={selectedRow.purchasedEveryMonth ? 'Sim' : 'Não'} highlight={selectedRow.purchasedEveryMonth} />

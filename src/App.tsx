@@ -373,7 +373,7 @@ export function App() {
   }
 
   const combinedMovements = useMemo<CanonicalMovement[]>(() => {
-    const normDoc = (v: string) => { let d = v.replace(/\D/g, ''); if (d.length >= 12 && d.length < 14) d = d.padStart(14, '0'); else if (d.length >= 9 && d.length < 11) d = d.padStart(11, '0'); return d }
+    const normDoc = (v: string) => { let d = v.replace(/\D/g, ''); if (d.length > 14) d = d.replace(/^0+/, '').padStart(14, '0'); else if (d.length >= 12 && d.length < 14) d = d.padStart(14, '0'); else if (d.length >= 9 && d.length < 11) d = d.padStart(11, '0'); return d }
     const histAsMovs: CanonicalMovement[] = historyBase.map(h => ({
       id: h.id,
       movementDate: h.date,
@@ -391,7 +391,7 @@ export function App() {
   }, [movementBase, historyBase])
   const snapCombined = useMemo<CanonicalMovement[] | null>(() => {
     if (!snap) return null
-    const normDoc = (v: string) => { let d = v.replace(/\D/g, ''); if (d.length >= 12 && d.length < 14) d = d.padStart(14, '0'); else if (d.length >= 9 && d.length < 11) d = d.padStart(11, '0'); return d }
+    const normDoc = (v: string) => { let d = v.replace(/\D/g, ''); if (d.length > 14) d = d.replace(/^0+/, '').padStart(14, '0'); else if (d.length >= 12 && d.length < 14) d = d.padStart(14, '0'); else if (d.length >= 9 && d.length < 11) d = d.padStart(11, '0'); return d }
     const histAsMovs: CanonicalMovement[] = (snap.history ?? []).map(h => ({
       id: h.id,
       movementDate: h.date,
