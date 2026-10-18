@@ -45,7 +45,8 @@ type Row = unknown[]
 type SheetCandidate = { rows: Row[]; sheet: string }
 const norm = (value: unknown) => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
 const text = (value: unknown) => { const result = String(value ?? '').trim(); return result || undefined }
-const documentKey = (value: unknown) => { let d = String(value ?? '').replace(/\D/g, ''); if (d.length === 13) d = '0' + d; if (d.length === 10) d = '0' + d; return d }
+const rcaKey = (value: unknown) => { const s = String(value ?? '').replace(/\D/g, ''); return s.replace(/^0+/, '') || s }
+const documentKey = (value: unknown) => { let d = String(value ?? '').replace(/\D/g, ''); if (d.length >= 12 && d.length < 14) d = d.padStart(14, '0'); else if (d.length >= 9 && d.length < 11) d = d.padStart(11, '0'); return d }
 const at = (row: Row, index: number) => row[index]
 const hasDocument = (value: unknown) => { const d = documentKey(value); return d.length === 11 || d.length === 14 }
 
@@ -88,7 +89,7 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
         for (const row of rows.slice(internalHeader + 1)) {
           const key = documentKey(at(row, 5)); if (!hasDocument(key)) continue
           if (internal.has(key)) continue
-          internal.set(key, { document: key, winthorCode: text(at(row, 0)), legalName: text(at(row, 1)), tradeName: text(at(row, 2)), city: text(at(row, 6)), rcaCode: text(at(row, 10)), rcaName: text(at(row, 11)), supervisor: text(at(row, 13)), branch: text(at(row, 8)), billingType: text(at(row, 9)), fiscalBlock: text(at(row, 14)), creditDueDate: text(at(row, 17)), sources: ['Cadastro interno'] }); accepted++
+          internal.set(key, { document: key, winthorCode: text(at(row, 0)), legalName: text(at(row, 1)), tradeName: text(at(row, 2)), city: text(at(row, 6)), rcaCode: rcaKey(at(row, 10)) || undefined, rcaName: text(at(row, 11)), supervisor: text(at(row, 13)), branch: text(at(row, 8)), billingType: text(at(row, 9)), fiscalBlock: text(at(row, 14)), creditDueDate: text(at(row, 17)), sources: ['Cadastro interno'] }); accepted++
         }
         audit.push({ id: 'internal-ok', level: 'ok', title: 'Cadastro interno reconhecido', instruction: `${accepted.toLocaleString('pt-BR')} clientes prontos para juntar.`, detail: 'Os dados de identificação e referência comercial foram lidos.', area: 'clientes' }); continue
       }
@@ -108,7 +109,7 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
         for (const row of rows.slice(routeHeader + 1)) {
           const key = documentKey(at(row, 3)); if (!hasDocument(key)) continue
           if (route.has(key)) continue
-          route.set(key, { document: key, winthorCode: text(at(row, 2)), legalName: text(at(row, 4)), tradeName: text(at(row, 5)), city: text(at(row, 6)), district: text(at(row, 7)), address: text(at(row, 8)), visitFrequency: text(at(row, 10)), visitDay: text(at(row, 13)), rcaCode: text(at(row, 0)), rcaName: text(at(row, 1)), sources: ['Roteiro geral'] }); accepted++
+          route.set(key, { document: key, winthorCode: text(at(row, 2)), legalName: text(at(row, 4)), tradeName: text(at(row, 5)), city: text(at(row, 6)), district: text(at(row, 7)), address: text(at(row, 8)), visitFrequency: text(at(row, 10)), visitDay: text(at(row, 13)), rcaCode: rcaKey(at(row, 0)) || undefined, rcaName: text(at(row, 1)), sources: ['Roteiro geral'] }); accepted++
         }
         audit.push({ id: `route-ok-${audit.length}`, level: 'ok', title: 'Roteiro geral reconhecido', instruction: `${accepted.toLocaleString('pt-BR')} clientes prontos para juntar.`, detail: 'Os dados de roteiro, frequência de visita e RCA foram lidos.', area: 'clientes' }); continue
       }
@@ -135,8 +136,8 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
     const merge = (input?: Partial<CanonicalClient>) => { if (!input) return; for (const [key, value] of Object.entries(input)) { if (key === 'sources') continue; if (value !== undefined && (current as Record<string, unknown>)[key] === undefined) (current as Record<string, unknown>)[key] = value }; for (const source of input.sources ?? []) if (!current.sources.includes(source)) current.sources.push(source) }
     const internalData = internal.get(document); const portfolioData = portfolio.get(document); const routeData = route.get(document); const premisesData = premises.get(document)
     merge(internalData); merge(routeData); merge(portfolioData); merge(premisesData)
-    // RCA: prioriza Roteiro geral > Cadastro interno
     if (routeData?.rcaCode) { current.rcaCode = routeData.rcaCode; current.rcaName = routeData.rcaName }
+    else if (internalData?.rcaCode) { current.rcaCode = internalData.rcaCode; current.rcaName = internalData.rcaName }
     return current
   }).sort((a, b) => a.document.localeCompare(b.document))
   const indicators = { totalClients: canonicalBase.length, internal: internal.size, portfolio: portfolio.size, route: route.size, premises: premises.size, complete: canonicalBase.filter(client => client.sources.includes('Cadastro interno') && client.sources.includes('Roteiro geral') && client.sources.includes('Pirâmide')).length }
