@@ -162,14 +162,17 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
         if (m.movementType === 'venda_faturada') fat3m += m.value ?? 0
         else if (m.movementType === 'devolucao') fat3m -= m.value ?? 0
       }
+      let lastDate = ''
+      for (const m of allMovs) {
+        const d = m.movementDate ?? ''
+        if (d > lastDate && m.movementType === 'venda_faturada') lastDate = d
+      }
+
       const movsAno = allMovs.filter(m => { const d = m.movementDate ?? ''; return d >= yearRange.start && d <= yearRange.end })
       let fatAno = 0
-      let lastDate = ''
       const mesesAnoSet = new Set<string>()
       for (const m of movsAno) {
-        const d = m.movementDate ?? ''
-        if (d > lastDate) lastDate = d
-        if (m.movementType === 'venda_faturada') { fatAno += m.value ?? 0; if (d) mesesAnoSet.add(d.slice(0, 7)) }
+        if (m.movementType === 'venda_faturada') { fatAno += m.value ?? 0; if (m.movementDate) mesesAnoSet.add(m.movementDate.slice(0, 7)) }
         else if (m.movementType === 'devolucao') fatAno -= m.value ?? 0
       }
       const nMesesAno = mesesAnoSet.size || 1
