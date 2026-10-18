@@ -139,7 +139,7 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
     if (routeData?.rcaCode) { current.rcaCode = routeData.rcaCode; current.rcaName = routeData.rcaName }
     return current
   }).sort((a, b) => a.document.localeCompare(b.document))
-  const indicators = { totalClients: canonicalBase.length, internal: internal.size, portfolio: portfolio.size, route: route.size, premises: premises.size, complete: canonicalBase.filter(client => client.sources.length >= 3).length }
+  const indicators = { totalClients: canonicalBase.length, internal: internal.size, portfolio: portfolio.size, route: route.size, premises: premises.size, complete: canonicalBase.filter(client => client.sources.includes('Cadastro interno') && client.sources.includes('Roteiro geral') && client.sources.includes('Pirâmide')).length }
   audit.push({ id: 'client-base-ready', level: 'ok', title: 'Base de clientes criada', instruction: `${indicators.totalClients.toLocaleString('pt-BR')} clientes na base única.`, detail: 'A base reuniu todos os clientes encontrados, mesmo quando uma fonte não tinha todas as informações.', area: 'clientes' })
   return { canonicalBase, audit, indicators, pyramidDocuments: [...premises.keys()] }
 }
