@@ -43,6 +43,10 @@ export async function detectFile(file: File): Promise<FileDetection> {
         return { motor: 'produtos', slot: 'subbrands' }
       if (headerAt(rows, { 0: 'materialsap', 16: 'st', 18: 'lifestage' }) >= 0)
         return { motor: 'produtos', slot: 'sortiment' }
+      if (headerAt(rows, { 0: 'status', 1: 'cod', 4: 'categoriamaster', 16: 'hiper' }) >= 0)
+        return { motor: 'produtos', slot: 'sortiment' }
+      if (headerAt(rows, { 0: 'status', 2: 'cod', 5: 'categoriamaster', 17: 'hiper' }) >= 0)
+        return { motor: 'produtos', slot: 'sortiment' }
       if (rows.some(row => norm(row[2]) === 'datamovimento' && norm(row[3]) === 'codcliente' && norm(row[24]) === 'codprodwinthor'))
         return { motor: 'movimentacoes', slot: 'sales' }
       if (rows.some(row => norm(row[0]).includes('consultarcortedemercadorias')))
