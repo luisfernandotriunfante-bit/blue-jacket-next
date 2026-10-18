@@ -12,21 +12,13 @@ const kpiCurrency = (n: number) => {
 const brlFull = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`
 
-const PROFILE_CHANNEL_MAP: Record<string, string> = {
-  'TOP VAREJISTA': 'Hiper',
-  'VAREJO': 'Super G',
-  'SMART': 'Super P',
-  'REPASSE VAREJO': 'Super P',
-  'REPASSE C&C': 'C&C',
-  'CASH IND': 'C&C',
-  'ATAC IND': 'Sortimento Atacados',
-  'FARMA - TOP DROGARIA': 'Drogaria',
-  'FARMA - DROG DIR': 'Drogaria',
-  'FARMA - DROG IND': 'Farma Bairro 1 a 4',
-  'FARMA - ASSOC_FRANQ': 'Farma Bairro 1 a 4',
-  'FARMA - TOP ASSOC': 'Drogaria',
-  'FARMA - INDEP': 'Farma Bairro 5 a 8',
-  'PERFUMARIA': 'Vizinhança GDE',
+const FAIXA_CHANNEL_MAP: Record<string, string> = {
+  '1': 'Hiper',
+  '2': 'Super G',
+  '3': 'Super P',
+  '4': 'Vizinhança GDE',
+  '5': 'Vizinhança PEQ',
+  '6': 'Tradicional Independente',
 }
 
 interface SortimentoItem {
@@ -103,8 +95,8 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
 
   const detectedChannel = useMemo(() => {
     if (!selectedClient) return ''
-    const profile = selectedClient.premiseProfile ?? ''
-    return PROFILE_CHANNEL_MAP[profile] ?? ''
+    const faixa = selectedClient.premiseRange ?? ''
+    return FAIXA_CHANNEL_MAP[faixa] ?? ''
   }, [selectedClient])
 
   const activeChannel = channelOverride ?? detectedChannel
@@ -258,27 +250,32 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
         </div>
 
         {!selectedDoc && q.length >= 2 && (
-          <div className="sort-client-results">
+          <div className="sort-dropdown">
             {clientResults.length === 0 && <p className="sort-empty">Nenhum cliente encontrado.</p>}
-            {clientResults.map(c => (
-              <button
-                key={c.document}
-                type="button"
-                className="sort-client-item"
-                onClick={() => {
-                  setSelectedDoc(c.document)
-                  setSearch(c.tradeName ?? c.legalName ?? c.document)
-                  setChannelOverride(null)
-                }}
-              >
-                <span className="sort-client-name">{c.tradeName ?? c.legalName ?? c.document}</span>
-                <span className="sort-client-meta">
-                  <code>{c.document}</code>
-                  {c.premiseRange && <span className="cad-badge-range">Faixa {c.premiseRange}</span>}
-                  {c.premiseProfile && <span style={{ color: 'var(--muted)', fontSize: 11 }}>{c.premiseProfile}</span>}
-                </span>
-              </button>
-            ))}
+            {clientResults.map(c => {
+              const faixa = c.premiseRange ?? ''
+              const ch = FAIXA_CHANNEL_MAP[faixa] ?? ''
+              return (
+                <button
+                  key={c.document}
+                  type="button"
+                  className="sort-dropdown-item"
+                  onClick={() => {
+                    setSelectedDoc(c.document)
+                    setSearch(c.tradeName ?? c.legalName ?? c.document)
+                    setChannelOverride(null)
+                  }}
+                >
+                  <span className="sort-dropdown-name">{c.tradeName ?? c.legalName ?? c.document}</span>
+                  <span className="sort-dropdown-meta">
+                    <code>{c.document}</code>
+                    {faixa && <span className="cad-badge-range">Faixa {faixa}</span>}
+                    {ch && <span style={{ color: 'var(--blue)', fontSize: 11 }}>{ch}</span>}
+                    {c.city && <span style={{ color: 'var(--muted)', fontSize: 11 }}>{c.city}</span>}
+                  </span>
+                </button>
+              )
+            })}
           </div>
         )}
       </div>
@@ -286,15 +283,12 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
       {selectedClient && (
         <div className="sort-header-info">
           <div className="sort-client-selected">
-            <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <strong>{selectedClient.tradeName ?? selectedClient.legalName ?? selectedClient.document}</strong>
-              <span style={{ color: 'var(--muted)', marginLeft: 8, fontSize: 12 }}>{selectedClient.document}</span>
-            </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ color: 'var(--muted)', fontSize: 12 }}>{selectedClient.document}</span>
               {selectedClient.premiseRange && <span className="cad-badge-range">Faixa {selectedClient.premiseRange}</span>}
-              {selectedClient.premiseProfile && <span className="cad-badge-net">{selectedClient.premiseProfile}</span>}
               {pexSet.has(selectedClient.document) && <span className="badge-pex">PEX</span>}
-              <button type="button" className="sort-clear-btn" onClick={() => { setSelectedDoc(null); setSearch(''); setChannelOverride(null) }}>Trocar cliente</button>
+              <button type="button" className="sort-clear-btn" onClick={() => { setSelectedDoc(null); setSearch(''); setChannelOverride(null) }}>Trocar</button>
             </div>
           </div>
 
