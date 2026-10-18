@@ -171,7 +171,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
         avg3m: fat3m / 3,
         premiseAvg12m: c.premiseAverage12Months,
         lastDate,
-        routed: !!(c.visitFrequency || c.visitDay),
+        routed: c.sources.includes('Roteiro geral'),
         rcaCode: c.rcaCode ?? '',
         rcaName: c.rcaName ?? c.representative ?? '',
         hasCadastro,
@@ -295,8 +295,16 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
     return m
   }, [semByCity, pexFilter, isPex])
 
-  const naoCount = useMemo(() => Object.values(filteredNaoByCity).reduce((s, l) => s + l.length, 0), [filteredNaoByCity])
-  const semCount = useMemo(() => Object.values(filteredSemByCity).reduce((s, l) => s + l.length, 0), [filteredSemByCity])
+  const naoCount = useMemo(() => {
+    const base = filteredClients.filter(c => !(c.routed && rcaMap.has(c.rcaCode)) && c.hasCadastro)
+    if (pexFilter === 'all') return base.length
+    return base.filter(c => pexFilter === 'pex' ? isPex(c) : !isPex(c)).length
+  }, [filteredClients, rcaMap, pexFilter, isPex])
+  const semCount = useMemo(() => {
+    const base = filteredClients.filter(c => !c.hasCadastro)
+    if (pexFilter === 'all') return base.length
+    return base.filter(c => pexFilter === 'pex' ? isPex(c) : !isPex(c)).length
+  }, [filteredClients, pexFilter, isPex])
   const activeData = mode === 'nao' ? filteredNaoByCity : mode === 'sem' ? filteredSemByCity : {}
 
   const cityCompletion = useMemo(() => {
