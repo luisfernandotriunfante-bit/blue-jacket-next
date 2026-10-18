@@ -596,7 +596,7 @@ export function App() {
           </div>
         </header>
         {clientesTab === 'carteira' && <CarteiraTab clientBase={effectiveClients} movementBase={effectiveMovements} activeComp={displayComp} pexSet={pexSet} />}
-        {clientesTab === 'cadastro' && <CadastroClienteTab clientBase={effectiveClients} movementBase={effectiveMovements} activeComp={displayComp} pexSet={pexSet} onPexChange={setPexSet} />}
+        {clientesTab === 'cadastro' && <CadastroClienteTab clientBase={effectiveClients} movementBase={effectiveMovements} activeComp={displayComp} pexSet={pexSet} onPexChange={setPexSet} historyCount={historyBase.length} historySample={historyBase.length > 0 ? historyBase[0].customerCode : undefined} />}
         {clientesTab === 'piramide' && <PiramideTab clientBase={effectiveClients} movementBase={effectiveMovements} activeComp={displayComp} pexSet={pexSet} onPexChange={setPexSet} />}
       </>) : section === 'campanhas' ? <>
         <CampaignTab />

@@ -58,12 +58,14 @@ interface CadastroRow {
   purchasedEveryMonth: boolean
 }
 
-export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSet, onPexChange }: {
+export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSet, onPexChange, historyCount = 0, historySample }: {
   clientBase: CanonicalClient[]
   movementBase: CanonicalMovement[]
   activeComp: string
   pexSet: Set<string>
   onPexChange: (s: Set<string>) => void
+  historyCount?: number
+  historySample?: string
 }) {
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -439,7 +441,9 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
                   <Field label="Total movimentos" value={`${history.length}`} />
                   <Field label="→ Winthor" value={`${history.filter(m => !m.sources?.includes('Histórico')).length}`} />
                   <Field label="→ Histórico" value={`${history.filter(m => m.sources?.includes('Histórico')).length}`} highlight={history.some(m => m.sources?.includes('Histórico'))} />
-                  <Field label="Movimentos base" value={`${movementBase.length} total (${movementBase.filter(m => m.sources?.includes('Histórico')).length} histórico)`} />
+                  <Field label="Base histórica" value={`${historyCount} registros carregados`} highlight={historyCount > 0} />
+                  {historySample && <Field label="Amostra CNPJ hist." value={historySample} />}
+                  <Field label="Movimentos combinados" value={`${movementBase.length} total (${movementBase.filter(m => m.sources?.includes('Histórico')).length} histórico)`} />
                 </div>
               </div>
 
