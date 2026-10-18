@@ -7,7 +7,7 @@ const headerAt = (rows: Row[], expected: Record<number, string>) =>
 
 export type FileDetection =
   | { motor: 'produtos'; slot: 'internal' | 'industry' | 'stock' | 'price' | 'subbrands' | 'sortiment' }
-  | { motor: 'clientes'; slot: 'internal' | 'portfolio' | 'premises' }
+  | { motor: 'clientes'; slot: 'internal' | 'portfolio' | 'route' | 'premises' }
   | { motor: 'movimentacoes'; slot: 'sales' | 'cuts' }
   | { motor: 'historico'; slot: 'sales' | 'catalog' }
   | { motor: 'recebimentos'; slot: 'legacy' | 'current' | 'portfolio' }
@@ -53,6 +53,8 @@ export async function detectFile(file: File): Promise<FileDetection> {
         return { motor: 'recebimentos', slot: 'portfolio' }
       if (headerAt(rows, { 0: 'codigo', 5: 'cpfcnpj', 10: 'codrca', 12: 'codsupervisor' }) >= 0)
         return { motor: 'clientes', slot: 'internal' }
+      if (headerAt(rows, { 2: 'codigocliente', 3: 'cnpj', 10: 'recorrencia', 13: 'diadasemana' }) >= 0)
+        return { motor: 'clientes', slot: 'route' }
       if (headerAt(rows, { 0: 'codigocliente', 1: 'cnpj', 12: 'frequencia', 15: 'representante' }) >= 0)
         return { motor: 'clientes', slot: 'portfolio' }
       if (headerAt(rows, { 0: 'semestrepremissa', 2: 'codcliente', 13: 'checkpdv' }) >= 0)
