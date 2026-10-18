@@ -45,7 +45,7 @@ type Row = unknown[]
 type SheetCandidate = { rows: Row[]; sheet: string }
 const norm = (value: unknown) => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
 const text = (value: unknown) => { const result = String(value ?? '').trim(); return result || undefined }
-const documentKey = (value: unknown) => String(value ?? '').replace(/\D/g, '')
+const documentKey = (value: unknown) => { let d = String(value ?? '').replace(/\D/g, ''); if (d.length === 13) d = '0' + d; if (d.length === 10) d = '0' + d; return d }
 const at = (row: Row, index: number) => row[index]
 const hasDocument = (value: unknown) => { const d = documentKey(value); return d.length === 11 || d.length === 14 }
 
