@@ -139,14 +139,17 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
         else if (m.movementType === 'devolucao') fatTotal3m -= m.value ?? 0
       }
 
+      let lastPurchaseDate = ''
+      for (const m of allMovs) {
+        const d = m.movementDate ?? ''
+        if (d > lastPurchaseDate && m.movementType === 'venda_faturada') lastPurchaseDate = d
+      }
+
       const movsAno = allMovs.filter(m => { const d = m.movementDate ?? ''; return d >= yearRange.start && d <= yearRange.end })
       let fatAno = 0
       const mesesAno = new Set<string>()
-      let lastPurchaseDate = ''
       for (const m of movsAno) {
-        const d = m.movementDate ?? ''
-        if (d > lastPurchaseDate && m.movementType === 'venda_faturada') lastPurchaseDate = d
-        if (m.movementType === 'venda_faturada') { fatAno += m.value ?? 0; if (d) mesesAno.add(d.slice(0, 7)) }
+        if (m.movementType === 'venda_faturada') { fatAno += m.value ?? 0; if (m.movementDate) mesesAno.add(m.movementDate.slice(0, 7)) }
         else if (m.movementType === 'devolucao') fatAno -= m.value ?? 0
       }
       const nMesesAno = mesesAno.size || 1
@@ -315,9 +318,9 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
         <div className="stock-list stock-list--cadastro">
           <div className="stock-head">
             <span>Cliente</span>
+            <span className="sc-num">Média Anual</span>
             <span className="sc-num">Fat. 3m Interno</span>
             <span className="sc-num">CG Mercado 3m</span>
-            <span className="sc-num">Média Anual</span>
             <span className="sc-num">Dias s/ compra</span>
           </div>
           {filtered.length === 0 && (
@@ -351,6 +354,11 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
                   </span>
                 </span>
                 <span className="sc-num">
+                  {r.avgAnual > 0
+                    ? <strong className="c-blue">{kpiCurrency(r.avgAnual)}</strong>
+                    : <strong className="c-muted">—</strong>}
+                </span>
+                <span className="sc-num">
                   {r.fatTotal3m > 0
                     ? <strong className="c-blue">{kpiCurrency(r.fatTotal3m)}</strong>
                     : <strong className="c-muted">—</strong>}
@@ -358,11 +366,6 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
                 <span className="sc-num">
                   {r.premiseAvg12m != null && r.premiseAvg12m > 0
                     ? <strong style={{ color: '#4caf50' }}>{kpiCurrency(r.premiseAvg12m)}</strong>
-                    : <strong className="c-muted">—</strong>}
-                </span>
-                <span className="sc-num">
-                  {r.avgAnual > 0
-                    ? <strong className="c-blue">{kpiCurrency(r.avgAnual)}</strong>
                     : <strong className="c-muted">—</strong>}
                 </span>
                 <span className="sc-num">
