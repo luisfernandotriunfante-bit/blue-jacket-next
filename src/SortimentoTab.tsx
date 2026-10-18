@@ -20,15 +20,18 @@ const FAIXA_CHANNEL_MAP: Record<string, string> = {
   '6': 'Tradicional Independente',
 }
 
+type Classification = 'Mandatório' | 'Importante' | 'Fora do sortimento'
+
 interface SortimentoItem {
   code: string
   description: string
   subcategory: string
   brand: string
-  classification: 'Mandatório' | 'Importante'
+  classification: Classification
   recommended: boolean
   purchased: boolean
   value: number
+  storesPurchased?: number
 }
 
 type ViewMode = 'cnpj' | 'rede'
@@ -44,20 +47,9 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
   const [selectedDoc, setSelectedDoc] = useState<string | null>(null)
   const [selectedRede, setSelectedRede] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('cnpj')
-  const [channelOverride, setChannelOverride] = useState<string | null>(null)
-  const [filterClass, setFilterClass] = useState<'all' | 'mandatorio' | 'importante'>('all')
+  const [filterClass, setFilterClass] = useState<'all' | 'mandatorio' | 'importante' | 'fora'>('all')
   const [filterStatus, setFilterStatus] = useState<'all' | 'comprado' | 'faltando'>('all')
   const [sortBy, setSortBy] = useState<'subcategory' | 'brand' | 'value' | 'classification'>('subcategory')
-
-  const availableChannels = useMemo(() => {
-    const set = new Set<string>()
-    for (const p of productBase) {
-      if (p.sortimentChannels) {
-        for (const ch of Object.keys(p.sortimentChannels)) set.add(ch)
-      }
-    }
-    return [...set].sort()
-  }, [productBase])
 
   const movsByCustomer = useMemo(() => {
     const map = new Map<string, CanonicalMovement[]>()
@@ -146,12 +138,10 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
     return FAIXA_CHANNEL_MAP[topFaixa] ?? ''
   }, [selectedClient, selectedRedeClients, viewMode])
 
-  const activeChannel = channelOverride ?? detectedChannel
-
   const hasSelection = viewMode === 'cnpj' ? !!selectedClient : selectedRedeClients.length > 0
 
   const analysis = useMemo(() => {
-    if (!hasSelection || !activeChannel) return null
+    if (!hasSelection || !detectedChannel) return null
 
     const [y] = activeComp.split('-').map(Number)
     const startAno = `${y}-01-01`
@@ -159,6 +149,8 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
     const endAno = now.toISOString().slice(0, 10)
 
     const purchasedProducts = new Map<string, number>()
+    const storesByProduct = new Map<string, Set<string>>()
+    let totalStores = 0
 
     const collectMovements = (client: CanonicalClient) => {
       const code = client.winthorCode ?? client.document
@@ -167,26 +159,40 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
         const d = m.movementDate ?? ''
         return d >= startAno && d <= endAno && (m.movementType === 'venda_faturada' || m.movementType === 'devolucao')
       })
+      const storeBought = new Set<string>()
       for (const m of movsAno) {
         const pc = m.productCode ?? ''
         if (!pc) continue
         const val = m.movementType === 'venda_faturada' ? (m.value ?? 0) : -(m.value ?? 0)
         purchasedProducts.set(pc, (purchasedProducts.get(pc) ?? 0) + val)
+        if (viewMode === 'rede') storeBought.add(pc)
+      }
+      if (viewMode === 'rede') {
+        for (const pc of storeBought) {
+          if (!storesByProduct.has(pc)) storesByProduct.set(pc, new Set())
+          storesByProduct.get(pc)!.add(client.document)
+        }
       }
     }
 
     if (viewMode === 'cnpj' && selectedClient) {
       collectMovements(selectedClient)
+      totalStores = 1
     } else {
       for (const client of selectedRedeClients) collectMovements(client)
+      totalStores = selectedRedeClients.length
     }
+
+    const storesWithPurchase = viewMode === 'rede'
+      ? new Set([...storesByProduct.values()].flatMap(s => [...s])).size
+      : purchasedProducts.size > 0 ? 1 : 0
 
     const items: SortimentoItem[] = []
     const recommendedCodes = new Set<string>()
 
     for (const p of productBase) {
       if (!p.sortimentChannels) continue
-      const level = p.sortimentChannels[activeChannel]
+      const level = p.sortimentChannels[detectedChannel]
       if (!level || level <= 0) continue
 
       const pCode = p.internalCode ?? p.manufacturerCode ?? ''
@@ -195,6 +201,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
       if (p.manufacturerCode) recommendedCodes.add(p.manufacturerCode)
 
       const purchaseValue = purchasedProducts.get(pCode) ?? (p.manufacturerCode ? (purchasedProducts.get(p.manufacturerCode) ?? 0) : 0)
+      const storeCount = viewMode === 'rede' ? (storesByProduct.get(pCode)?.size ?? (p.manufacturerCode ? (storesByProduct.get(p.manufacturerCode)?.size ?? 0) : 0)) : undefined
 
       items.push({
         code: pCode,
@@ -205,26 +212,30 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
         recommended: true,
         purchased: purchaseValue > 0,
         value: purchaseValue,
+        storesPurchased: storeCount,
       })
     }
 
     for (const [pc, val] of purchasedProducts) {
       if (recommendedCodes.has(pc)) continue
       const prod = productByCode.get(pc)
-      if (prod?.sortimentChannels && prod.sortimentChannels[activeChannel] != null) continue
+      if (prod?.sortimentChannels && prod.sortimentChannels[detectedChannel] != null) continue
+      const storeCount = viewMode === 'rede' ? (storesByProduct.get(pc)?.size ?? 0) : undefined
       items.push({
         code: pc,
         description: prod?.description ?? pc,
         subcategory: prod?.subcategory ?? prod?.category ?? '',
         brand: prod?.brand ?? prod?.subBrand ?? '',
-        classification: 'Mandatório',
+        classification: 'Fora do sortimento',
         recommended: false,
         purchased: true,
         value: val,
+        storesPurchased: storeCount,
       })
     }
 
     const recommended = items.filter(i => i.recommended)
+    const fora = items.filter(i => !i.recommended)
     const mandatorios = recommended.filter(i => i.classification === 'Mandatório')
     const importantes = recommended.filter(i => i.classification === 'Importante')
 
@@ -241,7 +252,8 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
     const cobImp = impDisp > 0 ? impComprados / impDisp : 0
 
     const valorTotal = recommended.reduce((s, i) => s + i.value, 0)
-    const valorForaSortimento = items.filter(i => !i.recommended).reduce((s, i) => s + i.value, 0)
+    const valorForaSortimento = fora.reduce((s, i) => s + i.value, 0)
+    const skusFora = fora.length
 
     return {
       items,
@@ -256,14 +268,18 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
       cobImp,
       valorTotal,
       valorForaSortimento,
+      skusFora,
+      totalStores,
+      storesWithPurchase,
     }
-  }, [hasSelection, selectedClient, selectedRedeClients, viewMode, activeChannel, movsByCustomer, productBase, productByCode, activeComp])
+  }, [hasSelection, selectedClient, selectedRedeClients, viewMode, detectedChannel, movsByCustomer, productBase, productByCode, activeComp])
 
   const filteredItems = useMemo(() => {
     if (!analysis) return []
     let items = analysis.items
     if (filterClass === 'mandatorio') items = items.filter(i => i.classification === 'Mandatório')
     else if (filterClass === 'importante') items = items.filter(i => i.classification === 'Importante')
+    else if (filterClass === 'fora') items = items.filter(i => i.classification === 'Fora do sortimento')
     if (filterStatus === 'comprado') items = items.filter(i => i.purchased)
     else if (filterStatus === 'faltando') items = items.filter(i => i.recommended && !i.purchased)
 
@@ -271,7 +287,8 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
       if (sortBy === 'value') return b.value - a.value
       if (sortBy === 'brand') return (a.brand || 'zzz').localeCompare(b.brand || 'zzz')
       if (sortBy === 'classification') {
-        if (a.classification !== b.classification) return a.classification === 'Mandatório' ? -1 : 1
+        const order: Record<Classification, number> = { 'Mandatório': 0, 'Importante': 1, 'Fora do sortimento': 2 }
+        if (a.classification !== b.classification) return order[a.classification] - order[b.classification]
         return a.subcategory.localeCompare(b.subcategory)
       }
       return a.subcategory.localeCompare(b.subcategory) || a.brand.localeCompare(b.brand)
@@ -279,17 +296,18 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
   }, [analysis, filterClass, filterStatus, sortBy])
 
   const subcategoryGroups = useMemo(() => {
-    const groups = new Map<string, { total: number; purchased: number; value: number }>()
+    const groups = new Map<string, { total: number; purchased: number; mandTotal: number; mandPurchased: number; value: number }>()
     if (!analysis) return []
     for (const item of analysis.items.filter(i => i.recommended)) {
       const key = item.subcategory || 'Sem categoria'
-      const g = groups.get(key) ?? { total: 0, purchased: 0, value: 0 }
+      const g = groups.get(key) ?? { total: 0, purchased: 0, mandTotal: 0, mandPurchased: 0, value: 0 }
       g.total++
+      if (item.classification === 'Mandatório') { g.mandTotal++; if (item.purchased) g.mandPurchased++ }
       if (item.purchased) { g.purchased++; g.value += item.value }
       groups.set(key, g)
     }
     return [...groups.entries()]
-      .map(([name, g]) => ({ name, ...g, coverage: g.total > 0 ? g.purchased / g.total : 0 }))
+      .map(([name, g]) => ({ name, ...g, coverage: g.total > 0 ? g.purchased / g.total : 0, mandCoverage: g.mandTotal > 0 ? g.mandPurchased / g.mandTotal : 0 }))
       .sort((a, b) => b.total - a.total)
   }, [analysis])
 
@@ -297,7 +315,6 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
     setSelectedDoc(null)
     setSelectedRede(null)
     setSearch('')
-    setChannelOverride(null)
   }
 
   const switchMode = (mode: ViewMode) => {
@@ -337,7 +354,6 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
                   onClick={() => {
                     setSelectedDoc(c.document)
                     setSearch(c.tradeName ?? c.legalName ?? c.document)
-                    setChannelOverride(null)
                   }}
                 >
                   <span className="sort-dropdown-name">{c.tradeName ?? c.legalName ?? c.document}</span>
@@ -364,7 +380,6 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
                 onClick={() => {
                   setSelectedRede(r.name)
                   setSearch(r.name)
-                  setChannelOverride(null)
                 }}
               >
                 <span className="sort-dropdown-name">{r.name}</span>
@@ -384,29 +399,11 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
               <strong>{selectedClient.tradeName ?? selectedClient.legalName ?? selectedClient.document}</strong>
               <span style={{ color: 'var(--muted)', fontSize: 12 }}>{selectedClient.document}</span>
               {selectedClient.premiseRange && <span className="cad-badge-range">Faixa {selectedClient.premiseRange}</span>}
+              {detectedChannel && <span className="sort-channel-badge">{detectedChannel}</span>}
               {selectedClient.premiseNetwork && <span style={{ color: 'var(--blue)', fontSize: 11 }}>Rede: {selectedClient.premiseNetwork}</span>}
               {pexSet.has(selectedClient.document) && <span className="badge-pex">PEX</span>}
               <button type="button" className="sort-clear-btn" onClick={clearSelection}>Trocar</button>
             </div>
-          </div>
-          <div className="sort-channel-select">
-            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>Canal do sortimento:</label>
-            <select
-              className="pf-select"
-              value={activeChannel}
-              onChange={e => setChannelOverride(e.target.value)}
-              style={{ minWidth: 160 }}
-            >
-              {!activeChannel && <option value="">Selecione um canal</option>}
-              {availableChannels.map(ch => (
-                <option key={ch} value={ch}>{ch}{ch === detectedChannel ? ' (detectado)' : ''}</option>
-              ))}
-            </select>
-            {detectedChannel && activeChannel !== detectedChannel && (
-              <button type="button" className="sort-reset-ch" onClick={() => setChannelOverride(null)}>
-                Usar detectado ({detectedChannel})
-              </button>
-            )}
           </div>
         </div>
       )}
@@ -417,6 +414,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <strong>{selectedRede}</strong>
               <span style={{ color: 'var(--blue)', fontSize: 12 }}>{selectedRedeClients.length} loja{selectedRedeClients.length !== 1 ? 's' : ''}</span>
+              {detectedChannel && <span className="sort-channel-badge">{detectedChannel}</span>}
               <button type="button" className="sort-clear-btn" onClick={clearSelection}>Trocar</button>
             </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
@@ -431,29 +429,10 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
               )}
             </div>
           </div>
-          <div className="sort-channel-select">
-            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>Canal do sortimento:</label>
-            <select
-              className="pf-select"
-              value={activeChannel}
-              onChange={e => setChannelOverride(e.target.value)}
-              style={{ minWidth: 160 }}
-            >
-              {!activeChannel && <option value="">Selecione um canal</option>}
-              {availableChannels.map(ch => (
-                <option key={ch} value={ch}>{ch}{ch === detectedChannel ? ' (detectado)' : ''}</option>
-              ))}
-            </select>
-            {detectedChannel && activeChannel !== detectedChannel && (
-              <button type="button" className="sort-reset-ch" onClick={() => setChannelOverride(null)}>
-                Usar detectado ({detectedChannel})
-              </button>
-            )}
-          </div>
         </div>
       )}
 
-      {analysis && activeChannel && (
+      {analysis && detectedChannel && (
         <>
           <div className="sort-kpi-grid">
             <div className="sort-kpi">
@@ -480,8 +459,19 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
             <div className="sort-kpi">
               <span className="sort-kpi-label">Valor no Sortimento</span>
               <span className="sort-kpi-value c-blue">{kpiCurrency(analysis.valorTotal)}</span>
-              <span className="sort-kpi-detail">fora: {kpiCurrency(analysis.valorForaSortimento)}</span>
             </div>
+            <div className="sort-kpi">
+              <span className="sort-kpi-label">Fora do Sortimento</span>
+              <span className="sort-kpi-value" style={{ color: '#ff9800' }}>{kpiCurrency(analysis.valorForaSortimento)}</span>
+              <span className="sort-kpi-detail">{analysis.skusFora} SKUs</span>
+            </div>
+            {viewMode === 'rede' && (
+              <div className="sort-kpi">
+                <span className="sort-kpi-label">Lojas com Compra</span>
+                <span className="sort-kpi-value c-blue">{analysis.storesWithPurchase}</span>
+                <span className="sort-kpi-detail">de {analysis.totalStores} loja{analysis.totalStores !== 1 ? 's' : ''}</span>
+              </div>
+            )}
           </div>
 
           {subcategoryGroups.length > 0 && (
@@ -495,7 +485,10 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
                     </div>
                     <div className="sort-subcat-info">
                       <span className="sort-subcat-name">{g.name}</span>
-                      <span className="sort-subcat-nums">{g.purchased}/{g.total} · {pct(g.coverage)}</span>
+                      <span className="sort-subcat-nums">
+                        {g.purchased}/{g.total} · {pct(g.coverage)}
+                        {g.mandTotal > 0 && <span style={{ color: 'var(--muted)', marginLeft: 4 }}>(mand: {g.mandPurchased}/{g.mandTotal})</span>}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -508,6 +501,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
               <button type="button" className={`sort-filter-btn${filterClass === 'all' ? ' active' : ''}`} onClick={() => setFilterClass('all')}>Todos</button>
               <button type="button" className={`sort-filter-btn${filterClass === 'mandatorio' ? ' active' : ''}`} onClick={() => setFilterClass('mandatorio')}>Mandatório</button>
               <button type="button" className={`sort-filter-btn${filterClass === 'importante' ? ' active' : ''}`} onClick={() => setFilterClass('importante')}>Importante</button>
+              <button type="button" className={`sort-filter-btn${filterClass === 'fora' ? ' active' : ''}`} onClick={() => setFilterClass('fora')}>Fora do sortimento</button>
             </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <button type="button" className={`sort-filter-btn${filterStatus === 'all' ? ' active' : ''}`} onClick={() => setFilterStatus('all')}>Todos</button>
@@ -531,6 +525,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
             <div className="sort-product-head">
               <span>Produto</span>
               <span className="sc-num">Classificação</span>
+              {viewMode === 'rede' && <span className="sc-num">Penetração</span>}
               <span className="sc-num">Status</span>
               <span className="sc-num">Valor</span>
             </div>
@@ -545,10 +540,17 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
                   </span>
                 </span>
                 <span className="sc-num">
-                  {item.recommended
-                    ? <span className={`sort-class-badge ${item.classification === 'Mandatório' ? 'sort-mand' : 'sort-imp'}`}>{item.classification === 'Mandatório' ? 'Mand.' : 'Import.'}</span>
-                    : <span className="sort-class-badge sort-fora">Fora</span>}
+                  {item.classification === 'Mandatório' && <span className="sort-class-badge sort-mand">Mand.</span>}
+                  {item.classification === 'Importante' && <span className="sort-class-badge sort-imp">Import.</span>}
+                  {item.classification === 'Fora do sortimento' && <span className="sort-class-badge sort-fora">Fora</span>}
                 </span>
+                {viewMode === 'rede' && (
+                  <span className="sc-num">
+                    {item.storesPurchased != null
+                      ? <span style={{ fontSize: 11 }}>{item.storesPurchased}/{analysis.totalStores} <span style={{ color: 'var(--muted)' }}>({pct(item.storesPurchased / analysis.totalStores)})</span></span>
+                      : <span className="c-muted">—</span>}
+                  </span>
+                )}
                 <span className="sc-num">
                   {item.purchased
                     ? <span className="sort-status-badge sort-ok">Comprou</span>
@@ -557,6 +559,8 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
                 <span className="sc-num">
                   {item.value > 0
                     ? <strong className="c-blue" style={{ fontSize: 12 }}>{kpiCurrency(item.value)}</strong>
+                    : item.value < 0
+                    ? <strong style={{ fontSize: 12, color: '#ef5350' }}>{kpiCurrency(item.value)}</strong>
                     : <span className="c-muted">—</span>}
                 </span>
               </div>
@@ -565,12 +569,10 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
         </>
       )}
 
-      {hasSelection && !activeChannel && (
+      {hasSelection && !detectedChannel && (
         <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>
-          <p>Selecione o canal do sortimento para analisar.</p>
-          {availableChannels.length === 0 && (
-            <p style={{ fontSize: 12, marginTop: 8 }}>Nenhum dado de sortimento encontrado. Carregue o arquivo de sortimento na aba de Administração → Produtos.</p>
-          )}
+          <p>Não foi possível detectar o canal do sortimento para este cliente.</p>
+          <p style={{ fontSize: 12, marginTop: 8 }}>Verifique se o arquivo de premissas (exportação PDVs) foi carregado com a faixa do cliente.</p>
         </div>
       )}
 
@@ -579,14 +581,9 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
           <p>{viewMode === 'cnpj' ? 'Busque um cliente para analisar o sortimento.' : 'Busque uma rede para analisar o sortimento consolidado.'}</p>
           <p style={{ fontSize: 12, marginTop: 8 }}>
             {viewMode === 'cnpj'
-              ? 'A análise cruza os produtos recomendados por canal (sortimento) com as compras reais do cliente, mostrando a cobertura de mandatórios e importantes.'
-              : 'A visão por rede agrega todas as compras das lojas da rede e compara com o sortimento recomendado, mostrando a cobertura consolidada.'}
+              ? 'O canal do sortimento é detectado automaticamente pela faixa do cliente. A análise cruza os produtos recomendados com as compras reais, mostrando cobertura de mandatórios, importantes e itens fora do sortimento.'
+              : 'A visão por rede agrega todas as compras das lojas e mostra a penetração de cada produto, com o canal detectado pela faixa predominante.'}
           </p>
-          {availableChannels.length > 0 && (
-            <p style={{ fontSize: 11, marginTop: 8, color: 'var(--blue)' }}>
-              Canais disponíveis: {availableChannels.join(', ')}
-            </p>
-          )}
         </div>
       )}
     </section>
