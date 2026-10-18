@@ -427,21 +427,19 @@ export function App() {
       const code = client.winthorCode ?? client.document
       const allMovs = [...(movsByClient.get(code) ?? []), ...(code !== client.document ? (movsByClient.get(client.document) ?? []) : [])]
       const sales = allMovs.filter(m => m.movementType === 'venda_faturada' || m.movementType === 'devolucao')
-      let totalFat = 0
-      const months = new Set<string>()
-      const last3 = new Set<string>()
       const d3 = new Date(now.getFullYear(), now.getMonth() - 2, 1)
       const start3m = `${d3.getFullYear()}-${String(d3.getMonth() + 1).padStart(2, '0')}-01`
+      const startAno = `${now.getFullYear()}-01-01`
       let fat3m = 0
+      let fatAno = 0; const mesesAno = new Set<string>()
       for (const m of sales) {
         const v = m.movementType === 'venda_faturada' ? (m.value ?? 0) : -(m.value ?? 0)
-        totalFat += v
         if (m.movementDate) {
-          months.add(m.movementDate.slice(0, 7))
-          if (m.movementDate >= start3m) { fat3m += v; last3.add(m.movementDate.slice(0, 7)) }
+          if (m.movementDate >= start3m) fat3m += v
+          if (m.movementDate >= startAno) { fatAno += v; mesesAno.add(m.movementDate.slice(0, 7)) }
         }
       }
-      const nMonths = months.size || 1
+      const nMesesAno = mesesAno.size || 1
       return {
         Documento: client.document, Código: client.winthorCode ?? '', Cliente: client.legalName ?? '', Fantasia: client.tradeName ?? '', Cidade: client.city ?? '',
         Filial: client.branch ?? '', Cobrança: client.billingType ?? '', 'Bloqueio SEFAZ': client.fiscalBlock ?? '',
@@ -449,8 +447,8 @@ export function App() {
         Latitude: client.latitude ?? '', Longitude: client.longitude ?? '', Frequência: client.visitFrequency ?? '', Visita: client.visitDay ?? '', 'Dias sem comprar': client.daysWithoutPurchase ?? '',
         Semestre: client.premiseSemester ?? '', Canal: client.channelType ?? '', Faixa: client.premiseRange ?? '', Estado: client.premiseState ?? '',
         Cluster: client.premiseCluster ?? '', Perfil: client.premiseProfile ?? '', Rede: client.premiseNetwork ?? '',
-        'Fat. Total Interno': totalFat > 0 ? totalFat : '', 'Meses c/ Dados': months.size, 'Média Mensal Interno': totalFat > 0 ? totalFat / nMonths : '',
-        'Fat. 3m Interno': fat3m > 0 ? fat3m : '', 'Média 3m Interno': fat3m > 0 ? fat3m / 3 : '',
+        'Fat. 3m Interno': fat3m > 0 ? fat3m : '',
+        'Média Anual': fatAno > 0 ? fatAno / nMesesAno : '', 'Meses c/ Dados': mesesAno.size,
         'Colgate Mercado 3m': client.premiseAverage12Months ?? '',
       }
     })
