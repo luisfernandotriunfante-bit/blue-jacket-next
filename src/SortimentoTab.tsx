@@ -9,7 +9,6 @@ const kpiCurrency = (n: number) => {
   if (abs >= 1_000) return `${sign}R$ ${(abs / 1_000).toFixed(2)}K`
   return `${sign}R$ ${abs.toFixed(2)}`
 }
-const brlFull = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`
 
 const FAIXA_CHANNEL_MAP: Record<string, string> = {
@@ -32,6 +31,8 @@ interface SortimentoItem {
   value: number
 }
 
+type ViewMode = 'cnpj' | 'rede'
+
 export function SortimentoTab({ clientBase, productBase, movementBase, activeComp, pexSet }: {
   clientBase: CanonicalClient[]
   productBase: CanonicalProduct[]
@@ -41,6 +42,8 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
 }) {
   const [search, setSearch] = useState('')
   const [selectedDoc, setSelectedDoc] = useState<string | null>(null)
+  const [selectedRede, setSelectedRede] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>('cnpj')
   const [channelOverride, setChannelOverride] = useState<string | null>(null)
   const [filterClass, setFilterClass] = useState<'all' | 'mandatorio' | 'importante'>('all')
   const [filterStatus, setFilterStatus] = useState<'all' | 'comprado' | 'faltando'>('all')
@@ -75,9 +78,27 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
     return map
   }, [productBase])
 
+  const redeMap = useMemo(() => {
+    const map = new Map<string, CanonicalClient[]>()
+    for (const c of clientBase) {
+      const rede = c.premiseNetwork?.trim()
+      if (!rede) continue
+      if (!map.has(rede)) map.set(rede, [])
+      map.get(rede)!.push(c)
+    }
+    return map
+  }, [clientBase])
+
+  const availableRedes = useMemo(() => {
+    return [...redeMap.entries()]
+      .map(([name, clients]) => ({ name, count: clients.length }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [redeMap])
+
   const q = search.toLowerCase()
+
   const clientResults = useMemo(() => {
-    if (!q || q.length < 2) return []
+    if (!q || q.length < 2 || viewMode !== 'cnpj') return []
     return clientBase
       .filter(c => {
         const doc = c.document.toLowerCase()
@@ -86,43 +107,78 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
         return doc.includes(q) || name.includes(q) || code.includes(q)
       })
       .slice(0, 20)
-  }, [clientBase, q])
+  }, [clientBase, q, viewMode])
+
+  const redeResults = useMemo(() => {
+    if (!q || q.length < 2 || viewMode !== 'rede') return []
+    return availableRedes
+      .filter(r => r.name.toLowerCase().includes(q))
+      .slice(0, 20)
+  }, [availableRedes, q, viewMode])
 
   const selectedClient = useMemo(() => {
-    if (!selectedDoc) return null
+    if (viewMode !== 'cnpj' || !selectedDoc) return null
     return clientBase.find(c => c.document === selectedDoc) ?? null
-  }, [clientBase, selectedDoc])
+  }, [clientBase, selectedDoc, viewMode])
+
+  const selectedRedeClients = useMemo(() => {
+    if (viewMode !== 'rede' || !selectedRede) return []
+    return redeMap.get(selectedRede) ?? []
+  }, [redeMap, selectedRede, viewMode])
 
   const detectedChannel = useMemo(() => {
-    if (!selectedClient) return ''
-    const faixa = selectedClient.premiseRange ?? ''
-    return FAIXA_CHANNEL_MAP[faixa] ?? ''
-  }, [selectedClient])
+    if (viewMode === 'cnpj') {
+      if (!selectedClient) return ''
+      const faixa = selectedClient.premiseRange ?? ''
+      return FAIXA_CHANNEL_MAP[faixa] ?? ''
+    }
+    if (selectedRedeClients.length === 0) return ''
+    const faixas = new Map<string, number>()
+    for (const c of selectedRedeClients) {
+      const f = c.premiseRange ?? ''
+      if (f) faixas.set(f, (faixas.get(f) ?? 0) + 1)
+    }
+    let topFaixa = ''
+    let topCount = 0
+    for (const [f, count] of faixas) {
+      if (count > topCount) { topFaixa = f; topCount = count }
+    }
+    return FAIXA_CHANNEL_MAP[topFaixa] ?? ''
+  }, [selectedClient, selectedRedeClients, viewMode])
 
   const activeChannel = channelOverride ?? detectedChannel
 
-  const analysis = useMemo(() => {
-    if (!selectedClient || !activeChannel) return null
+  const hasSelection = viewMode === 'cnpj' ? !!selectedClient : selectedRedeClients.length > 0
 
-    const code = selectedClient.winthorCode ?? selectedClient.document
-    const allMovs = [...(movsByCustomer.get(code) ?? []), ...(code !== selectedClient.document ? (movsByCustomer.get(selectedClient.document) ?? []) : [])]
+  const analysis = useMemo(() => {
+    if (!hasSelection || !activeChannel) return null
 
     const [y] = activeComp.split('-').map(Number)
     const startAno = `${y}-01-01`
     const now = new Date()
     const endAno = now.toISOString().slice(0, 10)
 
-    const movsAno = allMovs.filter(m => {
-      const d = m.movementDate ?? ''
-      return d >= startAno && d <= endAno && (m.movementType === 'venda_faturada' || m.movementType === 'devolucao')
-    })
-
     const purchasedProducts = new Map<string, number>()
-    for (const m of movsAno) {
-      const pc = m.productCode ?? ''
-      if (!pc) continue
-      const val = m.movementType === 'venda_faturada' ? (m.value ?? 0) : -(m.value ?? 0)
-      purchasedProducts.set(pc, (purchasedProducts.get(pc) ?? 0) + val)
+
+    const collectMovements = (client: CanonicalClient) => {
+      const code = client.winthorCode ?? client.document
+      const allMovs = [...(movsByCustomer.get(code) ?? []), ...(code !== client.document ? (movsByCustomer.get(client.document) ?? []) : [])]
+      const movsAno = allMovs.filter(m => {
+        const d = m.movementDate ?? ''
+        return d >= startAno && d <= endAno && (m.movementType === 'venda_faturada' || m.movementType === 'devolucao')
+      })
+      for (const m of movsAno) {
+        const pc = m.productCode ?? ''
+        if (!pc) continue
+        const val = m.movementType === 'venda_faturada' ? (m.value ?? 0) : -(m.value ?? 0)
+        purchasedProducts.set(pc, (purchasedProducts.get(pc) ?? 0) + val)
+      }
+    }
+
+    if (viewMode === 'cnpj' && selectedClient) {
+      collectMovements(selectedClient)
+    } else {
+      for (const client of selectedRedeClients) collectMovements(client)
     }
 
     const items: SortimentoItem[] = []
@@ -201,7 +257,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
       valorTotal,
       valorForaSortimento,
     }
-  }, [selectedClient, activeChannel, movsByCustomer, productBase, productByCode, activeComp])
+  }, [hasSelection, selectedClient, selectedRedeClients, viewMode, activeChannel, movsByCustomer, productBase, productByCode, activeComp])
 
   const filteredItems = useMemo(() => {
     if (!analysis) return []
@@ -237,19 +293,37 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
       .sort((a, b) => b.total - a.total)
   }, [analysis])
 
+  const clearSelection = () => {
+    setSelectedDoc(null)
+    setSelectedRede(null)
+    setSearch('')
+    setChannelOverride(null)
+  }
+
+  const switchMode = (mode: ViewMode) => {
+    setViewMode(mode)
+    clearSelection()
+  }
+
   return (
     <section className="content">
       <div className="stock-toolbar">
+        <div className="sort-mode-toggle">
+          <button type="button" className={`sort-mode-btn${viewMode === 'cnpj' ? ' active' : ''}`} onClick={() => switchMode('cnpj')}>Por CNPJ</button>
+          <button type="button" className={`sort-mode-btn${viewMode === 'rede' ? ' active' : ''}`} onClick={() => switchMode('rede')}>
+            Por Rede {availableRedes.length > 0 && <span className="sort-mode-count">({availableRedes.length})</span>}
+          </button>
+        </div>
         <div className="pf-bar">
           <input
             className="pf-input"
-            placeholder="Buscar cliente por CNPJ, código ou nome…"
+            placeholder={viewMode === 'cnpj' ? 'Buscar cliente por CNPJ, código ou nome…' : 'Buscar rede pelo nome…'}
             value={search}
-            onChange={e => { setSearch(e.target.value); if (!e.target.value) { setSelectedDoc(null); setChannelOverride(null) } }}
+            onChange={e => { setSearch(e.target.value); if (!e.target.value) clearSelection() }}
           />
         </div>
 
-        {!selectedDoc && q.length >= 2 && (
+        {viewMode === 'cnpj' && !selectedDoc && q.length >= 2 && (
           <div className="sort-dropdown">
             {clientResults.length === 0 && <p className="sort-empty">Nenhum cliente encontrado.</p>}
             {clientResults.map(c => {
@@ -278,20 +352,85 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
             })}
           </div>
         )}
+
+        {viewMode === 'rede' && !selectedRede && q.length >= 2 && (
+          <div className="sort-dropdown">
+            {redeResults.length === 0 && <p className="sort-empty">Nenhuma rede encontrada.</p>}
+            {redeResults.map(r => (
+              <button
+                key={r.name}
+                type="button"
+                className="sort-dropdown-item"
+                onClick={() => {
+                  setSelectedRede(r.name)
+                  setSearch(r.name)
+                  setChannelOverride(null)
+                }}
+              >
+                <span className="sort-dropdown-name">{r.name}</span>
+                <span className="sort-dropdown-meta">
+                  <span style={{ color: 'var(--blue)', fontSize: 11 }}>{r.count} loja{r.count !== 1 ? 's' : ''}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {selectedClient && (
+      {viewMode === 'cnpj' && selectedClient && (
         <div className="sort-header-info">
           <div className="sort-client-selected">
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <strong>{selectedClient.tradeName ?? selectedClient.legalName ?? selectedClient.document}</strong>
               <span style={{ color: 'var(--muted)', fontSize: 12 }}>{selectedClient.document}</span>
               {selectedClient.premiseRange && <span className="cad-badge-range">Faixa {selectedClient.premiseRange}</span>}
+              {selectedClient.premiseNetwork && <span style={{ color: 'var(--blue)', fontSize: 11 }}>Rede: {selectedClient.premiseNetwork}</span>}
               {pexSet.has(selectedClient.document) && <span className="badge-pex">PEX</span>}
-              <button type="button" className="sort-clear-btn" onClick={() => { setSelectedDoc(null); setSearch(''); setChannelOverride(null) }}>Trocar</button>
+              <button type="button" className="sort-clear-btn" onClick={clearSelection}>Trocar</button>
             </div>
           </div>
+          <div className="sort-channel-select">
+            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>Canal do sortimento:</label>
+            <select
+              className="pf-select"
+              value={activeChannel}
+              onChange={e => setChannelOverride(e.target.value)}
+              style={{ minWidth: 160 }}
+            >
+              {!activeChannel && <option value="">Selecione um canal</option>}
+              {availableChannels.map(ch => (
+                <option key={ch} value={ch}>{ch}{ch === detectedChannel ? ' (detectado)' : ''}</option>
+              ))}
+            </select>
+            {detectedChannel && activeChannel !== detectedChannel && (
+              <button type="button" className="sort-reset-ch" onClick={() => setChannelOverride(null)}>
+                Usar detectado ({detectedChannel})
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
+      {viewMode === 'rede' && selectedRede && selectedRedeClients.length > 0 && (
+        <div className="sort-header-info">
+          <div className="sort-client-selected">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <strong>{selectedRede}</strong>
+              <span style={{ color: 'var(--blue)', fontSize: 12 }}>{selectedRedeClients.length} loja{selectedRedeClients.length !== 1 ? 's' : ''}</span>
+              <button type="button" className="sort-clear-btn" onClick={clearSelection}>Trocar</button>
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+              {selectedRedeClients.slice(0, 8).map(c => (
+                <span key={c.document} style={{ fontSize: 10, color: 'var(--muted)', background: 'var(--surface)', padding: '2px 6px', borderRadius: 4 }}>
+                  {c.tradeName ?? c.document}
+                  {c.premiseRange && <span className="cad-badge-range" style={{ fontSize: 9, marginLeft: 4 }}>F{c.premiseRange}</span>}
+                </span>
+              ))}
+              {selectedRedeClients.length > 8 && (
+                <span style={{ fontSize: 10, color: 'var(--muted)' }}>+{selectedRedeClients.length - 8} mais</span>
+              )}
+            </div>
+          </div>
           <div className="sort-channel-select">
             <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>Canal do sortimento:</label>
             <select
@@ -426,21 +565,22 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
         </>
       )}
 
-      {selectedClient && !activeChannel && (
+      {hasSelection && !activeChannel && (
         <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>
-          <p>Selecione o canal do sortimento para analisar este cliente.</p>
+          <p>Selecione o canal do sortimento para analisar.</p>
           {availableChannels.length === 0 && (
             <p style={{ fontSize: 12, marginTop: 8 }}>Nenhum dado de sortimento encontrado. Carregue o arquivo de sortimento na aba de Administração → Produtos.</p>
           )}
         </div>
       )}
 
-      {!selectedDoc && !q && (
+      {!hasSelection && !q && (
         <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>
-          <p>Busque um cliente para analisar o sortimento.</p>
+          <p>{viewMode === 'cnpj' ? 'Busque um cliente para analisar o sortimento.' : 'Busque uma rede para analisar o sortimento consolidado.'}</p>
           <p style={{ fontSize: 12, marginTop: 8 }}>
-            A análise cruza os produtos recomendados por canal (sortimento) com as compras reais do cliente,
-            mostrando a cobertura de mandatórios e importantes.
+            {viewMode === 'cnpj'
+              ? 'A análise cruza os produtos recomendados por canal (sortimento) com as compras reais do cliente, mostrando a cobertura de mandatórios e importantes.'
+              : 'A visão por rede agrega todas as compras das lojas da rede e compara com o sortimento recomendado, mostrando a cobertura consolidada.'}
           </p>
           {availableChannels.length > 0 && (
             <p style={{ fontSize: 11, marginTop: 8, color: 'var(--blue)' }}>
