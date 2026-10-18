@@ -319,8 +319,8 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
           <div className="stock-head">
             <span>Cliente</span>
             <span className="sc-num">Média Anual</span>
-            <span className="sc-num">Fat. 3m Interno</span>
             <span className="sc-num">CG Mercado 3m</span>
+            <span className="sc-num">Fat. 3m Interno</span>
             <span className="sc-num">Dias s/ compra</span>
           </div>
           {filtered.length === 0 && (
@@ -359,13 +359,13 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
                     : <strong className="c-muted">—</strong>}
                 </span>
                 <span className="sc-num">
-                  {r.fatTotal3m > 0
-                    ? <strong className="c-blue">{kpiCurrency(r.fatTotal3m)}</strong>
+                  {r.premiseAvg12m != null && r.premiseAvg12m > 0
+                    ? <strong style={{ color: '#4caf50' }}>{kpiCurrency(r.premiseAvg12m)}</strong>
                     : <strong className="c-muted">—</strong>}
                 </span>
                 <span className="sc-num">
-                  {r.premiseAvg12m != null && r.premiseAvg12m > 0
-                    ? <strong style={{ color: '#4caf50' }}>{kpiCurrency(r.premiseAvg12m)}</strong>
+                  {r.fatTotal3m > 0
+                    ? <strong className="c-blue">{kpiCurrency(r.fatTotal3m)}</strong>
                     : <strong className="c-muted">—</strong>}
                 </span>
                 <span className="sc-num">

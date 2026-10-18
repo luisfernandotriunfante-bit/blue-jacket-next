@@ -374,12 +374,24 @@ export function App() {
 
   const combinedMovements = useMemo<CanonicalMovement[]>(() => {
     const normDoc = (v: string) => { let d = v.replace(/\D/g, ''); if (d.length >= 12 && d.length < 14) d = d.padStart(14, '0'); else if (d.length >= 9 && d.length < 11) d = d.padStart(11, '0'); return d }
+    const clientDocs = new Set(clientBase.map(c => c.document))
+    const rootToDoc = new Map<string, string>()
+    for (const c of clientBase) {
+      const d = c.document
+      if (d.length >= 8 && !rootToDoc.has(d.slice(0, 8))) rootToDoc.set(d.slice(0, 8), d)
+    }
+    const resolveDoc = (raw: string) => {
+      const doc = normDoc(raw)
+      if (clientDocs.has(doc)) return doc
+      if (doc.length >= 8) return rootToDoc.get(doc.slice(0, 8)) ?? doc
+      return doc
+    }
     const histAsMovs: CanonicalMovement[] = historyBase.map(h => ({
       id: h.id,
       movementDate: h.date,
       movementType: 'venda_faturada' as const,
       customerCode: h.customerCode,
-      customerDocument: normDoc(h.customerCode),
+      customerDocument: resolveDoc(h.customerCode),
       productCode: h.winthorCode ?? h.productCode,
       quantity: h.quantity,
       value: h.netValue,
@@ -388,16 +400,29 @@ export function App() {
       sources: ['Histórico'],
     }))
     return [...movementBase, ...histAsMovs]
-  }, [movementBase, historyBase])
+  }, [movementBase, historyBase, clientBase])
   const snapCombined = useMemo<CanonicalMovement[] | null>(() => {
     if (!snap) return null
     const normDoc = (v: string) => { let d = v.replace(/\D/g, ''); if (d.length >= 12 && d.length < 14) d = d.padStart(14, '0'); else if (d.length >= 9 && d.length < 11) d = d.padStart(11, '0'); return d }
+    const clients = snap.clients ?? []
+    const clientDocs = new Set(clients.map(c => c.document))
+    const rootToDoc = new Map<string, string>()
+    for (const c of clients) {
+      const d = c.document
+      if (d.length >= 8 && !rootToDoc.has(d.slice(0, 8))) rootToDoc.set(d.slice(0, 8), d)
+    }
+    const resolveDoc = (raw: string) => {
+      const doc = normDoc(raw)
+      if (clientDocs.has(doc)) return doc
+      if (doc.length >= 8) return rootToDoc.get(doc.slice(0, 8)) ?? doc
+      return doc
+    }
     const histAsMovs: CanonicalMovement[] = (snap.history ?? []).map(h => ({
       id: h.id,
       movementDate: h.date,
       movementType: 'venda_faturada' as const,
       customerCode: h.customerCode,
-      customerDocument: normDoc(h.customerCode),
+      customerDocument: resolveDoc(h.customerCode),
       productCode: h.winthorCode ?? h.productCode,
       quantity: h.quantity,
       value: h.netValue,
