@@ -9,6 +9,7 @@ export type CanonicalClient = {
   city?: string
   rcaCode?: string
   rcaName?: string
+  rcaCodes?: Array<{code: string, name?: string}>
   supervisor?: string
   creditDueDate?: string
   branch?: string
@@ -108,8 +109,20 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
         let accepted = 0
         for (const row of rows.slice(routeHeader + 1)) {
           const key = documentKey(at(row, 3)); if (!hasDocument(key)) continue
-          if (route.has(key)) continue
-          route.set(key, { document: key, winthorCode: text(at(row, 2)), legalName: text(at(row, 4)), tradeName: text(at(row, 5)), city: text(at(row, 6)), district: text(at(row, 7)), address: text(at(row, 8)), visitFrequency: text(at(row, 10)), visitDay: text(at(row, 13)), rcaCode: rcaKey(at(row, 0)) || undefined, rcaName: text(at(row, 1)), sources: ['Roteiro geral'] }); accepted++
+          const rca = rcaKey(at(row, 0)) || undefined
+          const rName = text(at(row, 1))
+          if (route.has(key)) {
+            if (rca) {
+              const existing = route.get(key)!
+              const codes = existing.rcaCodes ?? (existing.rcaCode ? [{ code: existing.rcaCode, name: existing.rcaName }] : [])
+              if (!codes.some(c => c.code === rca)) codes.push({ code: rca, name: rName })
+              existing.rcaCodes = codes
+            }
+            continue
+          }
+          const entry: Partial<CanonicalClient> = { document: key, winthorCode: text(at(row, 2)), legalName: text(at(row, 4)), tradeName: text(at(row, 5)), city: text(at(row, 6)), district: text(at(row, 7)), address: text(at(row, 8)), visitFrequency: text(at(row, 10)), visitDay: text(at(row, 13)), rcaCode: rca, rcaName: rName, sources: ['Roteiro geral'] }
+          if (rca) entry.rcaCodes = [{ code: rca, name: rName }]
+          route.set(key, entry); accepted++
         }
         audit.push({ id: `route-ok-${audit.length}`, level: 'ok', title: 'Roteiro geral reconhecido', instruction: `${accepted.toLocaleString('pt-BR')} clientes prontos para juntar.`, detail: 'Os dados de roteiro, frequência de visita e RCA foram lidos.', area: 'clientes' }); continue
       }
@@ -136,6 +149,7 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
     const merge = (input?: Partial<CanonicalClient>) => { if (!input) return; for (const [key, value] of Object.entries(input)) { if (key === 'sources') continue; if (value !== undefined && (current as Record<string, unknown>)[key] === undefined) (current as Record<string, unknown>)[key] = value }; for (const source of input.sources ?? []) if (!current.sources.includes(source)) current.sources.push(source) }
     const internalData = internal.get(document); const portfolioData = portfolio.get(document); const routeData = route.get(document); const premisesData = premises.get(document)
     merge(internalData); merge(routeData); merge(portfolioData); merge(premisesData)
+    if (routeData?.rcaCodes?.length) current.rcaCodes = routeData.rcaCodes
     if (routeData?.rcaCode) { current.rcaCode = routeData.rcaCode; current.rcaName = routeData.rcaName }
     else if (internalData?.rcaCode) { current.rcaCode = internalData.rcaCode; current.rcaName = internalData.rcaName }
     return current

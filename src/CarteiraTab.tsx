@@ -157,6 +157,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
       let lastDate = ''
       for (const m of allMovs) { const d = m.movementDate ?? ''; if (d > lastDate) lastDate = d }
       const hasCadastro = c.sources.some(s => s !== 'Pirâmide')
+      const resolvedRca = c.rcaCodes?.find(r => rcaMap.has(r.code))
       return {
         name: c.legalName ?? c.tradeName ?? c.document,
         document: c.document,
@@ -175,12 +176,12 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
         premiseAvg12m: c.premiseAverage12Months,
         lastDate,
         routed: c.sources.includes('Roteiro geral'),
-        rcaCode: c.rcaCode ?? '',
-        rcaName: c.rcaName ?? c.representative ?? '',
+        rcaCode: resolvedRca?.code ?? c.rcaCode ?? '',
+        rcaName: resolvedRca?.name ?? c.rcaName ?? c.representative ?? '',
         hasCadastro,
       }
     })
-  }, [clientBase, movsByCustomer, monthStart, monthEnd, threeMonthRange])
+  }, [clientBase, movsByCustomer, monthStart, monthEnd, threeMonthRange, rcaMap])
 
   const availableRanges = useMemo(() => [...new Set(allClients.map(c => c.range).filter(Boolean))].sort(), [allClients])
   const availableNetworks = useMemo(() => [...new Set(allClients.map(c => c.network).filter(Boolean))].sort(), [allClients])
