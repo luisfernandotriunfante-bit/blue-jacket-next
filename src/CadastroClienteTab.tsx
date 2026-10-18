@@ -432,6 +432,18 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
               </div>
 
               <div className="cad-section">
+                <h4>Diagnóstico de dados</h4>
+                <div className="cad-fields">
+                  <Field label="CNPJ busca" value={selectedRow.document} />
+                  <Field label="Código busca" value={selectedRow.code} />
+                  <Field label="Total movimentos" value={`${history.length}`} />
+                  <Field label="→ Winthor" value={`${history.filter(m => !m.sources?.includes('Histórico')).length}`} />
+                  <Field label="→ Histórico" value={`${history.filter(m => m.sources?.includes('Histórico')).length}`} highlight={history.some(m => m.sources?.includes('Histórico'))} />
+                  <Field label="Movimentos base" value={`${movementBase.length} total (${movementBase.filter(m => m.sources?.includes('Histórico')).length} histórico)`} />
+                </div>
+              </div>
+
+              <div className="cad-section">
                 <h4>Classificação</h4>
                 <div className="cad-fields">
                   <Field label="Faixa" value={selectedRow.range} />
