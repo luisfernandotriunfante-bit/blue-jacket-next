@@ -425,7 +425,7 @@ export function App() {
     const curComp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     const rows = clientBase.map(client => {
       const code = client.winthorCode ?? client.document
-      const allMovs = movsByClient.get(code) ?? movsByClient.get(client.document) ?? []
+      const allMovs = [...(movsByClient.get(code) ?? []), ...(code !== client.document ? (movsByClient.get(client.document) ?? []) : [])]
       const sales = allMovs.filter(m => m.movementType === 'venda_faturada' || m.movementType === 'devolucao')
       let totalFat = 0
       const months = new Set<string>()

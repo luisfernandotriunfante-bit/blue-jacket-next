@@ -124,7 +124,7 @@ export function PiramideTab({ clientBase, movementBase, activeComp, pexSet, onPe
   const allRows = useMemo<PiramideRow[]>(() => {
     return clientBase.map(c => {
       const code = c.winthorCode ?? c.document
-      const allMovs = movsByCustomer.get(code) ?? movsByCustomer.get(c.document) ?? []
+      const allMovs = [...(movsByCustomer.get(code) ?? []), ...(code !== c.document ? (movsByCustomer.get(c.document) ?? []) : [])]
       const movs3m = allMovs.filter(m => { const d = m.movementDate ?? ''; return d >= threeMonthRange.start && d <= threeMonthRange.end })
 
       let fatTotal3m = 0
@@ -232,7 +232,7 @@ export function PiramideTab({ clientBase, movementBase, activeComp, pexSet, onPe
 
   const history = useMemo(() => {
     if (!expanded || !selectedRow) return []
-    const movs = movsByCustomer.get(selectedRow.code) ?? movsByCustomer.get(expanded) ?? []
+    const movs = [...(movsByCustomer.get(selectedRow.code) ?? []), ...(selectedRow.code !== expanded ? (movsByCustomer.get(expanded) ?? []) : [])]
     return [...movs].sort((a, b) => (b.movementDate ?? '').localeCompare(a.movementDate ?? ''))
   }, [expanded, selectedRow, movsByCustomer])
 
