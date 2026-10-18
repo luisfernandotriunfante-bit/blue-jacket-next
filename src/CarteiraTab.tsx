@@ -64,9 +64,9 @@ interface ClientRow {
   fat: number
   fat3m: number
   avg3m: number
-  fatTotal: number
-  avgMensal: number
-  mesesComDados: number
+  fatAno: number
+  mesesAno: number
+  avgAnual: number
   premiseAvg12m: number | undefined
   lastDate: string
   routed: boolean
@@ -141,6 +141,11 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
     return { start, end: monthEnd }
   }, [y, mo, monthEnd])
 
+  const yearRange = useMemo(() => {
+    const start = `${y}-01-01`
+    return { start, end: monthEnd }
+  }, [y, monthEnd])
+
   const allClients = useMemo<ClientRow[]>(() => {
     return clientBase.map(c => {
       const code = c.winthorCode ?? c.document
@@ -157,16 +162,17 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
         if (m.movementType === 'venda_faturada') fat3m += m.value ?? 0
         else if (m.movementType === 'devolucao') fat3m -= m.value ?? 0
       }
+      const movsAno = allMovs.filter(m => { const d = m.movementDate ?? ''; return d >= yearRange.start && d <= yearRange.end })
+      let fatAno = 0
       let lastDate = ''
-      let fatTotal = 0
-      const activeMonths = new Set<string>()
-      for (const m of allMovs) {
+      const mesesAnoSet = new Set<string>()
+      for (const m of movsAno) {
         const d = m.movementDate ?? ''
         if (d > lastDate) lastDate = d
-        if (m.movementType === 'venda_faturada') { fatTotal += m.value ?? 0; if (d) activeMonths.add(d.slice(0, 7)) }
-        else if (m.movementType === 'devolucao') fatTotal -= m.value ?? 0
+        if (m.movementType === 'venda_faturada') { fatAno += m.value ?? 0; if (d) mesesAnoSet.add(d.slice(0, 7)) }
+        else if (m.movementType === 'devolucao') fatAno -= m.value ?? 0
       }
-      const mesesComDados = activeMonths.size || 1
+      const nMesesAno = mesesAnoSet.size || 1
       const hasCadastro = c.sources.some(s => s !== 'Pirâmide')
       const resolvedRca = c.rcaCodes?.find(r => rcaMap.has(r.code))
       return {
@@ -184,9 +190,9 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
         fat,
         fat3m,
         avg3m: fat3m / 3,
-        fatTotal,
-        avgMensal: fatTotal / mesesComDados,
-        mesesComDados: activeMonths.size,
+        fatAno,
+        mesesAno: mesesAnoSet.size,
+        avgAnual: fatAno / nMesesAno,
         premiseAvg12m: c.premiseAverage12Months,
         lastDate,
         routed: c.sources.includes('Roteiro geral'),
@@ -195,7 +201,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
         hasCadastro,
       }
     })
-  }, [clientBase, movsByCustomer, monthStart, monthEnd, threeMonthRange, rcaMap])
+  }, [clientBase, movsByCustomer, monthStart, monthEnd, threeMonthRange, yearRange, rcaMap])
 
   const availableRanges = useMemo(() => [...new Set(allClients.map(c => c.range).filter(Boolean))].sort(), [allClients])
   const availableNetworks = useMemo(() => [...new Set(allClients.map(c => c.network).filter(Boolean))].sort(), [allClients])
@@ -351,13 +357,13 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
   }, [])
 
   const downloadReport = useCallback(() => {
-    const rows: string[][] = [['Cliente', 'CNPJ', 'Cidade', 'Canal', 'Faixa', 'Rede', 'Vendedor Atribuído', 'Cód. Vendedor', 'Supervisor', 'Fat. Mês Atual', 'Fat. 3m Interno', 'Média 3m Interno', 'Média Mensal Interno', 'Meses c/ Dados', 'Colgate Mercado 3m']]
+    const rows: string[][] = [['Cliente', 'CNPJ', 'Cidade', 'Canal', 'Faixa', 'Rede', 'Vendedor Atribuído', 'Cód. Vendedor', 'Supervisor', 'Fat. Mês Atual', 'Fat. 3m Interno', 'Média Anual', 'Meses c/ Dados', 'Colgate Mercado 3m']]
     for (const [ck, clients] of Object.entries(activeData)) {
       for (const c of clients) {
         const selCode = assignments[c.document]
         if (!selCode) continue
         const seller = sellers.find(s => s.code === selCode)
-        rows.push([c.name, c.document, msGeo[ck]?.n ?? ck, c.channel, c.range, c.network, seller?.name ?? '', selCode, seller?.supervisor ?? '', c.fat.toFixed(2), c.fat3m.toFixed(2), c.avg3m.toFixed(2), c.avgMensal.toFixed(2), String(c.mesesComDados), c.premiseAvg12m != null ? c.premiseAvg12m.toFixed(2) : ''])
+        rows.push([c.name, c.document, msGeo[ck]?.n ?? ck, c.channel, c.range, c.network, seller?.name ?? '', selCode, seller?.supervisor ?? '', c.fat.toFixed(2), c.fat3m.toFixed(2), c.avgAnual.toFixed(2), String(c.mesesAno), c.premiseAvg12m != null ? c.premiseAvg12m.toFixed(2) : ''])
       }
     }
     if (rows.length <= 1) return
