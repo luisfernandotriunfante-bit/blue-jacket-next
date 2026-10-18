@@ -66,6 +66,9 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
   const [lncSearch, setLncSearch] = useState('')
   const [lncFilter, setLncFilter] = useState<'all' | 'launch' | 'pex'>('all')
   const [lncStatus, setLncStatus] = useState<StockFilter>('all')
+  const [showLncImport, setShowLncImport] = useState(false)
+  const [lncImportText, setLncImportText] = useState('')
+  const [lncImportType, setLncImportType] = useState<'launch' | 'pex'>('launch')
   const [notaPrev, setNotaPrev] = useState<Record<string, string>>(() => {
     try { return JSON.parse(localStorage.getItem('rj-nota-prev') ?? '{}') } catch { return {} }
   })
@@ -415,6 +418,31 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
       const prev = cur[id] ?? {}
       return { ...cur, [id]: { ...prev, [key]: !prev[key] } }
     })
+  }
+
+  function importTags(text: string, key: 'launch' | 'pex') {
+    const codes = text.split(/[\n,;\t]+/).map(s => s.trim()).filter(Boolean)
+    if (!codes.length) return
+    const byEan = new Map<string, string>()
+    const byInternal = new Map<string, string>()
+    const byMfr = new Map<string, string>()
+    for (const p of productBase) {
+      if (p.ean) byEan.set(p.ean, p.id)
+      if (p.internalCode) byInternal.set(p.internalCode, p.id)
+      if (p.manufacturerCode) byMfr.set(p.manufacturerCode, p.id)
+    }
+    const matched = new Set<string>()
+    for (const code of codes) {
+      const id = byEan.get(code) ?? byInternal.get(code) ?? byMfr.get(code)
+      if (id) matched.add(id)
+    }
+    if (!matched.size) return 0
+    setTags(cur => {
+      const next = { ...cur }
+      for (const id of matched) next[id] = { ...next[id], [key]: true }
+      return next
+    })
+    return matched.size
   }
 
   function toggleExpanded(key: string) {
@@ -918,7 +946,41 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                   value={lncSearch}
                   onChange={e => setLncSearch(e.target.value)}
                 />
+                <button
+                  type="button"
+                  className="pf-select"
+                  style={{ minWidth: 'auto', padding: '0 14px', cursor: 'pointer', background: showLncImport ? 'var(--red)' : undefined, color: showLncImport ? '#fff' : undefined, border: showLncImport ? '1px solid var(--red)' : undefined }}
+                  onClick={() => setShowLncImport(v => !v)}
+                >
+                  {showLncImport ? 'Fechar' : 'Importar'}
+                </button>
               </div>
+              {showLncImport && (
+                <div className="cad-upload-area">
+                  <textarea
+                    className="cad-upload-textarea"
+                    placeholder="Cole aqui os códigos dos produtos (EAN, código interno ou código fabricante — um por linha, separados por vírgula ou ponto-e-vírgula)…"
+                    value={lncImportText}
+                    onChange={e => setLncImportText(e.target.value)}
+                    rows={4}
+                  />
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <select className="pf-select" style={{ minWidth: 'auto', padding: '4px 10px' }} value={lncImportType} onChange={e => setLncImportType(e.target.value as 'launch' | 'pex')}>
+                      <option value="launch">Lançamento</option>
+                      <option value="pex">PEX</option>
+                    </select>
+                    <button type="button" className="cad-pex-btn" onClick={() => {
+                      const n = importTags(lncImportText, lncImportType)
+                      if (n) { setLncImportText(''); setShowLncImport(false) }
+                    }}>Marcar produtos</button>
+                    <small style={{ color: 'var(--muted)' }}>
+                      {lncCounts.launch > 0 && <span>{lncCounts.launch} lançamento{lncCounts.launch !== 1 ? 's' : ''}</span>}
+                      {lncCounts.launch > 0 && lncCounts.pex > 0 && ' · '}
+                      {lncCounts.pex > 0 && <span>{lncCounts.pex} PEX</span>}
+                    </small>
+                  </div>
+                </div>
+              )}
               <div className="pf-filters-row">
                 <FilterDrop
                   label="Situação"

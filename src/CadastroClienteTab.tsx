@@ -55,10 +55,12 @@ interface CadastroRow {
   purchasedEveryMonth: boolean
 }
 
-export function CadastroClienteTab({ clientBase, movementBase, activeComp }: {
+export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSet, onPexChange }: {
   clientBase: CanonicalClient[]
   movementBase: CanonicalMovement[]
   activeComp: string
+  pexSet: Set<string>
+  onPexChange: (s: Set<string>) => void
 }) {
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -67,7 +69,6 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp }: {
   const [filterNetwork, setFilterNetwork] = useState<string[]>([])
   const [filterRouted, setFilterRouted] = useState<string[]>([])
   const [openFilter, setOpenFilter] = useState<string | null>(null)
-  const [pexSet, setPexSet] = useState<Set<string>>(new Set())
   const [pexText, setPexText] = useState('')
   const [showPexUpload, setShowPexUpload] = useState(false)
 
@@ -214,14 +215,16 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp }: {
   const handlePexUpload = useCallback(() => {
     const docs = pexText.split(/[\n,;]+/).map(s => s.replace(/\D/g, '')).filter(d => d.length === 11 || d.length === 14)
     if (!docs.length) return
-    setPexSet(prev => { const next = new Set(prev); for (const d of docs) next.add(d); return next })
+    const next = new Set(pexSet); for (const d of docs) next.add(d)
+    onPexChange(next)
     setPexText('')
     setShowPexUpload(false)
-  }, [pexText])
+  }, [pexText, pexSet, onPexChange])
 
   const togglePex = useCallback((doc: string) => {
-    setPexSet(prev => { const next = new Set(prev); if (next.has(doc)) next.delete(doc); else next.add(doc); return next })
-  }, [])
+    const next = new Set(pexSet); if (next.has(doc)) next.delete(doc); else next.add(doc)
+    onPexChange(next)
+  }, [pexSet, onPexChange])
 
   const selectedRow = useMemo(() => expanded ? rows.find(r => r.document === expanded) : undefined, [expanded, rows])
 
@@ -264,7 +267,7 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp }: {
             <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
               <button type="button" className="cad-pex-btn" onClick={handlePexUpload}>Marcar como PEX</button>
               {pexSet.size > 0 && <small style={{ color: 'var(--muted)' }}>{pexSet.size} cliente{pexSet.size !== 1 ? 's' : ''} marcado{pexSet.size !== 1 ? 's' : ''} como PEX</small>}
-              {pexSet.size > 0 && <button type="button" className="cad-pex-clear" onClick={() => setPexSet(new Set())}>Limpar PEX</button>}
+              {pexSet.size > 0 && <button type="button" className="cad-pex-clear" onClick={() => onPexChange(new Set())}>Limpar PEX</button>}
             </div>
           </div>
         )}
