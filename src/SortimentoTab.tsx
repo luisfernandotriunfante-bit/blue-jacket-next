@@ -120,28 +120,29 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
 
   const resolveChannel = (client: CanonicalClient): string => {
     const ct = (client.channelType ?? '').trim()
-    const faixa = (client.premiseRange ?? '').trim()
-    if (availableSortChannels.length === 0) return ct
+    const rawFaixa = (client.premiseRange ?? '').trim()
+    const faixaNum = rawFaixa.replace(/\D/g, '')
+    if (availableSortChannels.length === 0) return ''
     const ctLow = ct.toLowerCase()
     const exact = availableSortChannels.find(ch => ch.toLowerCase() === ctLow)
     if (exact) return exact
+    const partial = availableSortChannels.find(ch => ctLow && ch.toLowerCase().includes(ctLow))
+    if (partial) return partial
     const FAIXA_MAP: Record<string, string[]> = {
       '1': ['hiper'],
       '2': ['super g', 'superg'],
       '3': ['super p', 'superp'],
-      '4': ['clubs', 'c&c'],
-      '5': ['drogaria', 'farma'],
+      '4': ['clubs', 'c&c', 'vizinhanca'],
+      '5': ['drogaria', 'farma', 'vizinhanca'],
     }
-    const candidates = FAIXA_MAP[faixa]
+    const candidates = FAIXA_MAP[faixaNum]
     if (candidates) {
       for (const cand of candidates) {
         const match = availableSortChannels.find(ch => ch.toLowerCase().startsWith(cand))
         if (match) return match
       }
     }
-    const firstCh = availableSortChannels[0]
-    if (firstCh) return firstCh
-    return ct
+    return ''
   }
 
   const detectedChannel = useMemo(() => {
@@ -384,7 +385,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
                   <span className="sort-dropdown-name">{c.tradeName ?? c.legalName ?? c.document}</span>
                   <span className="sort-dropdown-meta">
                     <code>{c.document}</code>
-                    {faixa && <span className="cad-badge-range">Faixa {faixa}</span>}
+                    {faixa && <span className="cad-badge-range">{/faixa/i.test(faixa) ? faixa : `Faixa ${faixa}`}</span>}
                     {ch && <span style={{ color: 'var(--blue)', fontSize: 11 }}>{ch}</span>}
                     {c.city && <span style={{ color: 'var(--muted)', fontSize: 11 }}>{c.city}</span>}
                   </span>
@@ -423,7 +424,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <strong>{selectedClient.tradeName ?? selectedClient.legalName ?? selectedClient.document}</strong>
               <span style={{ color: 'var(--muted)', fontSize: 12 }}>{selectedClient.document}</span>
-              {selectedClient.premiseRange && <span className="cad-badge-range">Faixa {selectedClient.premiseRange}</span>}
+              {selectedClient.premiseRange && <span className="cad-badge-range">{/faixa/i.test(selectedClient.premiseRange) ? selectedClient.premiseRange : `Faixa ${selectedClient.premiseRange}`}</span>}
               {detectedChannel && <span className="sort-channel-badge">{detectedChannel}</span>}
               {selectedClient.premiseNetwork && <span style={{ color: 'var(--blue)', fontSize: 11 }}>Rede: {selectedClient.premiseNetwork}</span>}
               {pexSet.has(selectedClient.document) && <span className="badge-pex">PEX</span>}
@@ -597,7 +598,11 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
       {hasSelection && !detectedChannel && (
         <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>
           <p>Não foi possível detectar o canal do sortimento para este cliente.</p>
-          <p style={{ fontSize: 12, marginTop: 8 }}>Verifique se o arquivo de premissas (exportação PDVs) foi carregado com a faixa do cliente.</p>
+          <p style={{ fontSize: 12, marginTop: 8 }}>
+            {availableSortChannels.length > 0
+              ? `Canais disponíveis no sortimento: ${availableSortChannels.join(', ')}. A faixa do cliente (${viewMode === 'cnpj' ? selectedClient?.premiseRange ?? '—' : '—'}) não correspondeu a nenhum.`
+              : 'Verifique se o arquivo de sortimento com canais foi carregado.'}
+          </p>
         </div>
       )}
 
