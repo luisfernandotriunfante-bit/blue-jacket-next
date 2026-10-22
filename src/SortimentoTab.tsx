@@ -110,15 +110,49 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
     return redeMap.get(selectedRede) ?? []
   }, [redeMap, selectedRede, viewMode])
 
+  const availableSortChannels = useMemo(() => {
+    const chSet = new Set<string>()
+    for (const p of productBase) {
+      if (p.sortimentChannels) for (const ch of Object.keys(p.sortimentChannels)) chSet.add(ch)
+    }
+    return [...chSet]
+  }, [productBase])
+
+  const resolveChannel = (client: CanonicalClient): string => {
+    const ct = (client.channelType ?? '').trim()
+    const faixa = (client.premiseRange ?? '').trim()
+    if (availableSortChannels.length === 0) return ct
+    const ctLow = ct.toLowerCase()
+    const exact = availableSortChannels.find(ch => ch.toLowerCase() === ctLow)
+    if (exact) return exact
+    const FAIXA_MAP: Record<string, string[]> = {
+      '1': ['hiper'],
+      '2': ['super g', 'superg'],
+      '3': ['super p', 'superp'],
+      '4': ['clubs', 'c&c'],
+      '5': ['drogaria', 'farma'],
+    }
+    const candidates = FAIXA_MAP[faixa]
+    if (candidates) {
+      for (const cand of candidates) {
+        const match = availableSortChannels.find(ch => ch.toLowerCase().startsWith(cand))
+        if (match) return match
+      }
+    }
+    const firstCh = availableSortChannels[0]
+    if (firstCh) return firstCh
+    return ct
+  }
+
   const detectedChannel = useMemo(() => {
     if (viewMode === 'cnpj') {
       if (!selectedClient) return ''
-      return selectedClient.channelType ?? ''
+      return resolveChannel(selectedClient)
     }
     if (selectedRedeClients.length === 0) return ''
     const channels = new Map<string, number>()
     for (const c of selectedRedeClients) {
-      const ch = c.channelType ?? ''
+      const ch = resolveChannel(c)
       if (ch) channels.set(ch, (channels.get(ch) ?? 0) + 1)
     }
     let topChannel = ''
@@ -127,7 +161,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
       if (count > topCount) { topChannel = ch; topCount = count }
     }
     return topChannel
-  }, [selectedClient, selectedRedeClients, viewMode])
+  }, [selectedClient, selectedRedeClients, viewMode, availableSortChannels])
 
   const hasSelection = viewMode === 'cnpj' ? !!selectedClient : selectedRedeClients.length > 0
 
@@ -336,7 +370,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
             {clientResults.length === 0 && <p className="sort-empty">Nenhum cliente encontrado.</p>}
             {clientResults.map(c => {
               const faixa = c.premiseRange ?? ''
-              const ch = c.channelType ?? ''
+              const ch = resolveChannel(c)
               return (
                 <button
                   key={c.document}
