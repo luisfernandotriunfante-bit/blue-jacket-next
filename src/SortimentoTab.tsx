@@ -11,14 +11,6 @@ const kpiCurrency = (n: number) => {
 }
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`
 
-const FAIXA_CHANNEL_MAP: Record<string, string> = {
-  '1': 'Hiper',
-  '2': 'Super G',
-  '3': 'Super P',
-  '4': 'Vizinhança GDE',
-  '5': 'Vizinhança PEQ',
-  '6': 'Tradicional Independente',
-}
 
 type Classification = 'Mandatório' | 'Importante' | 'Fora do sortimento'
 
@@ -121,21 +113,20 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
   const detectedChannel = useMemo(() => {
     if (viewMode === 'cnpj') {
       if (!selectedClient) return ''
-      const faixa = selectedClient.premiseRange ?? ''
-      return FAIXA_CHANNEL_MAP[faixa] ?? ''
+      return selectedClient.channelType ?? ''
     }
     if (selectedRedeClients.length === 0) return ''
-    const faixas = new Map<string, number>()
+    const channels = new Map<string, number>()
     for (const c of selectedRedeClients) {
-      const f = c.premiseRange ?? ''
-      if (f) faixas.set(f, (faixas.get(f) ?? 0) + 1)
+      const ch = c.channelType ?? ''
+      if (ch) channels.set(ch, (channels.get(ch) ?? 0) + 1)
     }
-    let topFaixa = ''
+    let topChannel = ''
     let topCount = 0
-    for (const [f, count] of faixas) {
-      if (count > topCount) { topFaixa = f; topCount = count }
+    for (const [ch, count] of channels) {
+      if (count > topCount) { topChannel = ch; topCount = count }
     }
-    return FAIXA_CHANNEL_MAP[topFaixa] ?? ''
+    return topChannel
   }, [selectedClient, selectedRedeClients, viewMode])
 
   const hasSelection = viewMode === 'cnpj' ? !!selectedClient : selectedRedeClients.length > 0
@@ -345,7 +336,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
             {clientResults.length === 0 && <p className="sort-empty">Nenhum cliente encontrado.</p>}
             {clientResults.map(c => {
               const faixa = c.premiseRange ?? ''
-              const ch = FAIXA_CHANNEL_MAP[faixa] ?? ''
+              const ch = c.channelType ?? ''
               return (
                 <button
                   key={c.document}
