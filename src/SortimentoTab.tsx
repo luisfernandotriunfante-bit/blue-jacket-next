@@ -380,22 +380,6 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
     })
   }, [analysis, filterClass, filterStatus, sortBy])
 
-  const subcategoryGroups = useMemo(() => {
-    const groups = new Map<string, { total: number; purchased: number; mandTotal: number; mandPurchased: number; value: number }>()
-    if (!analysis) return []
-    for (const item of analysis.items.filter(i => i.recommended)) {
-      const key = item.subcategory || 'Sem categoria'
-      const g = groups.get(key) ?? { total: 0, purchased: 0, mandTotal: 0, mandPurchased: 0, value: 0 }
-      g.total++
-      if (item.classification === 'Mandatório') { g.mandTotal++; if (item.purchased) g.mandPurchased++ }
-      if (item.purchased) { g.purchased++; g.value += item.value }
-      groups.set(key, g)
-    }
-    return [...groups.entries()]
-      .map(([name, g]) => ({ name, ...g, coverage: g.total > 0 ? g.purchased / g.total : 0, mandCoverage: g.mandTotal > 0 ? g.mandPurchased / g.mandTotal : 0 }))
-      .sort((a, b) => b.total - a.total)
-  }, [analysis])
-
   const clientCards = useMemo(() => {
     if (hasSelection || viewMode !== 'cnpj') return []
     const cardQ = q.length >= 2 ? q : ''
@@ -508,67 +492,71 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
 
       {analysis && detectedChannel && (
         <>
-          <div className="sort-kpi-grid">
-            <div className="sort-kpi">
-              <span className="sort-kpi-label">Assortment</span>
-              <span className="sort-kpi-value" style={{ color: analysis.assortment >= 0.5 ? '#4caf50' : analysis.assortment >= 0.25 ? '#ff9800' : '#ef5350' }}>
-                {pct(analysis.assortment)}
-              </span>
-              <span className="sort-kpi-detail">{analysis.skusComprados} de {analysis.skusRecom} SKUs</span>
-            </div>
-            <div className="sort-kpi">
-              <span className="sort-kpi-label">Cobertura Mandatório</span>
-              <span className="sort-kpi-value" style={{ color: analysis.cobMand >= 0.5 ? '#4caf50' : analysis.cobMand >= 0.25 ? '#ff9800' : '#ef5350' }}>
-                {pct(analysis.cobMand)}
-              </span>
-              <span className="sort-kpi-detail">{analysis.mandComprados} de {analysis.mandDisp}</span>
-            </div>
-            <div className="sort-kpi">
-              <span className="sort-kpi-label">Cobertura Importante</span>
-              <span className="sort-kpi-value" style={{ color: analysis.cobImp >= 0.5 ? '#4caf50' : analysis.cobImp >= 0.25 ? '#ff9800' : '#ef5350' }}>
-                {pct(analysis.cobImp)}
-              </span>
-              <span className="sort-kpi-detail">{analysis.impComprados} de {analysis.impDisp}</span>
-            </div>
-            <div className="sort-kpi">
-              <span className="sort-kpi-label">Valor no Sortimento</span>
-              <span className="sort-kpi-value c-blue">{kpiCurrency(analysis.valorTotal)}</span>
-            </div>
-            <div className="sort-kpi">
-              <span className="sort-kpi-label">Fora do Sortimento</span>
-              <span className="sort-kpi-value" style={{ color: '#ff9800' }}>{kpiCurrency(analysis.valorForaSortimento)}</span>
-              <span className="sort-kpi-detail">{analysis.skusFora} SKUs</span>
-            </div>
-            {viewMode === 'rede' && (
-              <div className="sort-kpi">
-                <span className="sort-kpi-label">Lojas com Compra</span>
-                <span className="sort-kpi-value c-blue">{analysis.storesWithPurchase}</span>
-                <span className="sort-kpi-detail">de {analysis.totalStores} loja{analysis.totalStores !== 1 ? 's' : ''}</span>
+          <div className="sort-hero-row">
+            <div className="sort-donut-block">
+              <div className="donut-svg-wrap">
+                <svg viewBox="0 0 120 120">
+                  <circle cx="60" cy="60" r="52" fill="none" stroke="var(--border)" strokeWidth="12" />
+                  <circle cx="60" cy="60" r="52" fill="none" stroke={analysis.assortment >= 0.5 ? '#4caf50' : analysis.assortment >= 0.25 ? '#ff9800' : '#ef5350'} strokeWidth="12" strokeLinecap="round" strokeDasharray={`${analysis.assortment * 326.73} ${326.73 - analysis.assortment * 326.73}`} strokeDashoffset="81.68" transform="rotate(-90 60 60)" />
+                </svg>
+                <div className="donut-center">
+                  <span className="donut-center-val" style={{ color: analysis.assortment >= 0.5 ? '#4caf50' : analysis.assortment >= 0.25 ? '#ff9800' : '#ef5350' }}>{pct(analysis.assortment)}</span>
+                  <span className="donut-center-label">Assortment</span>
+                </div>
               </div>
-            )}
-          </div>
+              <div className="donut-legend">
+                <div className="donut-leg-item">
+                  <span className="donut-leg-dot" style={{ background: '#4caf50' }} />
+                  <span className="donut-leg-label">Comprados</span>
+                  <span className="donut-leg-val">{analysis.skusComprados}</span>
+                </div>
+                <div className="donut-leg-item">
+                  <span className="donut-leg-dot" style={{ background: 'var(--border)' }} />
+                  <span className="donut-leg-label">Total SKUs</span>
+                  <span className="donut-leg-val">{analysis.skusRecom}</span>
+                </div>
+              </div>
+            </div>
 
-          {subcategoryGroups.length > 0 && (
-            <div className="sort-subcat-section">
-              <h4 style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', margin: '0 0 8px', textTransform: 'uppercase' }}>Cobertura por Subcategoria</h4>
-              <div className="sort-subcat-grid">
-                {subcategoryGroups.map(g => (
-                  <div key={g.name} className="sort-subcat-item">
-                    <div className="sort-subcat-bar">
-                      <div className="sort-subcat-fill" style={{ width: `${Math.max(2, g.coverage * 100)}%`, background: g.coverage >= 0.5 ? '#4caf50' : g.coverage >= 0.25 ? '#ff9800' : '#ef5350' }} />
-                    </div>
-                    <div className="sort-subcat-info">
-                      <span className="sort-subcat-name">{g.name}</span>
-                      <span className="sort-subcat-nums">
-                        {g.purchased}/{g.total} · {pct(g.coverage)}
-                        {g.mandTotal > 0 && <span style={{ color: 'var(--muted)', marginLeft: 4 }}>(mand: {g.mandPurchased}/{g.mandTotal})</span>}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+            <div className="stock-kpis" style={{ flex: 1 }}>
+              <div className="kpi-card">
+                <div className="kpi-card-body">
+                  <div className="kpi-label">Mandatório</div>
+                  <div className="kpi-val" style={{ color: analysis.cobMand >= 0.5 ? '#4caf50' : analysis.cobMand >= 0.25 ? '#ff9800' : '#ef5350' }}>{pct(analysis.cobMand)}</div>
+                  <div className="kpi-sub">{analysis.mandComprados} de {analysis.mandDisp}</div>
+                </div>
               </div>
+              <div className="kpi-card">
+                <div className="kpi-card-body">
+                  <div className="kpi-label">Importante</div>
+                  <div className="kpi-val" style={{ color: analysis.cobImp >= 0.5 ? '#4caf50' : analysis.cobImp >= 0.25 ? '#ff9800' : '#ef5350' }}>{pct(analysis.cobImp)}</div>
+                  <div className="kpi-sub">{analysis.impComprados} de {analysis.impDisp}</div>
+                </div>
+              </div>
+              <div className="kpi-card kpi-blue">
+                <div className="kpi-card-body">
+                  <div className="kpi-label">Valor Sortimento</div>
+                  <div className="kpi-val">{kpiCurrency(analysis.valorTotal)}</div>
+                </div>
+              </div>
+              <div className="kpi-card">
+                <div className="kpi-card-body">
+                  <div className="kpi-label">Fora Sortimento</div>
+                  <div className="kpi-val" style={{ color: '#ff9800' }}>{kpiCurrency(analysis.valorForaSortimento)}</div>
+                  <div className="kpi-sub">{analysis.skusFora} SKUs</div>
+                </div>
+              </div>
+              {viewMode === 'rede' && (
+                <div className="kpi-card kpi-blue">
+                  <div className="kpi-card-body">
+                    <div className="kpi-label">Lojas com Compra</div>
+                    <div className="kpi-val">{analysis.storesWithPurchase}/{analysis.totalStores}</div>
+                    <div className="kpi-sub">{pct(analysis.totalStores > 0 ? analysis.storesWithPurchase / analysis.totalStores : 0)}</div>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+          </div>
 
           <div className="sort-filters">
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -596,23 +584,24 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
           </div>
 
           <div className="sort-product-list">
-            <div className="sort-product-head">
+            <div className={`sort-product-head${viewMode === 'rede' ? ' sort-head-rede' : ''}`}>
               <span>Produto</span>
+              <span className="sc-num">Subcategoria</span>
               <span className="sc-num">Classificação</span>
               {viewMode === 'rede' && <span className="sc-num">Penetração</span>}
               <span className="sc-num">Status</span>
               <span className="sc-num">Valor</span>
             </div>
             {filteredItems.map(item => (
-              <div key={item.code} className={`sort-product-row${item.purchased ? '' : ' sort-missing'}`}>
+              <div key={item.code} className={`sort-product-row${item.purchased ? '' : ' sort-missing'}${viewMode === 'rede' ? ' sort-row-rede' : ''}`}>
                 <span className="sc-desc">
                   <span className="p-name">{item.description}</span>
                   <span className="p-meta">
                     <code>{item.code}</code>
-                    {item.subcategory && <span>{item.subcategory}</span>}
                     {item.brand && <span style={{ color: 'var(--muted)' }}>{item.brand}</span>}
                   </span>
                 </span>
+                <span className="sc-num" style={{ fontSize: 11 }}>{item.subcategory || '—'}</span>
                 <span className="sc-num">
                   {item.classification === 'Mandatório' && <span className="sort-class-badge sort-mand">Mand.</span>}
                   {item.classification === 'Importante' && <span className="sort-class-badge sort-imp">Import.</span>}
