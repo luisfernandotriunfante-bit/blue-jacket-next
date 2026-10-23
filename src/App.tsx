@@ -75,7 +75,7 @@ export function App() {
     const unsub = onSyncStatus(setCloudStatus)
     setOnSaveHook(schedulePush)
 
-    const lsEvents = ['rj-competencias-changed', 'rj-active-comp-changed', 'rj-markup-changed', 'rj-covdays-changed', 'rj-sellout-meta-changed', 'rj-positiv-meta-changed', 'rj-rcas-changed']
+    const lsEvents = ['rj-competencias-changed', 'rj-active-comp-changed', 'rj-markup-changed', 'rj-covdays-changed', 'rj-sellout-meta-changed', 'rj-positiv-meta-changed', 'rj-rcas-changed', 'rj-tags-changed']
     lsEvents.forEach(e => window.addEventListener(e, schedulePush))
 
     const bumpSync = () => {
