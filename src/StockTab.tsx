@@ -7,9 +7,12 @@ import { computeAbcMap } from './domain/movementMotor'
 import { resolveCommercialLine, COMMERCIAL_LINES } from './domain/productGrouping'
 import type { CommercialLine } from './domain/productGrouping'
 
-type ProductTag = { launch?: boolean; pex?: boolean }
+type ProductTag = { launch?: boolean; pex?: boolean; pexTheme?: string }
 type Tags = Record<string, ProductTag>
 type StockFilter = 'all' | 'com_estoque' | 'sem_estoque' | 'em_transito'
+
+const PEX_THEMES = ['1.1','1.2','1.3','1.4','1.5','2.1','2.2','2.3','2.4','2.5','3.1','3.2','3.3','3.4','3.5','3.6'] as const
+const PEX_LAUNCH_THEME = '3.5'
 
 const norm = (v: unknown) => String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
 
@@ -68,9 +71,12 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
   const [lncStatus, setLncStatus] = useState<StockFilter>('all')
   const [showLncImport, setShowLncImport] = useState(false)
   const [lncImportText, setLncImportText] = useState('')
-  const [lncImportType, setLncImportType] = useState<'launch' | 'pex' | 'pex_launch'>('launch')
-  const [lncPendingItems, setLncPendingItems] = useState<Array<{id: string; desc: string; code: string; tag: 'launch' | 'pex' | 'pex_launch'}>>([])
-  const [lncBatchTag, setLncBatchTag] = useState<'launch' | 'pex' | 'pex_launch'>('pex')
+  const [lncImportMode, setLncImportMode] = useState<'launch' | 'pex'>('pex')
+  const [lncImportTheme, setLncImportTheme] = useState<string>(PEX_THEMES[0])
+  const [lncPendingItems, setLncPendingItems] = useState<Array<{id: string; desc: string; code: string; mode: 'launch' | 'pex'; theme: string}>>([])
+  const [lncBatchMode, setLncBatchMode] = useState<'launch' | 'pex'>('pex')
+  const [lncBatchTheme, setLncBatchTheme] = useState<string>(PEX_THEMES[0])
+  const [lncFilterTheme, setLncFilterTheme] = useState<string>('all')
   const [notaPrev, setNotaPrev] = useState<Record<string, string>>(() => {
     try { return JSON.parse(localStorage.getItem('rj-nota-prev') ?? '{}') } catch { return {} }
   })
@@ -352,6 +358,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
       if (lncFilter === 'launch' && !isLaunch) return false
       if (lncFilter === 'pex' && !isPex) return false
       if (lncFilter === 'pex_launch' && !(isLaunch && isPex)) return false
+      if (lncFilterTheme !== 'all' && (t?.pexTheme ?? '') !== lncFilterTheme) return false
       if (lncStatus === 'com_estoque' && (p.availableStock ?? 0) <= 0) return false
       if (lncStatus === 'sem_estoque' && (p.availableStock ?? 0) > 0) return false
       if (lncStatus === 'em_transito' && (p.inTransitQuantity ?? 0) <= 0) return false
@@ -370,10 +377,11 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
       }
       return true
     })
-  }, [productBase, tags, lncSearch, lncFilter, lncStatus])
+  }, [productBase, tags, lncSearch, lncFilter, lncFilterTheme, lncStatus])
 
   const lncCounts = useMemo(() => {
     let launch = 0, pex = 0, pexLaunch = 0, total = 0
+    const byTheme: Record<string, number> = {}
     for (const p of productBase) {
       const t = tags[p.id]
       const isL = !!t?.launch, isP = !!t?.pex
@@ -382,8 +390,9 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
       if (isL && isP) pexLaunch++
       else if (isL) launch++
       else pex++
+      if (isP && t?.pexTheme) byTheme[t.pexTheme] = (byTheme[t.pexTheme] ?? 0) + 1
     }
-    return { launch, pex, pexLaunch, total }
+    return { launch, pex, pexLaunch, total, byTheme }
   }, [productBase, tags])
 
   const receivedInvoices = useMemo(() => receiptGroups.receivedGroups, [receiptGroups])
@@ -424,11 +433,13 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
   function toggleTag(id: string, key: 'launch' | 'pex') {
     setTags(cur => {
       const prev = cur[id] ?? {}
-      return { ...cur, [id]: { ...prev, [key]: !prev[key] } }
+      const next = { ...prev, [key]: !prev[key] }
+      if (key === 'pex' && !next.pex) { delete next.pexTheme }
+      return { ...cur, [id]: next }
     })
   }
 
-  function importTags(text: string, key: 'launch' | 'pex' | 'pex_launch') {
+  function importTagsBatch(text: string, mode: 'launch' | 'pex', theme: string) {
     const codes = text.split(/[\n,;\t]+/).map(s => s.trim()).filter(Boolean)
     if (!codes.length) return
     const byEan = new Map<string, string>()
@@ -448,8 +459,12 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
     setTags(cur => {
       const next = { ...cur }
       for (const id of matched) {
-        if (key === 'pex_launch') next[id] = { ...next[id], launch: true, pex: true }
-        else next[id] = { ...next[id], [key]: true }
+        if (mode === 'pex') {
+          const isLaunchTheme = theme === PEX_LAUNCH_THEME
+          next[id] = { ...next[id], pex: true, pexTheme: theme, ...(isLaunchTheme ? { launch: true } : {}) }
+        } else {
+          next[id] = { ...next[id], launch: true }
+        }
       }
       return next
     })
@@ -468,12 +483,12 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
       if (p.manufacturerCode) byMfr.set(p.manufacturerCode, p)
     }
     const seen = new Set<string>()
-    const result: Array<{id: string; desc: string; code: string; tag: 'launch' | 'pex' | 'pex_launch'}> = []
+    const result: Array<{id: string; desc: string; code: string; mode: 'launch' | 'pex'; theme: string}> = []
     for (const code of codes) {
       const p = byEan.get(code) ?? byInternal.get(code) ?? byMfr.get(code)
       if (p && !seen.has(p.id)) {
         seen.add(p.id)
-        result.push({ id: p.id, desc: p.description ?? p.internalCode ?? code, code, tag: lncBatchTag })
+        result.push({ id: p.id, desc: p.description ?? p.internalCode ?? code, code, mode: lncImportMode, theme: lncImportTheme })
       }
     }
     return result
@@ -484,15 +499,26 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
     setTags(cur => {
       const next = { ...cur }
       for (const item of lncPendingItems) {
-        if (item.tag === 'pex_launch') next[item.id] = { ...next[item.id], launch: true, pex: true }
-        else if (item.tag === 'launch') next[item.id] = { ...next[item.id], launch: true }
-        else next[item.id] = { ...next[item.id], pex: true }
+        if (item.mode === 'pex') {
+          const isLaunchTheme = item.theme === PEX_LAUNCH_THEME
+          next[item.id] = { ...next[item.id], pex: true, pexTheme: item.theme, ...(isLaunchTheme ? { launch: true } : {}) }
+        } else {
+          next[item.id] = { ...next[item.id], launch: true }
+        }
       }
       return next
     })
     setLncPendingItems([])
     setLncImportText('')
     setShowLncImport(false)
+  }
+
+  function setPexTheme(id: string, theme: string) {
+    setTags(cur => {
+      const prev = cur[id] ?? {}
+      const isLaunchTheme = theme === PEX_LAUNCH_THEME
+      return { ...cur, [id]: { ...prev, pex: true, pexTheme: theme, ...(isLaunchTheme ? { launch: true } : { launch: prev.launch && !prev.pexTheme ? prev.launch : undefined }) } }
+    })
   }
 
   function toggleExpanded(key: string) {
@@ -815,9 +841,9 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                           {p.internalCode && <code>{p.internalCode}</code>}
                           {p.brand && <span>{p.brand}</span>}
                           {p.groupName && <span className="p-group">{p.groupName}</span>}
-                          {tags[p.id]?.launch && tags[p.id]?.pex && <span className="badge-pex-launch">PEX Lançamento</span>}
+                          {tags[p.id]?.launch && tags[p.id]?.pex && <span className="badge-pex-launch">PEX {tags[p.id]?.pexTheme ?? ''} Lançamento</span>}
                           {tags[p.id]?.launch && !tags[p.id]?.pex && <span className="badge-launch">Lançamento</span>}
-                          {tags[p.id]?.pex && !tags[p.id]?.launch && <span className="badge-pex">PEX</span>}
+                          {tags[p.id]?.pex && !tags[p.id]?.launch && <span className="badge-pex">PEX {tags[p.id]?.pexTheme ?? ''}</span>}
                           {p.internalCode && abcMap.has(p.internalCode) && <span className={`badge-abc badge-abc-${abcMap.get(p.internalCode)!.toLowerCase()}`}>{abcMap.get(p.internalCode)}</span>}
                         </span>
                       </span>
@@ -887,6 +913,12 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                     <button type="button" className={`tag-pill${tags[selected.id]?.pex ? ' tp' : ''}`} onClick={() => toggleTag(selected.id, 'pex')}>
                       {tags[selected.id]?.pex ? '★ PEX' : '☆ PEX'}
                     </button>
+                    {tags[selected.id]?.pex && (
+                      <select className="pf-select" style={{ minWidth: 'auto', padding: '2px 8px', fontSize: 11 }} value={tags[selected.id]?.pexTheme ?? ''} onChange={e => setPexTheme(selected.id, e.target.value)}>
+                        <option value="">Sem tema</option>
+                        {PEX_THEMES.map(t => <option key={t} value={t}>Tema {t}</option>)}
+                      </select>
+                    )}
                   </div>
 
                   <div className="sd-section">
@@ -1018,13 +1050,17 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                         rows={4}
                       />
                       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                        <select className="pf-select" style={{ minWidth: 'auto', padding: '4px 10px' }} value={lncImportType} onChange={e => setLncImportType(e.target.value as 'launch' | 'pex' | 'pex_launch')}>
+                        <select className="pf-select" style={{ minWidth: 'auto', padding: '4px 10px' }} value={lncImportMode} onChange={e => setLncImportMode(e.target.value as 'launch' | 'pex')}>
                           <option value="pex">PEX</option>
                           <option value="launch">Lançamento</option>
-                          <option value="pex_launch">PEX + Lançamento</option>
                         </select>
+                        {lncImportMode === 'pex' && (
+                          <select className="pf-select" style={{ minWidth: 'auto', padding: '4px 10px' }} value={lncImportTheme} onChange={e => setLncImportTheme(e.target.value)}>
+                            {PEX_THEMES.map(t => <option key={t} value={t}>Tema {t}</option>)}
+                          </select>
+                        )}
                         <button type="button" className="cad-pex-btn" onClick={() => {
-                          const n = importTags(lncImportText, lncImportType)
+                          const n = importTagsBatch(lncImportText, lncImportMode, lncImportTheme)
                           if (n) { setLncImportText(''); setShowLncImport(false) }
                         }}>Marcar em lote</button>
                         <button type="button" className="cad-pex-btn" style={{ background: 'var(--surface-raised)', color: 'var(--text)', border: '1px solid var(--border)' }} onClick={() => {
@@ -1044,31 +1080,47 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                     <div className="import-review">
                       <div className="import-review-header">
                         <strong>{lncPendingItems.length} produto{lncPendingItems.length !== 1 ? 's' : ''} encontrado{lncPendingItems.length !== 1 ? 's' : ''}</strong>
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                           <span style={{ fontSize: 12, color: 'var(--muted)' }}>Marcar todos:</span>
-                          <select className="pf-select" style={{ minWidth: 'auto', padding: '4px 10px', fontSize: 12 }} value={lncBatchTag} onChange={e => {
-                            const t = e.target.value as 'launch' | 'pex' | 'pex_launch'
-                            setLncBatchTag(t)
-                            setLncPendingItems(prev => prev.map(item => ({ ...item, tag: t })))
+                          <select className="pf-select" style={{ minWidth: 'auto', padding: '4px 10px', fontSize: 12 }} value={lncBatchMode} onChange={e => {
+                            const m = e.target.value as 'launch' | 'pex'
+                            setLncBatchMode(m)
+                            setLncPendingItems(prev => prev.map(item => ({ ...item, mode: m, theme: m === 'pex' ? lncBatchTheme : '' })))
                           }}>
                             <option value="pex">PEX</option>
                             <option value="launch">Lançamento</option>
-                            <option value="pex_launch">PEX + Lançamento</option>
                           </select>
+                          {lncBatchMode === 'pex' && (
+                            <select className="pf-select" style={{ minWidth: 'auto', padding: '4px 10px', fontSize: 12 }} value={lncBatchTheme} onChange={e => {
+                              const th = e.target.value
+                              setLncBatchTheme(th)
+                              setLncPendingItems(prev => prev.map(item => item.mode === 'pex' ? { ...item, theme: th } : item))
+                            }}>
+                              {PEX_THEMES.map(t => <option key={t} value={t}>Tema {t}</option>)}
+                            </select>
+                          )}
                         </div>
                       </div>
                       <div className="import-review-list">
                         {lncPendingItems.map(item => (
                           <div key={item.id} className="import-review-item">
                             <span className="import-review-desc">{item.desc}</span>
-                            <select className="import-review-tag" value={item.tag} onChange={e => {
-                              const t = e.target.value as 'launch' | 'pex' | 'pex_launch'
-                              setLncPendingItems(prev => prev.map(x => x.id === item.id ? { ...x, tag: t } : x))
-                            }}>
-                              <option value="pex">PEX</option>
-                              <option value="launch">Lançamento</option>
-                              <option value="pex_launch">PEX + Lançamento</option>
-                            </select>
+                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                              <select className="import-review-tag" value={item.mode} onChange={e => {
+                                const m = e.target.value as 'launch' | 'pex'
+                                setLncPendingItems(prev => prev.map(x => x.id === item.id ? { ...x, mode: m, theme: m === 'pex' ? PEX_THEMES[0] : '' } : x))
+                              }}>
+                                <option value="pex">PEX</option>
+                                <option value="launch">Lançamento</option>
+                              </select>
+                              {item.mode === 'pex' && (
+                                <select className="import-review-tag" value={item.theme} onChange={e => {
+                                  setLncPendingItems(prev => prev.map(x => x.id === item.id ? { ...x, theme: e.target.value } : x))
+                                }}>
+                                  {PEX_THEMES.map(t => <option key={t} value={t}>{t}</option>)}
+                                </select>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -1104,6 +1156,18 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                   single
                   open={openFilter === 'lnc-tipo'}
                   onToggle={() => setOpenFilter(o => o === 'lnc-tipo' ? null : 'lnc-tipo')}
+                />
+                <FilterDrop
+                  label="Tema PEX"
+                  options={['Todos', ...PEX_THEMES.map(t => `Tema ${t}`)]}
+                  selected={lncFilterTheme === 'all' ? [] : [`Tema ${lncFilterTheme}`]}
+                  onSelect={vals => {
+                    if (vals.length === 0 || vals[0] === 'Todos') setLncFilterTheme('all')
+                    else setLncFilterTheme(vals[0].replace('Tema ', ''))
+                  }}
+                  single
+                  open={openFilter === 'lnc-tema'}
+                  onToggle={() => setOpenFilter(o => o === 'lnc-tema' ? null : 'lnc-tema')}
                 />
               </div>
             </div>
@@ -1162,9 +1226,9 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                             {p.internalCode && <code>{p.internalCode}</code>}
                             {p.brand && <span>{p.brand}</span>}
                             {p.groupName && <span className="p-group">{p.groupName}</span>}
-                            {tags[p.id]?.launch && tags[p.id]?.pex && <span className="badge-pex-launch">PEX Lançamento</span>}
+                            {tags[p.id]?.launch && tags[p.id]?.pex && <span className="badge-pex-launch">PEX {tags[p.id]?.pexTheme ?? ''} Lançamento</span>}
                             {tags[p.id]?.launch && !tags[p.id]?.pex && <span className="badge-launch">Lançamento</span>}
-                            {tags[p.id]?.pex && !tags[p.id]?.launch && <span className="badge-pex">PEX</span>}
+                            {tags[p.id]?.pex && !tags[p.id]?.launch && <span className="badge-pex">PEX {tags[p.id]?.pexTheme ?? ''}</span>}
                             {p.internalCode && abcMap.has(p.internalCode) && <span className={`badge-abc badge-abc-${abcMap.get(p.internalCode)!.toLowerCase()}`}>{abcMap.get(p.internalCode)}</span>}
                           </span>
                         </span>
@@ -1234,6 +1298,12 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                       <button type="button" className={`tag-pill${tags[selected.id]?.pex ? ' tp' : ''}`} onClick={() => toggleTag(selected.id, 'pex')}>
                         {tags[selected.id]?.pex ? '★ PEX' : '☆ PEX'}
                       </button>
+                      {tags[selected.id]?.pex && (
+                        <select className="pf-select" style={{ minWidth: 'auto', padding: '2px 8px', fontSize: 11 }} value={tags[selected.id]?.pexTheme ?? ''} onChange={e => setPexTheme(selected.id, e.target.value)}>
+                          <option value="">Sem tema</option>
+                          {PEX_THEMES.map(t => <option key={t} value={t}>Tema {t}</option>)}
+                        </select>
+                      )}
                     </div>
 
                     <div className="sd-section">
