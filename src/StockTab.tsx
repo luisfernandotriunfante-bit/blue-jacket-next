@@ -117,6 +117,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
   useEffect(() => {
     try { localStorage.setItem('rj-product-tags', JSON.stringify(tags)) }
     catch { /* quota exceeded */ }
+    window.dispatchEvent(new Event('rj-tags-changed'))
   }, [tags])
 
   useEffect(() => {
