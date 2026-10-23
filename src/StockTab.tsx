@@ -1172,10 +1172,28 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
               </div>
             </div>
 
-            <div className="stock-count">
-              <strong>{filteredLnc.length.toLocaleString('pt-BR')}</strong>{' '}
-              produto{filteredLnc.length !== 1 ? 's' : ''}
-              {lncCounts.total !== filteredLnc.length && ` de ${lncCounts.total.toLocaleString('pt-BR')}`}
+            <div className="stock-count" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span>
+                <strong>{filteredLnc.length.toLocaleString('pt-BR')}</strong>{' '}
+                produto{filteredLnc.length !== 1 ? 's' : ''}
+                {lncCounts.total !== filteredLnc.length && ` de ${lncCounts.total.toLocaleString('pt-BR')}`}
+              </span>
+              {filteredLnc.length > 0 && (
+                <button type="button" className="cad-pex-btn" style={{ fontSize: 11, padding: '2px 10px', background: 'var(--surface-raised)', color: 'var(--red)', border: '1px solid var(--red)' }} onClick={() => {
+                  if (!confirm(`Desmarcar ${filteredLnc.length} item(ns) filtrado(s)? Os outros itens não serão afetados.`)) return
+                  const ids = new Set(filteredLnc.map(p => p.id))
+                  setTags(cur => {
+                    const next = { ...cur }
+                    for (const id of ids) {
+                      delete next[id]
+                    }
+                    return next
+                  })
+                  setSelected(null)
+                }}>
+                  Desmarcar todos
+                </button>
+              )}
             </div>
 
             {lncCounts.total === 0 && (
