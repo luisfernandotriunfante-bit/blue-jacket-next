@@ -225,6 +225,13 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 .p-group { color: var(--muted); }
 .badge-launch { background: #3b82f615; color: var(--blue); border: 1px solid var(--blue); padding: 0 5px; border-radius: 4px; font-weight: 700; font-size: 10px; }
 .badge-pex { background: #ef444415; color: var(--red); border: 1px solid var(--red); padding: 0 5px; border-radius: 4px; font-weight: 700; font-size: 10px; }
+.badge-pex-launch { background: linear-gradient(135deg, #7c3aed15, #ef444415); color: #a855f7; border: 1px solid #a855f7; padding: 0 5px; border-radius: 4px; font-weight: 700; font-size: 10px; }
+.import-review { display: flex; flex-direction: column; gap: 10px; }
+.import-review-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+.import-review-list { max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--border); border-radius: 8px; padding: 8px; }
+.import-review-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; background: var(--surface-raised); }
+.import-review-desc { flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.import-review-tag { min-width: auto; padding: 3px 8px; font-size: 11px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; }
 .badge-abc { padding: 0 5px; border-radius: 4px; font-weight: 800; font-size: 10px; letter-spacing: .04em; }
 .badge-abc-a { background: #f59e0b18; color: #f59e0b; border: 1px solid #f59e0b; }
 .badge-abc-b { background: #3b82f615; color: var(--blue); border: 1px solid var(--blue); }
