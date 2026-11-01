@@ -84,12 +84,12 @@ export type ProductIndicators = {
 }
 export type ProductMotorResult = { canonicalBase: CanonicalProduct[]; audit: AuditItem[]; indicators: ProductIndicators }
 type Row = unknown[]
-type Sheet = { rows: Row[] }
+type Sheet = { rows: Row[]; sheetName: string }
 const norm = (value: unknown) => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
 const text = (value: unknown) => { const result = String(value ?? '').trim(); return result || undefined }
 const code = (value: unknown) => { const result = String(value ?? '').replace(/\*/g, '').replace(/\.0$/, '').replace(/\s/g, '').replace(/^0+(?=\d)/, ''); return result || undefined }
 const number = (value: unknown) => { const raw = String(value ?? '').replace(/\*/g, '').trim(); const normalized = raw.includes(',') && raw.includes('.') ? (raw.lastIndexOf(',') < raw.lastIndexOf('.') ? raw.replace(/,/g, '') : raw.replace(/\./g, '').replace(',', '.')) : raw.replace(',', '.'); const result = Number(normalized); return Number.isFinite(result) ? result : undefined }
-const rowsFrom = async (file: File): Promise<Sheet[]> => { const book = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: 'array' }); return book.SheetNames.map(name => ({ rows: XLSX.utils.sheet_to_json<Row>(book.Sheets[name], { header: 1, defval: '', raw: true }) })) }
+const rowsFrom = async (file: File): Promise<Sheet[]> => { const book = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: 'array' }); return book.SheetNames.map(name => ({ sheetName: name, rows: XLSX.utils.sheet_to_json<Row>(book.Sheets[name], { header: 1, defval: '', raw: true }) })) }
 const headerAt = (rows: Row[], expected: Record<number, string>) => rows.findIndex(row => Object.entries(expected).every(([index, label]) => norm(row[Number(index)]) === label))
 const audit = (id: string, title: string, instruction: string, detail: string, level: AuditItem['level'] = 'ok'): AuditItem => ({ id, title, instruction, detail, level, area: 'produtos' })
 
@@ -105,16 +105,18 @@ export async function processProductMotor(files: File[]): Promise<ProductMotorRe
   const sortimentSubBrands = new Map<string, string>()
   const check105 = new Map<string, number>()
   const subBrands = new Map<string, { subBrand: string; category?: string }>()
-  for (const file of files) for (const { rows } of await rowsFrom(file)) {
+  for (const file of files) for (const { rows, sheetName } of await rowsFrom(file)) {
+    const normSheet = norm(sheetName)
+    const isSortNacional = normSheet.includes('nacional') || normSheet === 'sortimento'
     const h286 = headerAt(rows, { 1: 'codigo', 2: 'descricao', 25: 'codbarras', 26: 'codfabricante' })
     const hIndustry = headerAt(rows, { 8: 'sku', 9: 'descricaopadrao', 10: 'ean', 17: 'uncx' })
     const h1118 = headerAt(rows, { 0: 'codigo', 1: 'descricao', 5: 'disponivel', 10: 'estoque', 16: 'codfabricante' })
     const h8011 = headerAt(rows, { 2: 'codprod', 3: 'descricao', 6: 'ean', 10: 'preco' })
     const hCart = headerAt(rows, { 0: 'orderdate', 4: 'material', 5: 'description', 6: 'orderqty', 7: 'billqty' })
     const h105 = headerAt(rows, { 1: 'codigo', 2: 'descricao', 6: 'qtestoque', 23: 'codfab' })
-    const hSortiment = headerAt(rows, { 0: 'materialsap', 16: 'st', 18: 'lifestage' })
+    const hSortiment = isSortNacional ? headerAt(rows, { 0: 'materialsap', 16: 'st', 18: 'lifestage' }) : -1
     let hSortBase: { h: number; codCol: number; descCol: number; catCol: number; subCatCol: number; brandCol: number; chanStart: number } | null = null
-    for (let ri = 0; ri < Math.min(rows.length, 30) && !hSortBase; ri++) {
+    for (let ri = 0; ri < Math.min(rows.length, 30) && !hSortBase && isSortNacional; ri++) {
       const norms = (rows[ri] as unknown[]).map(c => norm(c))
       const catIdx = norms.findIndex(n => n === 'categoriamaster')
       if (catIdx < 0) continue
