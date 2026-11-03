@@ -216,3 +216,13 @@ export function schedulePush(): void {
     void pushToCloud()
   }, 2000)
 }
+
+export function forcePush(): void {
+  if (!isFirebaseConfigured() || _pulling) return
+  if (debounceTimer) clearTimeout(debounceTimer)
+  _pullCooldown = false
+  debounceTimer = setTimeout(() => {
+    if (_pulling) return
+    void pushToCloud()
+  }, 500)
+}
