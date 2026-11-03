@@ -22,7 +22,7 @@ import { PiramideTab } from './PiramideTab'
 import { SortimentoTab } from './SortimentoTab'
 import { saveCompetenciaSnap, loadCompetenciaSnap, listClosedCompetencias, fmtCompetencia, getActiveComp, setActiveComp, type CompetenciaSnapshot } from './domain/competenciaEngine'
 import { exportBundle, importBundle, downloadBundle, validateBundle } from './domain/syncEngine'
-import { pushToCloud, pullFromCloud, listenForChanges, schedulePush, onSyncStatus, getSyncDetail } from './domain/cloudSync'
+import { pushToCloud, pullFromCloud, listenForChanges, schedulePush, forcePush, onSyncStatus, getSyncDetail } from './domain/cloudSync'
 import { isFirebaseConfigured } from './firebaseConfig'
 
 const motors: Array<{ id: Exclude<SourceArea, 'diario'>; name: string }> = [
@@ -308,14 +308,14 @@ export function App() {
     setClientProcessing(true); setClientAudit([])
     try { const result = await processClientMotor(selected); setClientAudit(result.audit); setClientBase(result.canonicalBase); setClientIndicators(result.indicators); if (result.pyramidDocuments.length > 0) setPexSet(new Set(result.pyramidDocuments)) }
     catch { setClientAudit([{ id: 'client-read-error', level: 'action', title: 'Não foi possível ler os arquivos', instruction: 'Confira os arquivos e tente novamente.', detail: 'A base de clientes não foi alterada.', area: 'clientes' }]); setClientBase([]); setClientIndicators(null) }
-    finally { setClientProcessing(false) }
+    finally { setClientProcessing(false); forcePush() }
   }
   async function processProducts() {
     const selected = Object.values(productSlots).map(file => file && rawFiles[file.id]).filter((file): file is File => Boolean(file)); if (!selected.length) return
     setProductProcessing(true); setProductAudit([])
     try { const result = await processProductMotor(selected); setProductBase(result.canonicalBase); setProductAudit(result.audit); setProductIndicators(result.indicators) }
     catch { setProductAudit([{ id: 'product-read-error', level: 'action', title: 'Não foi possível ler os arquivos', instruction: 'Confira os arquivos e tente novamente.', detail: 'A base de produtos não foi alterada.', area: 'produtos' }]); setProductBase([]); setProductIndicators(null) }
-    finally { setProductProcessing(false) }
+    finally { setProductProcessing(false); forcePush() }
   }
   async function processHistory() {
     const salesFiles = (historySlots.sales ?? []).map(f => rawFiles[f.id]).filter((f): f is File => Boolean(f)); if (!salesFiles.length) return
@@ -323,16 +323,16 @@ export function App() {
     setHistoryProcessing(true); setHistoryAudit([])
     try { const result = await processHistoryMotor(salesFiles, { catalogFile: catalogRaw, productBase }); setHistoryBase(result.canonicalBase); setHistoryAudit(result.audit); setHistoryIndicators(result.indicators) }
     catch { setHistoryAudit([{ id: 'history-read-error', level: 'action', title: 'Não foi possível ler os arquivos', instruction: 'Confira os arquivos e tente novamente.', detail: 'A base histórica não foi alterada.', area: 'historico' }]); setHistoryBase([]); setHistoryIndicators(null) }
-    finally { setHistoryProcessing(false) }
+    finally { setHistoryProcessing(false); forcePush() }
   }
   async function processMovements() {
     const selected = Object.values(movementSlots).flat().map(file => rawFiles[file.id]).filter((file): file is File => Boolean(file)); if (!selected.length) return
     setMovementProcessing(true); setMovementAudit([])
     try { const result = await processMovementMotor(selected); setMovementBase(result.canonicalBase); setMovementAudit(result.audit); setMovementIndicators(result.indicators) }
     catch { setMovementAudit([{ id: 'movement-read-error', level: 'action', title: 'Não foi possível ler os arquivos', instruction: 'Confira os arquivos e tente novamente.', detail: 'A base de movimentações não foi alterada.', area: 'movimentacoes' }]); setMovementBase([]); setMovementIndicators(null) }
-    finally { setMovementProcessing(false) }
+    finally { setMovementProcessing(false); forcePush() }
   }
-  async function processReceipts(){const selected=Object.values(receiptSlots).flat().map(file=>rawFiles[file.id]).filter((file):file is File=>Boolean(file));if(!selected.length)return;setReceiptProcessing(true);setReceiptAudit([]);try{const result=await processReceiptMotor(selected);setReceiptBase(result.canonicalBase);setReceiptAudit(result.audit);setReceiptIndicators(result.indicators)}catch{setReceiptAudit([{id:'receipt-read-error',level:'action',title:'Não foi possível ler os arquivos',instruction:'Confira os arquivos e tente novamente.',detail:'A base de chegada de notas não foi alterada.',area:'recebimentos'}]);setReceiptBase([]);setReceiptIndicators(null)}finally{setReceiptProcessing(false)}}
+  async function processReceipts(){const selected=Object.values(receiptSlots).flat().map(file=>rawFiles[file.id]).filter((file):file is File=>Boolean(file));if(!selected.length)return;setReceiptProcessing(true);setReceiptAudit([]);try{const result=await processReceiptMotor(selected);setReceiptBase(result.canonicalBase);setReceiptAudit(result.audit);setReceiptIndicators(result.indicators)}catch{setReceiptAudit([{id:'receipt-read-error',level:'action',title:'Não foi possível ler os arquivos',instruction:'Confira os arquivos e tente novamente.',detail:'A base de chegada de notas não foi alterada.',area:'recebimentos'}]);setReceiptBase([]);setReceiptIndicators(null)}finally{setReceiptProcessing(false);forcePush()}}
   async function processAll() {
     setProcessingAll(true)
     const toRun: Promise<void>[] = []
