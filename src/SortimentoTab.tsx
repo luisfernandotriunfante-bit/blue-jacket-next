@@ -11,7 +11,6 @@ const kpiCurrency = (n: number) => {
 }
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`
 
-
 type Classification = 'Mandatório' | 'Importante' | 'Fora do sortimento'
 
 interface SortimentoItem {
@@ -28,7 +27,7 @@ interface SortimentoItem {
 
 type ViewMode = 'cnpj' | 'rede'
 
-const CARDS_PER_PAGE = 40
+const ROWS_PER_PAGE = 40
 
 export function SortimentoTab({ clientBase, productBase, movementBase, activeComp, pexSet }: {
   clientBase: CanonicalClient[]
@@ -44,7 +43,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
   const [filterClass, setFilterClass] = useState<'all' | 'mandatorio' | 'importante' | 'fora'>('all')
   const [filterStatus, setFilterStatus] = useState<'all' | 'comprado' | 'faltando'>('all')
   const [sortBy, setSortBy] = useState<'subcategory' | 'brand' | 'value' | 'classification'>('subcategory')
-  const [cardsPage, setCardsPage] = useState(0)
+  const [listPage, setListPage] = useState(0)
 
   const movsByCustomer = useMemo(() => {
     const map = new Map<string, CanonicalMovement[]>()
@@ -89,25 +88,6 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
   }, [redeMap])
 
   const q = search.toLowerCase()
-
-  const clientResults = useMemo(() => {
-    if (!q || q.length < 2 || viewMode !== 'cnpj') return []
-    return clientBase
-      .filter(c => {
-        const doc = c.document.toLowerCase()
-        const name = (c.tradeName ?? c.legalName ?? '').toLowerCase()
-        const code = (c.winthorCode ?? '').toLowerCase()
-        return doc.includes(q) || name.includes(q) || code.includes(q)
-      })
-      .slice(0, 20)
-  }, [clientBase, q, viewMode])
-
-  const redeResults = useMemo(() => {
-    if (!q || q.length < 2 || viewMode !== 'rede') return []
-    return availableRedes
-      .filter(r => r.name.toLowerCase().includes(q))
-      .slice(0, 20)
-  }, [availableRedes, q, viewMode])
 
   const selectedClient = useMemo(() => {
     if (viewMode !== 'cnpj' || !selectedDoc) return null
@@ -221,12 +201,26 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
       }
     }
     return topChannel
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedClient, selectedRedeClients, viewMode, availableSortChannels, selectedRede, networkChannelMap])
+
+  const redeChannelBreakdown = useMemo(() => {
+    if (viewMode !== 'rede' || selectedRedeClients.length === 0) return new Map<string, number>()
+    const channels = new Map<string, number>()
+    for (const c of selectedRedeClients) {
+      const ch = resolveChannel(c)
+      if (ch) channels.set(ch, (channels.get(ch) ?? 0) + 1)
+    }
+    return channels
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRedeClients, viewMode, availableSortChannels, networkChannelMap])
 
   const hasSelection = viewMode === 'cnpj' ? !!selectedClient : selectedRedeClients.length > 0
 
   const analysis = useMemo(() => {
-    if (!hasSelection || !detectedChannel) return null
+    if (!hasSelection) return null
+    const hasChannel = viewMode === 'cnpj' ? !!detectedChannel : redeChannelBreakdown.size > 0
+    if (!hasChannel) return null
 
     const [y] = activeComp.split('-').map(Number)
     const startAno = `${y}-01-01`
@@ -275,10 +269,18 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
     const items: SortimentoItem[] = []
     const recommendedCodes = new Set<string>()
 
+    const activeChannels: string[] = viewMode === 'cnpj'
+      ? (detectedChannel ? [detectedChannel] : [])
+      : [...redeChannelBreakdown.keys()]
+
     for (const p of productBase) {
       if (!p.sortimentChannels) continue
-      const level = p.sortimentChannels[detectedChannel]
-      if (!level || level <= 0) continue
+      let bestLevel = 0
+      for (const ch of activeChannels) {
+        const level = p.sortimentChannels[ch]
+        if (level && level > 0 && (bestLevel === 0 || level < bestLevel)) bestLevel = level
+      }
+      if (bestLevel <= 0) continue
 
       const pCode = p.internalCode ?? p.manufacturerCode ?? ''
       if (!pCode) continue
@@ -293,7 +295,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
         description: p.description ?? pCode,
         subcategory: p.subcategory ?? p.category ?? '',
         brand: p.brand ?? p.subBrand ?? '',
-        classification: level === 1 ? 'Mandatório' : 'Importante',
+        classification: bestLevel === 1 ? 'Mandatório' : 'Importante',
         recommended: true,
         purchased: purchaseValue > 0,
         value: purchaseValue,
@@ -304,7 +306,13 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
     for (const [pc, val] of purchasedProducts) {
       if (recommendedCodes.has(pc)) continue
       const prod = productByCode.get(pc)
-      if (prod?.sortimentChannels && prod.sortimentChannels[detectedChannel] != null) continue
+      if (prod?.sortimentChannels) {
+        let inSort = false
+        for (const ch of activeChannels) {
+          if (prod.sortimentChannels[ch] != null) { inSort = true; break }
+        }
+        if (inSort) continue
+      }
       const storeCount = viewMode === 'rede' ? (storesByProduct.get(pc)?.size ?? 0) : undefined
       items.push({
         code: pc,
@@ -357,7 +365,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
       totalStores,
       storesWithPurchase,
     }
-  }, [hasSelection, selectedClient, selectedRedeClients, viewMode, detectedChannel, movsByCustomer, productBase, productByCode, activeComp])
+  }, [hasSelection, selectedClient, selectedRedeClients, viewMode, detectedChannel, redeChannelBreakdown, movsByCustomer, productBase, productByCode, activeComp])
 
   const filteredItems = useMemo(() => {
     if (!analysis) return []
@@ -380,26 +388,26 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
     })
   }, [analysis, filterClass, filterStatus, sortBy])
 
-  const clientCards = useMemo(() => {
+  const clientList = useMemo(() => {
     if (hasSelection || viewMode !== 'cnpj') return []
-    const cardQ = q.length >= 2 ? q : ''
+    const listQ = q.length >= 2 ? q : ''
     let list = clientBase
-    if (cardQ) {
+    if (listQ) {
       list = list.filter(c => {
         const doc = c.document.toLowerCase()
         const name = (c.tradeName ?? c.legalName ?? '').toLowerCase()
         const code = (c.winthorCode ?? '').toLowerCase()
-        return doc.includes(cardQ) || name.includes(cardQ) || code.includes(cardQ)
+        return doc.includes(listQ) || name.includes(listQ) || code.includes(listQ)
       })
     }
     return list.sort((a, b) => (a.tradeName ?? a.legalName ?? a.document).localeCompare(b.tradeName ?? b.legalName ?? b.document))
   }, [clientBase, hasSelection, viewMode, q])
 
-  const redeCards = useMemo(() => {
+  const redeList = useMemo(() => {
     if (hasSelection || viewMode !== 'rede') return []
-    const cardQ = q.length >= 2 ? q : ''
+    const listQ = q.length >= 2 ? q : ''
     let list = availableRedes
-    if (cardQ) list = list.filter(r => r.name.toLowerCase().includes(cardQ))
+    if (listQ) list = list.filter(r => r.name.toLowerCase().includes(listQ))
     return list
   }, [availableRedes, hasSelection, viewMode, q])
 
@@ -407,7 +415,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
     setSelectedDoc(null)
     setSelectedRede(null)
     setSearch('')
-    setCardsPage(0)
+    setListPage(0)
   }
 
   const switchMode = (mode: ViewMode) => {
@@ -415,39 +423,30 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
     clearSelection()
   }
 
-  const totalCardsPages = viewMode === 'cnpj' ? Math.ceil(clientCards.length / CARDS_PER_PAGE) : Math.ceil(redeCards.length / CARDS_PER_PAGE)
-  const pagedClientCards = clientCards.slice(cardsPage * CARDS_PER_PAGE, (cardsPage + 1) * CARDS_PER_PAGE)
-  const pagedRedeCards = redeCards.slice(cardsPage * CARDS_PER_PAGE, (cardsPage + 1) * CARDS_PER_PAGE)
+  const totalPages = viewMode === 'cnpj' ? Math.ceil(clientList.length / ROWS_PER_PAGE) : Math.ceil(redeList.length / ROWS_PER_PAGE)
+  const pagedClients = clientList.slice(listPage * ROWS_PER_PAGE, (listPage + 1) * ROWS_PER_PAGE)
+  const pagedRedes = redeList.slice(listPage * ROWS_PER_PAGE, (listPage + 1) * ROWS_PER_PAGE)
 
   return (
     <section className="content">
       <div className="stock-toolbar">
-        <div className="sort-mode-toggle">
-          <button type="button" className={`sort-mode-btn${viewMode === 'cnpj' ? ' active' : ''}`} onClick={() => switchMode('cnpj')}>Por CNPJ</button>
-          <button type="button" className={`sort-mode-btn${viewMode === 'rede' ? ' active' : ''}`} onClick={() => switchMode('rede')}>
-            Por Rede {availableRedes.length > 0 && <span className="sort-mode-count">({availableRedes.length})</span>}
-          </button>
-        </div>
+        <fieldset className="pf-range">
+          <legend>Visualização</legend>
+          <div>
+            <button type="button" className={viewMode === 'cnpj' ? 'is-active' : ''} onClick={() => switchMode('cnpj')}>Por CNPJ</button>
+            <button type="button" className={viewMode === 'rede' ? 'is-active' : ''} onClick={() => switchMode('rede')}>
+              Por Rede {availableRedes.length > 0 && `(${availableRedes.length})`}
+            </button>
+          </div>
+        </fieldset>
         <div className="pf-bar">
           <input
             className="pf-input"
             placeholder={viewMode === 'cnpj' ? 'Buscar cliente por CNPJ, código ou nome…' : 'Buscar rede pelo nome…'}
             value={search}
-            onChange={e => { setSearch(e.target.value); setCardsPage(0); if (!e.target.value) clearSelection() }}
+            onChange={e => { setSearch(e.target.value); setListPage(0); if (!e.target.value) clearSelection() }}
           />
         </div>
-
-        {viewMode === 'cnpj' && !selectedDoc && q.length >= 2 && clientCards.length === 0 && (
-          <div className="sort-dropdown">
-            <p className="sort-empty">Nenhum cliente encontrado.</p>
-          </div>
-        )}
-
-        {viewMode === 'rede' && !selectedRede && q.length >= 2 && redeCards.length === 0 && (
-          <div className="sort-dropdown">
-            <p className="sort-empty">Nenhuma rede encontrada.</p>
-          </div>
-        )}
       </div>
 
       {viewMode === 'cnpj' && selectedClient && (
@@ -472,16 +471,29 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <strong>{selectedRede}</strong>
               <span style={{ color: 'var(--blue)', fontSize: 12 }}>{selectedRedeClients.length} loja{selectedRedeClients.length !== 1 ? 's' : ''}</span>
-              {detectedChannel && <span className="sort-channel-badge">{detectedChannel}</span>}
               <button type="button" className="sort-clear-btn" onClick={clearSelection}>Trocar</button>
             </div>
+            {redeChannelBreakdown.size > 0 && (
+              <div className="sort-channels-list">
+                {[...redeChannelBreakdown.entries()]
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([ch, count]) => (
+                    <span key={ch} className="sort-channel-pill">
+                      {ch} <span className="sort-channel-pill-count">{count}</span>
+                    </span>
+                  ))}
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-              {selectedRedeClients.slice(0, 8).map(c => (
-                <span key={c.document} style={{ fontSize: 10, color: 'var(--muted)', background: 'var(--surface)', padding: '2px 6px', borderRadius: 4 }}>
-                  {c.tradeName ?? c.document}
-                  {c.premiseRange && <span className="cad-badge-range" style={{ fontSize: 9, marginLeft: 4 }}>F{c.premiseRange}</span>}
-                </span>
-              ))}
+              {selectedRedeClients.slice(0, 8).map(c => {
+                const clientCh = resolveChannel(c)
+                return (
+                  <span key={c.document} style={{ fontSize: 10, color: 'var(--muted)', background: 'var(--surface)', padding: '2px 6px', borderRadius: 4 }}>
+                    {c.tradeName ?? c.document}
+                    {clientCh && <span className="sort-channel-badge" style={{ fontSize: 9, marginLeft: 4, padding: '1px 5px' }}>{clientCh}</span>}
+                  </span>
+                )
+              })}
               {selectedRedeClients.length > 8 && (
                 <span style={{ fontSize: 10, color: 'var(--muted)' }}>+{selectedRedeClients.length - 8} mais</span>
               )}
@@ -490,7 +502,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
         </div>
       )}
 
-      {analysis && detectedChannel && (
+      {analysis && (
         <>
           <div className="sort-hero-row">
             <div className="sort-donut-block">
@@ -558,24 +570,33 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
             </div>
           </div>
 
-          <div className="sort-filters">
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <button type="button" className={`sort-filter-btn${filterClass === 'all' ? ' active' : ''}`} onClick={() => setFilterClass('all')}>Todos</button>
-              <button type="button" className={`sort-filter-btn${filterClass === 'mandatorio' ? ' active' : ''}`} onClick={() => setFilterClass('mandatorio')}>Mandatório</button>
-              <button type="button" className={`sort-filter-btn${filterClass === 'importante' ? ' active' : ''}`} onClick={() => setFilterClass('importante')}>Importante</button>
-              <button type="button" className={`sort-filter-btn${filterClass === 'fora' ? ' active' : ''}`} onClick={() => setFilterClass('fora')}>Fora do sortimento</button>
-            </div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <button type="button" className={`sort-filter-btn${filterStatus === 'all' ? ' active' : ''}`} onClick={() => setFilterStatus('all')}>Todos</button>
-              <button type="button" className={`sort-filter-btn${filterStatus === 'comprado' ? ' active' : ''}`} onClick={() => setFilterStatus('comprado')}>Comprados</button>
-              <button type="button" className={`sort-filter-btn${filterStatus === 'faltando' ? ' active' : ''}`} onClick={() => setFilterStatus('faltando')}>Faltando</button>
-            </div>
-            <select className="pf-select" value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)} style={{ minWidth: 130 }}>
-              <option value="subcategory">Subcategoria</option>
-              <option value="brand">Marca</option>
-              <option value="value">Valor</option>
-              <option value="classification">Classificação</option>
-            </select>
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            <fieldset className="pf-range">
+              <legend>Classificação</legend>
+              <div>
+                <button type="button" className={filterClass === 'all' ? 'is-active' : ''} onClick={() => setFilterClass('all')}>Todos</button>
+                <button type="button" className={filterClass === 'mandatorio' ? 'is-active' : ''} onClick={() => setFilterClass('mandatorio')}>Mandatório</button>
+                <button type="button" className={filterClass === 'importante' ? 'is-active' : ''} onClick={() => setFilterClass('importante')}>Importante</button>
+                <button type="button" className={filterClass === 'fora' ? 'is-active' : ''} onClick={() => setFilterClass('fora')}>Fora</button>
+              </div>
+            </fieldset>
+            <fieldset className="pf-range">
+              <legend>Status</legend>
+              <div>
+                <button type="button" className={filterStatus === 'all' ? 'is-active' : ''} onClick={() => setFilterStatus('all')}>Todos</button>
+                <button type="button" className={filterStatus === 'comprado' ? 'is-active' : ''} onClick={() => setFilterStatus('comprado')}>Comprados</button>
+                <button type="button" className={filterStatus === 'faltando' ? 'is-active' : ''} onClick={() => setFilterStatus('faltando')}>Faltando</button>
+              </div>
+            </fieldset>
+            <fieldset className="pf-range">
+              <legend>Ordenar por</legend>
+              <div>
+                <button type="button" className={sortBy === 'subcategory' ? 'is-active' : ''} onClick={() => setSortBy('subcategory')}>Subcategoria</button>
+                <button type="button" className={sortBy === 'brand' ? 'is-active' : ''} onClick={() => setSortBy('brand')}>Marca</button>
+                <button type="button" className={sortBy === 'value' ? 'is-active' : ''} onClick={() => setSortBy('value')}>Valor</button>
+                <button type="button" className={sortBy === 'classification' ? 'is-active' : ''} onClick={() => setSortBy('classification')}>Classificação</button>
+              </div>
+            </fieldset>
           </div>
 
           <div className="sort-count">
@@ -632,94 +653,115 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
         </>
       )}
 
-      {hasSelection && !detectedChannel && (
+      {hasSelection && !analysis && (
         <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>
           <p>Não foi possível detectar o canal do sortimento para este cliente.</p>
           <p style={{ fontSize: 12, marginTop: 8 }}>
             {availableSortChannels.length > 0
-              ? `Canais disponíveis no sortimento: ${availableSortChannels.join(', ')}. A faixa do cliente (${viewMode === 'cnpj' ? selectedClient?.premiseRange ?? '—' : '—'}) não correspondeu a nenhum.`
+              ? `Canais disponíveis no sortimento: ${availableSortChannels.join(', ')}.`
               : 'Verifique se o arquivo de sortimento com canais foi carregado.'}
           </p>
         </div>
       )}
 
       {!hasSelection && viewMode === 'cnpj' && clientBase.length > 0 && (
-        <div className="sort-cards-section">
-          <div className="sort-cards-header">
-            <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>
-              {q.length >= 2 ? `${clientCards.length} cliente${clientCards.length !== 1 ? 's' : ''} encontrado${clientCards.length !== 1 ? 's' : ''}` : `${clientBase.length} clientes na base`}
-            </span>
+        <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, marginBottom: 8 }}>
+            {q.length >= 2 ? `${clientList.length} cliente${clientList.length !== 1 ? 's' : ''} encontrado${clientList.length !== 1 ? 's' : ''}` : `${clientBase.length} clientes na base`}
           </div>
-          <div className="sort-cards-grid">
-            {pagedClientCards.map(c => {
+          <div className="sort-client-list">
+            <div className="sort-client-head">
+              <span>Cliente</span>
+              <span>CNPJ</span>
+              <span>Cidade</span>
+              <span>Faixa</span>
+              <span>Canal</span>
+              <span>Rede</span>
+              <span></span>
+            </div>
+            {pagedClients.map(c => {
               const ch = resolveChannel(c)
               return (
-                <button
+                <div
                   key={c.document}
-                  type="button"
-                  className="sort-card"
+                  className="sort-client-row"
                   onClick={() => { setSelectedDoc(c.document); setSearch(c.tradeName ?? c.legalName ?? c.document) }}
                 >
-                  <span className="sort-card-name">{c.tradeName ?? c.legalName ?? c.document}</span>
-                  <span className="sort-card-meta">
-                    <code style={{ fontSize: 10 }}>{c.document}</code>
-                    {c.city && <span>{c.city}</span>}
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>
+                    {c.tradeName ?? c.legalName ?? c.document}
+                    {c.winthorCode && <span style={{ color: 'var(--muted)', fontSize: 10, marginLeft: 6 }}>#{c.winthorCode}</span>}
                   </span>
-                  <span className="sort-card-badges">
-                    {c.premiseRange && <span className="cad-badge-range" style={{ fontSize: 9 }}>{/faixa/i.test(c.premiseRange) ? c.premiseRange : `F${c.premiseRange}`}</span>}
-                    {ch && <span className="sort-channel-badge" style={{ fontSize: 9, padding: '1px 5px' }}>{ch}</span>}
-                    {c.premiseNetwork && <span style={{ fontSize: 9, color: 'var(--blue)' }}>{c.premiseNetwork}</span>}
-                    {pexSet.has(c.document) && <span className="badge-pex" style={{ fontSize: 9 }}>PEX</span>}
+                  <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'monospace' }}>{c.document}</span>
+                  <span style={{ fontSize: 11, color: 'var(--muted)' }}>{c.city || '—'}</span>
+                  <span>
+                    {c.premiseRange
+                      ? <span className="cad-badge-range" style={{ fontSize: 9 }}>{/faixa/i.test(c.premiseRange) ? c.premiseRange : `F${c.premiseRange}`}</span>
+                      : <span style={{ color: 'var(--muted)', fontSize: 10 }}>—</span>}
                   </span>
-                </button>
+                  <span>
+                    {ch
+                      ? <span className="sort-channel-badge" style={{ fontSize: 9, padding: '1px 5px' }}>{ch}</span>
+                      : <span style={{ color: 'var(--muted)', fontSize: 10 }}>—</span>}
+                  </span>
+                  <span style={{ fontSize: 10, color: 'var(--blue)' }}>{c.premiseNetwork || '—'}</span>
+                  <span>{pexSet.has(c.document) && <span className="badge-pex" style={{ fontSize: 9 }}>PEX</span>}</span>
+                </div>
               )
             })}
           </div>
-          {totalCardsPages > 1 && (
+          {totalPages > 1 && (
             <div className="sort-cards-pagination">
-              <button type="button" disabled={cardsPage === 0} onClick={() => setCardsPage(p => p - 1)}>Anterior</button>
-              <span style={{ fontSize: 11, color: 'var(--muted)' }}>{cardsPage + 1} de {totalCardsPages}</span>
-              <button type="button" disabled={cardsPage >= totalCardsPages - 1} onClick={() => setCardsPage(p => p + 1)}>Próxima</button>
+              <button type="button" disabled={listPage === 0} onClick={() => setListPage(p => p - 1)}>Anterior</button>
+              <span style={{ fontSize: 11, color: 'var(--muted)' }}>{listPage + 1} de {totalPages}</span>
+              <button type="button" disabled={listPage >= totalPages - 1} onClick={() => setListPage(p => p + 1)}>Próxima</button>
             </div>
           )}
         </div>
       )}
 
       {!hasSelection && viewMode === 'rede' && availableRedes.length > 0 && (
-        <div className="sort-cards-section">
-          <div className="sort-cards-header">
-            <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>
-              {q.length >= 2 ? `${redeCards.length} rede${redeCards.length !== 1 ? 's' : ''} encontrada${redeCards.length !== 1 ? 's' : ''}` : `${availableRedes.length} redes disponíveis`}
-            </span>
+        <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, marginBottom: 8 }}>
+            {q.length >= 2 ? `${redeList.length} rede${redeList.length !== 1 ? 's' : ''} encontrada${redeList.length !== 1 ? 's' : ''}` : `${availableRedes.length} redes disponíveis`}
           </div>
-          <div className="sort-cards-grid">
-            {pagedRedeCards.map(r => {
+          <div className="sort-client-list">
+            <div className="sort-rede-head">
+              <span>Rede</span>
+              <span>Lojas</span>
+              <span>Canal</span>
+            </div>
+            {pagedRedes.map(r => {
               const counts = networkChannelMap.get(r.name)
-              let topCh = ''
-              if (counts) { let topN = 0; for (const [ch, n] of counts) { if (n > topN) { topCh = ch; topN = n } } }
+              const channels: [string, number][] = []
+              if (counts) {
+                for (const [ch, n] of counts) channels.push([ch, n])
+                channels.sort((a, b) => b[1] - a[1])
+              }
               return (
-                <button
+                <div
                   key={r.name}
-                  type="button"
-                  className="sort-card"
+                  className="sort-rede-row"
                   onClick={() => { setSelectedRede(r.name); setSearch(r.name) }}
                 >
-                  <span className="sort-card-name">{r.name}</span>
-                  <span className="sort-card-meta">
-                    <span style={{ color: 'var(--blue)' }}>{r.count} loja{r.count !== 1 ? 's' : ''}</span>
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>{r.name}</span>
+                  <span style={{ fontSize: 12, color: 'var(--blue)' }}>{r.count} loja{r.count !== 1 ? 's' : ''}</span>
+                  <span style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    {channels.map(([ch, n]) => (
+                      <span key={ch} className="sort-channel-pill">
+                        {ch} <span className="sort-channel-pill-count">{n}</span>
+                      </span>
+                    ))}
+                    {channels.length === 0 && <span style={{ color: 'var(--muted)', fontSize: 10 }}>—</span>}
                   </span>
-                  <span className="sort-card-badges">
-                    {topCh && <span className="sort-channel-badge" style={{ fontSize: 9, padding: '1px 5px' }}>{topCh}</span>}
-                  </span>
-                </button>
+                </div>
               )
             })}
           </div>
-          {totalCardsPages > 1 && (
+          {totalPages > 1 && (
             <div className="sort-cards-pagination">
-              <button type="button" disabled={cardsPage === 0} onClick={() => setCardsPage(p => p - 1)}>Anterior</button>
-              <span style={{ fontSize: 11, color: 'var(--muted)' }}>{cardsPage + 1} de {totalCardsPages}</span>
-              <button type="button" disabled={cardsPage >= totalCardsPages - 1} onClick={() => setCardsPage(p => p + 1)}>Próxima</button>
+              <button type="button" disabled={listPage === 0} onClick={() => setListPage(p => p - 1)}>Anterior</button>
+              <span style={{ fontSize: 11, color: 'var(--muted)' }}>{listPage + 1} de {totalPages}</span>
+              <button type="button" disabled={listPage >= totalPages - 1} onClick={() => setListPage(p => p + 1)}>Próxima</button>
             </div>
           )}
         </div>
