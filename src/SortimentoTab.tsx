@@ -120,8 +120,15 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
         const ctLow = ct.toLowerCase()
         resolved = availableSortChannels.find(ch => ch.toLowerCase() === ctLow) ?? availableSortChannels.find(ch => ctLow && ch.toLowerCase().includes(ctLow)) ?? ''
       }
+      if (!resolved && ct) {
+        const ctN = ct.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
+        if (['farma', 'droga', 'farmacia', 'drogaria'].some(k => ctN.includes(k)))
+          resolved = availableSortChannels.find(ch => { const l = ch.toLowerCase(); return l.startsWith('droga') || l.startsWith('farma') }) ?? ''
+        if (!resolved && ['cc', 'cashcarry', 'atacarejo', 'atacado', 'club'].some(k => ctN.includes(k)))
+          resolved = availableSortChannels.find(ch => { const l = ch.toLowerCase(); return l.startsWith('club') || l.includes('c&c') }) ?? ''
+      }
       if (!resolved && faixaNum) {
-        const FAIXA_MAP: Record<string, string[]> = { '1': ['hiper'], '2': ['super g', 'superg'], '3': ['super p', 'superp'], '4': ['clubs', 'c&c', 'vizinhanca'], '5': ['drogaria', 'farma', 'vizinhanca'] }
+        const FAIXA_MAP: Record<string, string[]> = { '1': ['hiper'], '2': ['super g', 'superg'], '3': ['super p', 'superp'], '4': ['viz g', 'vizg', 'vizinhanca'], '5': ['viz p', 'vizp', 'vizinhanca'], '6': ['tard', 'tradicional'] }
         const candidates = FAIXA_MAP[faixaNum]
         if (candidates) {
           for (const cand of candidates) {
@@ -150,12 +157,26 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
       const partial = availableSortChannels.find(ch => ctLow && ch.toLowerCase().includes(ctLow))
       if (partial) return partial
     }
+    const ctNorm = ct.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
+    if (ctNorm) {
+      const isDrug = ['farma', 'droga', 'farmacia', 'drogaria'].some(k => ctNorm.includes(k))
+      if (isDrug) {
+        const m = availableSortChannels.find(ch => { const l = ch.toLowerCase(); return l.startsWith('droga') || l.startsWith('farma') })
+        if (m) return m
+      }
+      const isClub = ['cc', 'cashcarry', 'cashandcarry', 'atacarejo', 'atacado', 'club'].some(k => ctNorm.includes(k))
+      if (isClub) {
+        const m = availableSortChannels.find(ch => { const l = ch.toLowerCase(); return l.startsWith('club') || l.includes('c&c') })
+        if (m) return m
+      }
+    }
     const FAIXA_MAP: Record<string, string[]> = {
       '1': ['hiper'],
       '2': ['super g', 'superg'],
       '3': ['super p', 'superp'],
-      '4': ['clubs', 'c&c', 'vizinhanca'],
-      '5': ['drogaria', 'farma', 'vizinhanca'],
+      '4': ['viz g', 'vizg', 'vizinhanca'],
+      '5': ['viz p', 'vizp', 'vizinhanca'],
+      '6': ['tard', 'tradicional'],
     }
     if (faixaNum) {
       const candidates = FAIXA_MAP[faixaNum]
