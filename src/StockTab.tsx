@@ -141,6 +141,17 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
 
   const receiptGroups = useMemo(() => groupReceiptsByInvoice(receiptBase), [receiptBase])
 
+  const unitsPerBoxMap = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const p of productBase) {
+      if (p.unitsPerBox && p.unitsPerBox > 0) {
+        if (p.internalCode) map.set(p.internalCode, p.unitsPerBox)
+        if (p.manufacturerCode) map.set(p.manufacturerCode, p.unitsPerBox)
+      }
+    }
+    return map
+  }, [productBase])
+
   const kpis = useMemo(() => {
     // Agrega carteira dos receipts em_transito (productCode = código fabricante / material)
     const transitByMfr = new Map<string, { qty: number; value: number }>()
@@ -1504,7 +1515,18 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                             <span className={`notas-inv-toggle${expandedNotas.has(inv.invoice) ? ' open' : ''}`}>▶</span>
                             <span className="notas-inv-num">NF {inv.displayInvoice}</span>
                             <span className="notas-inv-supplier">{inv.supplier ?? '—'}</span>
-                            <span className="notas-inv-qty">{inv.totalQty.toLocaleString('pt-BR')} UN</span>
+                            <span className="notas-inv-qty">
+                              {inv.totalQty.toLocaleString('pt-BR')} UN
+                              {(() => {
+                                let totalBoxes = 0; let allResolved = true
+                                for (const r of inv.items) {
+                                  const upb = r.productCode ? unitsPerBoxMap.get(r.productCode) : undefined
+                                  if (upb && r.quantity) totalBoxes += r.quantity / upb
+                                  else allResolved = false
+                                }
+                                return totalBoxes > 0 ? ` · ${totalBoxes.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} CX${!allResolved ? '*' : ''}` : ''
+                              })()}
+                            </span>
                             <span className="notas-inv-val">R$ {brl(inv.totalValue)}</span>
                           </div>
                           {expandedNotas.has(inv.invoice) && (
@@ -1515,20 +1537,26 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                                     <th>Código</th>
                                     <th>Descrição</th>
                                     <th className="n-right">Qtd</th>
+                                    <th className="n-right">Cx</th>
                                     <th className="n-right">Preço unit.</th>
                                     <th className="n-right">Valor</th>
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {inv.items.map((r, i) => (
+                                  {inv.items.map((r, i) => {
+                                    const upb = r.productCode ? unitsPerBoxMap.get(r.productCode) : undefined
+                                    const boxes = upb && r.quantity ? r.quantity / upb : undefined
+                                    return (
                                     <tr key={i}>
                                       <td><code style={{ fontSize: 11 }}>{r.productCode ?? '—'}</code></td>
                                       <td>{r.description ?? '—'}</td>
                                       <td className="n-right">{(r.quantity ?? 0).toLocaleString('pt-BR')}</td>
+                                      <td className="n-right">{boxes !== undefined ? boxes.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '—'}</td>
                                       <td className="n-right">{r.unitPrice !== undefined ? `R$ ${brl(r.unitPrice)}` : '—'}</td>
                                       <td className="n-right">{r.value !== undefined ? `R$ ${brl(r.value)}` : '—'}</td>
                                     </tr>
-                                  ))}
+                                    )
+                                  })}
                                 </tbody>
                               </table>
                             </div>
