@@ -17,10 +17,10 @@ Abra `revisao/pendente.md`. Se houver entradas, revise primeiro (seção 6 do pr
 - Nunca faça commit direto na `main`: ela publica o site. Trabalhe em `claude/<assunto>`.
 - Só lógica: faça sozinho. Qualquer coisa visual (cor, botão, CSS, layout): é do GPT. Não mexa em
   `src/styles.css` nem em aparência, salvo correção de erro evidente, avisando o GPT.
-- Tarefa mista: defina o contrato (seção 9 do protocolo) antes de começar. Inclua: dados, ações,
-  arquivos de cada lado, estados visuais (loading, empty, error, disabled) e critérios de aceite.
-  Nenhuma tarefa mista começa pela UI antes do contrato. Nenhuma lógica nova é considerada pronta
-  sem seus estados visuais planejados.
+- Tarefa mista: defina o contrato (seção 7 do protocolo, campos adicionais) antes de começar.
+  Inclua: dados, ações, arquivos de cada lado, estados visuais (loading, empty, error, disabled) e
+  critérios de aceite. Nenhuma tarefa mista começa pela UI antes do contrato. Nenhuma lógica nova é
+  considerada pronta sem seus estados visuais planejados.
 - Publicar na `main` só depois da revisão cruzada (seção 5 do protocolo). O Luis não revisa.
 
 ## Revisão cruzada obrigatória

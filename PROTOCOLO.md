@@ -14,7 +14,8 @@ Leia inteiro antes da primeira alteração. Em caso de conflito com outra instru
   Também atua como **colaborador estratégico**: sugere melhores abordagens, dá ideias e participa da
   validação cruzada. O site não usa imagens.
 - A divisão define de quem é a palavra final, não quem pode tocar no arquivo. Quem achar um erro que
-  tem certeza de saber corrigir, corrige e avisa a outra IA explicitamente.
+  tem certeza de saber corrigir, corrige e avisa a outra IA explicitamente — desde que o arquivo não
+  esteja reservado a outra IA numa tarefa ativa (seção 4, item 4).
 
 ## 2. Onde o Luis pede
 
@@ -25,10 +26,10 @@ Leia inteiro antes da primeira alteração. Em caso de conflito com outra instru
 
 1. **Só lógica** (nada muda na aparência): Claude faz sozinho. Não aciona o GPT.
 2. **Só visual** (cor, botão, CSS, espaçamento, tipografia, layout, componente): vai para o GPT.
-3. **Misto** (tela nova, função com interface): Claude define o contrato antes de começar (seção 9),
-   faz a lógica e passa o visual ao GPT com esse contrato. Nenhuma tarefa mista começa pela UI antes
-   do contrato de dados/ação estar definido; nenhuma lógica nova é considerada pronta sem seus estados
-   visuais planejados.
+3. **Misto** (tela nova, função com interface): Claude define o contrato antes de começar (seção 7,
+   campos adicionais), faz a lógica e passa o visual ao GPT com esse contrato. Nenhuma tarefa mista
+   começa pela UI antes do contrato de dados/ação estar definido; nenhuma lógica nova é considerada
+   pronta sem seus estados visuais planejados.
 4. Na dúvida entre 1 e 2: se o resultado aparece para quem usa o site, o GPT entra.
 5. Ajuste de texto, valor ou correção de uma linha **sem efeito visual**: quem recebeu faz direto
    e notifica a outra IA explicitamente sobre o que mudou.
@@ -64,6 +65,8 @@ Isso não dispensa o envio do ramo e do pull request por quem fez o trabalho (se
 - Código do Claude → GPT revisa antes do merge.
 - Código visual do GPT → Claude revisa antes do merge.
 - Nenhum merge sem aprovação explícita da outra IA.
+- **Exceção**: no modo substituição (seção 6), o GPT trabalha e publica sozinho; a revisão acontece
+  depois, quando o Claude volta, via `revisao/pendente.md`.
 
 ### Checklist de aprovação
 
@@ -115,7 +118,8 @@ No chat em que ele pediu, dizendo quem fez o quê, o que foi decidido e por quê
 A comunicação entre Claude e GPT acontece pela ponte em `C:\nemo` no computador do Luis, usando as
 ferramentas `perguntar_ao_gpt` e `resultado_do_gpt`.
 
-1. `C:\nemo` é **exclusivamente para comunicação**. Nenhum arquivo do projeto é copiado para lá.
+1. `C:\nemo` é **exclusivamente para comunicação**. O repositório nunca é clonado nem copiado para
+   lá. Trechos de arquivos podem ser citados nas mensagens de conversa, mas não como cópia de trabalho.
 2. Mensagens de conversa podem ser armazenadas em `C:\nemo\conversas\`.
 3. Itens pendentes de revisão podem ficar em `C:\nemo\revisao\`.
 4. O repositório nunca é clonado para o computador do Luis. Todo o trabalho de código acontece no
