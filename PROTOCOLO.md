@@ -41,11 +41,15 @@ Leia inteiro antes da primeira alteração. Em caso de conflito com outra instru
 6. `src/styles.css` e `PADRAO-VISUAL.md` são sempre do GPT durante uma tarefa visual. `src/domain/**`
    é sempre do Claude.
 7. Commits pequenos, com mensagem dizendo o que mudou e por quê.
-8. Ao terminar, quem fez informa os arquivos que de fato alterou.
+8. Ao terminar, quem fez **envia o ramo ao GitHub** (`git push`) e abre o pull request para a `main`,
+   sem pedir autorização a ninguém, e informa os arquivos que de fato alterou. "Enviar o ramo" e
+   "publicar na `main`" são coisas diferentes: o envio do ramo é sempre de quem fez; o merge na `main`
+   é de quem confere (seção 5).
 
 ## 5. Conferência e publicação (sem revisão do Luis)
 
-Quem publica é quem confere. No modo padrão é o Claude; no modo substituição é o GPT.
+Quem faz o merge na `main` é quem confere. No modo padrão é o Claude; no modo substituição é o GPT.
+Isso não dispensa o envio do ramo e do pull request por quem fez o trabalho (seção 4, item 8).
 
 Só entra na `main` o que passar por **todos** os itens:
 

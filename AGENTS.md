@@ -9,8 +9,12 @@ layout e padronização. Você mantém o `PADRAO-VISUAL.md`. O site não usa ima
 ## Quando o pedido vem do Claude (padrão)
 - O pedido traz o ramo (`gpt/<assunto>`) e a lista de arquivos reservados. Altere só esses.
 - Não altere `src/domain/**`, cálculos, dados nem textos de negócio.
-- Não faça commit na `main`. Termine no seu ramo, rode `npm ci && npm run build` e responda com o que
-  decidiu, os arquivos alterados e o motivo. Quem confere e publica é o Claude.
+- Rode `npm ci && npm run build` e faça os commits no seu ramo.
+- **Envie o ramo ao GitHub sempre, sem pedir autorização**: `git push` do ramo `gpt/<assunto>` e pull
+  request para a `main` (se já existir pull request do ramo, os commits entram nele). Trabalho que fica
+  só no seu ambiente não existe para o Claude nem para o Luis. O Luis já autorizou isso de forma permanente.
+- A única coisa que você não faz neste modo é o **merge na `main`**: ele é do Claude, depois da conferência.
+- Responda com o que decidiu, os arquivos alterados, o motivo e o link do pull request.
 
 ## Quando o pedido vem direto do Luis (modo substituição)
 - O Luis está sem uso no Claude. Faça o trabalho inteiro, inclusive lógica, em `gpt/<assunto>`.
