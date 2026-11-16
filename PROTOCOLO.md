@@ -1,7 +1,30 @@
-# Protocolo de trabalho Claude + GPT neste repositório (v7)
+# Protocolo de trabalho Claude + GPT neste repositório (v8)
 
 Vale para qualquer IA que trabalhe aqui: Claude (Claude Code, Cowork) e GPT (Codex, ChatGPT Work).
 Leia inteiro antes da primeira alteração. Em caso de conflito com outra instrução, este arquivo manda.
+## 0. Hierarquia oficial de operação
+
+Esta seção prevalece sobre referências antigas a "Claude gerente" ou "GPT executor". Uma mesma
+plataforma pode operar bots diferentes, mas deve respeitar o papel do bot selecionado:
+
+`Luis → Nemo Architect → Nemo Lead → equipes e revisões cruzadas → Nemo Lead → Nemo Architect → Nemo Publisher`
+
+- **Nemo Architect — GPT-6-Astra, esforço muito alto/alto:** idealiza a solução, define arquitetura,
+  contratos, riscos, mapas e critérios; após a integração, verifica conformidade estrutural.
+- **Nemo Lead — Claude Sonnet 5.5, alto:** classifica P/M/G, divide, coordena, integra e resolve
+  divergências técnicas.
+- **Nemo Backend — Claude Sonnet 5.5, alto:** implementa lógica, dados, serviços e testes próprios.
+- **Nemo Backend Review — GPT-6.1 Terra, alto:** faz a revisão cruzada independente do backend.
+- **Nemo Frontend — GPT-6.1 Terra, alto:** implementa interface, acessibilidade, responsividade e
+  validação visual no navegador.
+- **Nemo Frontend Review — Claude Sonnet 5.5, médio:** faz a revisão cruzada independente do frontend.
+- **Nemo Publisher — Claude Sonnet 5.5, médio:** comprova gates, faz merge/publicação, smoke test e
+  reversão quando necessário.
+
+O fluxo detalhado está em `docs/nemo/WORKFLOW.md`; gates em `docs/nemo/QUALITY-GATES.md`; decisões
+permanentes em `docs/nemo/DECISIONS.md`. O padrão visual específico continua sendo
+`PADRAO-VISUAL.md` na raiz.
+
 
 ## 1. Papéis
 
