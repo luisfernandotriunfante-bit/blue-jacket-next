@@ -59,3 +59,13 @@ de cor) devem atualizar `PADRAO-VISUAL.md` na mesma entrega.
 
 ## Comandos
 - `npm ci` · `npm run build` (TypeScript + Vite; conferência obrigatória) · `npm run dev`
+
+## Documentos compartilhados da equipe Nemo
+
+Além do protocolo e do padrão visual da raiz, consulte conforme a tarefa:
+- `docs/nemo/PRODUCT.md` — objetivo e experiência do produto.
+- `docs/nemo/ARCHITECTURE.md` — limites, contratos, dados e segurança.
+- `docs/nemo/WORKFLOW.md` — hierarquia, estados e passagem entre bots.
+- `docs/nemo/QUALITY-GATES.md` — gates de implementação, integração e publicação.
+- `docs/nemo/DECISIONS.md` — memória das decisões permanentes.
+- `docs/nemo/SYSTEM-MAP.md` — mapa atual do sistema e das fontes oficiais.
