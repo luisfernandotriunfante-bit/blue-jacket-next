@@ -133,3 +133,7 @@ Hoje existem 15 classes de botão com raio de 5 a 8px e paddings diferentes (`.a
 2. Nenhuma cor hexadecimal nova em `.tsx` (exceto as cores de dado da seção 5).
 3. Tela conferida nos temas claro e escuro e em largura de celular.
 4. Nenhuma regra de cálculo, dado ou texto de negócio foi alterada.
+
+### Base de interação (E1)
+
+As escalas de cor, espaço, raio e tipografia estão disponíveis como propriedades CSS globais. `--focus` usa o azul do tema; `--on-accent` é branco e `--overlay` é preto a 60%. Os temas definem `color-scheme`. Controles recebem contorno de foco visível e animações respeitam movimento reduzido; a fonte usa `system-ui` como alternativa.
