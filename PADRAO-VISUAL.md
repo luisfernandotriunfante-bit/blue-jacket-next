@@ -161,3 +161,7 @@ O cabeçalho e a superfície dos cartões do treemap usam os tokens do tema; os 
 ### Carteira (E7)
 
 Os estilos da Carteira residem em `styles.css`. O seletor de modo ativo usa azul, e cidades selecionáveis no mapa e na lista aceitam teclado. As rampas do mapa preservam seus valores de dados originais.
+
+### Sortimento e filtros (E8)
+
+O semáforo de sortimento usa azul (bom), âmbar (intermediário) e vermelho (ruim). `--amber-text` usa `#f59e0b` no escuro e `#985500` no claro para leitura em superfícies; o âmbar de preenchimento permanece `--amber`. Controles selecionados usam azul; linhas de seleção respondem ao teclado.

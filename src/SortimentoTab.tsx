@@ -530,16 +530,16 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
               <div className="donut-svg-wrap">
                 <svg viewBox="0 0 120 120">
                   <circle cx="60" cy="60" r="52" fill="none" stroke="var(--border)" strokeWidth="12" />
-                  <circle cx="60" cy="60" r="52" fill="none" stroke={analysis.assortment >= 0.5 ? '#4caf50' : analysis.assortment >= 0.25 ? '#ff9800' : '#ef5350'} strokeWidth="12" strokeLinecap="round" strokeDasharray={`${analysis.assortment * 326.73} ${326.73 - analysis.assortment * 326.73}`} strokeDashoffset="81.68" transform="rotate(-90 60 60)" />
+                  <circle cx="60" cy="60" r="52" fill="none" stroke={analysis.assortment >= 0.5 ? 'var(--blue)' : analysis.assortment >= 0.25 ? 'var(--amber-text)' : 'var(--red-text)'} strokeWidth="12" strokeLinecap="round" strokeDasharray={`${analysis.assortment * 326.73} ${326.73 - analysis.assortment * 326.73}`} strokeDashoffset="81.68" transform="rotate(-90 60 60)" />
                 </svg>
                 <div className="donut-center">
-                  <span className="donut-center-val" style={{ color: analysis.assortment >= 0.5 ? '#4caf50' : analysis.assortment >= 0.25 ? '#ff9800' : '#ef5350' }}>{pct(analysis.assortment)}</span>
+                  <span className="donut-center-val" style={{ color: analysis.assortment >= 0.5 ? 'var(--blue)' : analysis.assortment >= 0.25 ? 'var(--amber-text)' : 'var(--red-text)' }}>{pct(analysis.assortment)}</span>
                   <span className="donut-center-label">Assortment</span>
                 </div>
               </div>
               <div className="donut-legend">
                 <div className="donut-leg-item">
-                  <span className="donut-leg-dot" style={{ background: '#4caf50' }} />
+                  <span className="donut-leg-dot" style={{ background: 'var(--blue)' }} />
                   <span className="donut-leg-label">Comprados</span>
                   <span className="donut-leg-val">{analysis.skusComprados}</span>
                 </div>
@@ -555,14 +555,14 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
               <div className="kpi-card">
                 <div className="kpi-card-body">
                   <div className="kpi-label">Mandatório</div>
-                  <div className="kpi-val" style={{ color: analysis.cobMand >= 0.5 ? '#4caf50' : analysis.cobMand >= 0.25 ? '#ff9800' : '#ef5350' }}>{pct(analysis.cobMand)}</div>
+                  <div className="kpi-val" style={{ color: analysis.cobMand >= 0.5 ? 'var(--blue)' : analysis.cobMand >= 0.25 ? 'var(--amber-text)' : 'var(--red-text)' }}>{pct(analysis.cobMand)}</div>
                   <div className="kpi-sub">{analysis.mandComprados} de {analysis.mandDisp}</div>
                 </div>
               </div>
               <div className="kpi-card">
                 <div className="kpi-card-body">
                   <div className="kpi-label">Importante</div>
-                  <div className="kpi-val" style={{ color: analysis.cobImp >= 0.5 ? '#4caf50' : analysis.cobImp >= 0.25 ? '#ff9800' : '#ef5350' }}>{pct(analysis.cobImp)}</div>
+                  <div className="kpi-val" style={{ color: analysis.cobImp >= 0.5 ? 'var(--blue)' : analysis.cobImp >= 0.25 ? 'var(--amber-text)' : 'var(--red-text)' }}>{pct(analysis.cobImp)}</div>
                   <div className="kpi-sub">{analysis.impComprados} de {analysis.impDisp}</div>
                 </div>
               </div>
@@ -575,7 +575,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
               <div className="kpi-card">
                 <div className="kpi-card-body">
                   <div className="kpi-label">Fora Sortimento</div>
-                  <div className="kpi-val" style={{ color: '#ff9800' }}>{kpiCurrency(analysis.valorForaSortimento)}</div>
+                  <div className="kpi-val" style={{ color: 'var(--amber-text)' }}>{kpiCurrency(analysis.valorForaSortimento)}</div>
                   <div className="kpi-sub">{analysis.skusFora} SKUs</div>
                 </div>
               </div>
@@ -665,7 +665,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
                   {item.value > 0
                     ? <strong className="c-blue" style={{ fontSize: 12 }}>{kpiCurrency(item.value)}</strong>
                     : item.value < 0
-                    ? <strong style={{ fontSize: 12, color: '#ef5350' }}>{kpiCurrency(item.value)}</strong>
+                    ? <strong style={{ fontSize: 12, color: 'var(--red-text)' }}>{kpiCurrency(item.value)}</strong>
                     : <span className="c-muted">—</span>}
                 </span>
               </div>
@@ -705,7 +705,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
               return (
                 <div
                   key={c.document}
-                  className="sort-client-row"
+                  className="sort-client-row" role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedDoc(c.document); setSearch(c.tradeName ?? c.legalName ?? c.document) } }}
                   onClick={() => { setSelectedDoc(c.document); setSearch(c.tradeName ?? c.legalName ?? c.document) }}
                 >
                   <span style={{ fontWeight: 600, fontSize: 13 }}>
@@ -761,7 +761,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
               return (
                 <div
                   key={r.name}
-                  className="sort-rede-row"
+                  className="sort-rede-row" role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedRede(r.name); setSearch(r.name) } }}
                   onClick={() => { setSelectedRede(r.name); setSearch(r.name) }}
                 >
                   <span style={{ fontWeight: 600, fontSize: 13 }}>{r.name}</span>

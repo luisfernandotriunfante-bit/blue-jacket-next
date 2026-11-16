@@ -366,7 +366,7 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
                 role="button"
                 tabIndex={0}
                 onClick={() => setExpanded(isSelected ? null : r.document)}
-                onKeyDown={e => e.key === 'Enter' && setExpanded(isSelected ? null : r.document)}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(isSelected ? null : r.document) } }}
               >
                 <span className="sc-desc">
                   <span className="p-name">{r.name}</span>
@@ -422,7 +422,7 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
                   <h3>{selectedRow.name}</h3>
                   <small>{selectedRow.document} · {selectedRow.code}</small>
                 </div>
-                <button type="button" style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 18, padding: '0 4px', lineHeight: 1 }} onClick={() => setExpanded(null)}>✕</button>
+                <button type="button" aria-label="Fechar" className="detail-close" onClick={() => setExpanded(null)}>✕</button>
               </div>
             </div>
             <div className="cad-side-body">
