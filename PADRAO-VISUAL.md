@@ -157,3 +157,7 @@ Os diálogos têm título associado, foco inicial, retorno ao controle de origem
 ### Estoque (E6)
 
 O cabeçalho e a superfície dos cartões do treemap usam os tokens do tema; os blocos coloridos permanecem calculados pelos dados. Linhas interativas respondem a Enter e Espaço.
+
+### Carteira (E7)
+
+Os estilos da Carteira residem em `styles.css`. O seletor de modo ativo usa azul, e cidades selecionáveis no mapa e na lista aceitam teclado. As rampas do mapa preservam seus valores de dados originais.
