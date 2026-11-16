@@ -5,7 +5,7 @@ Painel comercial web para execução de vendas. O usuário importa planilhas (Ex
 - **Site publicado:** <https://luisfernandotriunfante-bit.github.io/blue-jacket-next/>
 - **Nome do repositório:** `blue-jacket-next` é um nome histórico. O nome oficial do produto é **Red Jacket**. O caminho `/blue-jacket-next/` continua sendo usado só como rota de publicação no GitHub Pages.
 
-> Este repositório não contém dados comerciais. Planilhas, `.env` e a pasta `arquivos/` estão no `.gitignore` e não devem ser commitados.
+> Não adicione dados comerciais ao repositório. `.env`, `.env.local` e `arquivos/` estão ignorados; planilhas fora dessa pasta não são ignoradas automaticamente. A revisão do histórico Git permanece pendente (veja o [HANDOFF.md](HANDOFF.md)).
 
 ## O que o painel faz
 
@@ -56,11 +56,11 @@ flowchart LR
   A["Arquivos<br/>.xls / .xlsx / .txt"] --> B["fileDetector<br/>identifica o tipo"]
   B --> C["Motores no navegador<br/>produtos · clientes · movimentações<br/>histórico · recebimentos"]
   C --> D[("IndexedDB<br/>bases processadas")]
-  C --> E[("localStorage<br/>configurações rj-*")]
   D --> F["Telas<br/>Sell Out · Estoque · Clientes · Administração"]
+  F -- "configurações e preferências" --> E[("localStorage<br/>chaves rj-*")]
   E --> F
-  D -. "opcional" .-> G[("Firebase<br/>Realtime Database")]
-  E -. "opcional" .-> G
+  D <-. "opcional: envia e recebe" .-> G[("Firebase<br/>Realtime Database")]
+  E <-. "opcional: envia e recebe" .-> G
   F --> H["Exportações<br/>JSON · Excel · backup"]
 ```
 
@@ -119,7 +119,7 @@ revisao/             registro de exceções de revisão
 
 ## Publicação
 
-O workflow `.github/workflows/deploy.yml` roda a cada push na `main`: `npm ci`, `npm run build` e publicação da pasta `dist/` no GitHub Pages (Node 20). Ele **não injeta** as variáveis `VITE_FB_*`; portanto, o site publicado hoje roda em modo local, sem sincronização em nuvem, a menos que isso seja configurado no futuro.
+O workflow `.github/workflows/deploy.yml` roda a cada push na `main`: `npm ci`, `npm run build` e publicação da pasta `dist/` no GitHub Pages (Node 20). O workflow versionado **não injeta** as variáveis `VITE_FB_*`; um build sem essas variáveis funciona em modo local, sem sincronização em nuvem.
 
 Não há testes automatizados, smoke test pós-deploy nem rollback automático.
 
@@ -127,7 +127,7 @@ Não há testes automatizados, smoke test pós-deploy nem rollback automático.
 
 - Campanhas é apenas um placeholder.
 - Sem testes automatizados e sem ESLint (o `lint` é só `tsc`).
-- Sem servidor, autenticação ou controle de acesso; os dados ficam no navegador do usuário.
+- Sem servidor próprio, autenticação ou controle de acesso; os dados ficam no navegador do usuário e, quando o Firebase está configurado, também são enviados ao Realtime Database.
 - Os motores reconhecem layouts de relatório específicos (colunas em posições fixas); arquivos com outro layout caem como não reconhecidos.
 - Revisão de segurança do Firebase e do histórico Git ainda pendente.
 
