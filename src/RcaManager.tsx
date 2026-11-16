@@ -182,7 +182,7 @@ export function RcaManager() {
       </div>
 
       {importMsg && (
-        <div className="rca-import-msg visual-u-70" >
+        <div className="rca-import-msg visual-u-70" role="status" >
           {importMsg}
         </div>
       )}
@@ -199,7 +199,7 @@ export function RcaManager() {
             <button className="close" type="button" aria-label="Fechar" onClick={() => setEditing(null)}>×</button>
             <h2 id="rca-modal-title" className="visual-u-72" >{isNew ? 'Novo vendedor' : 'Editar vendedor'}</h2>
             {formErrors.length > 0 && (
-              <ul className="rca-errors">
+              <ul className="rca-errors" role="alert">
                 {formErrors.map(e => <li key={e}>{e}</li>)}
               </ul>
             )}
@@ -293,7 +293,8 @@ export function RcaManager() {
       )}
 
       {/* ── tabela ────────────────────────────────────── */}
-      <div className="visual-u-73" >
+      {!filtered.length && <div className="rca-empty" role="status">{rcas.length ? 'Nenhum resultado para a busca.' : 'Nenhum vendedor cadastrado. Clique em "+ Novo vendedor" para começar.'}</div>}
+      {filtered.length > 0 && <div className="visual-u-73" >
         <table className="gr-table">
           <thead>
             <tr>
@@ -344,16 +345,9 @@ export function RcaManager() {
                 </td>
               </tr>
             ))}
-            {!filtered.length && (
-              <tr>
-                <td colSpan={9} className="visual-u-77" >
-                  {rcas.length ? 'Nenhum resultado para a busca.' : 'Nenhum vendedor cadastrado. Clique em "+ Novo vendedor" para começar.'}
-                </td>
-              </tr>
-            )}
           </tbody>
         </table>
-      </div>
+      </div>}
     </div>
   )
 }

@@ -528,7 +528,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
           <div className="sort-hero-row">
             <div className="sort-donut-block">
               <div className="donut-svg-wrap">
-                <svg viewBox="0 0 120 120">
+                <svg viewBox="0 0 120 120" aria-hidden="true">
                   <circle cx="60" cy="60" r="52" fill="none" stroke="var(--border)" strokeWidth="12" />
                   <circle cx="60" cy="60" r="52" fill="none" stroke={analysis.assortment >= 0.5 ? 'var(--blue)' : analysis.assortment >= 0.25 ? 'var(--amber-text)' : 'var(--red-text)'} strokeWidth="12" strokeLinecap="round" strokeDasharray={`${analysis.assortment * 326.73} ${326.73 - analysis.assortment * 326.73}`} strokeDashoffset="81.68" transform="rotate(-90 60 60)" />
                 </svg>

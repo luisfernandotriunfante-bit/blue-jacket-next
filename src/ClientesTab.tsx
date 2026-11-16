@@ -205,7 +205,7 @@ export function ClientesTab({ movementBase, clientBase, monthLabel, activeComp }
           <span className="notas-section-title">Positivados · {monthLabel}</span>
           <small className="e5-muted-small">clique numa linha para ver histórico</small>
         </div>
-        <div>
+        <div className="table-scroll" tabIndex={0} role="region" aria-label={`Positivados · ${monthLabel}`}>
           <table className="gr-table data-table">
             <thead>
               <tr>

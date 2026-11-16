@@ -1476,6 +1476,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                 />
                 <input
                   type="date"
+                  aria-label="Notas Recebidas"
                   value={notasDate}
                   onChange={e => setNotasDate(e.target.value)}
                   className="stock-date-select"
@@ -1704,7 +1705,7 @@ function KpiCard({ label, value, accent, sub, percent, pctLabel }: {
         {(showRing || showSub) && (
           <div className="kpi-ring-row">
             {showRing && (
-              <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="kpi-ring-svg visual-u-118" >
+              <svg aria-hidden="true" width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="kpi-ring-svg visual-u-118" >
                 <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--border)" strokeWidth={2.5} />
                 <circle cx={cx} cy={cy} r={r} fill="none" stroke={ringColor} strokeWidth={2.5}
                   strokeDasharray={`${filled} ${circ}`} strokeLinecap="round" />
@@ -1737,7 +1738,7 @@ function StockDonut({ segments, total, centerLabel, centerValue }: {
   return (
     <div className="stock-donut-wrap">
       <div className="donut-svg-wrap">
-        <svg viewBox="0 0 120 120">
+        <svg viewBox="0 0 120 120" aria-hidden="true">
           <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--border)" strokeWidth="12" />
           <g transform={`rotate(-90 ${cx} ${cy})`}>
             {arcs.map((arc, i) => arc.dash > 0 && (

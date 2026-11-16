@@ -140,7 +140,7 @@ As escalas de cor, espaço, raio e tipografia estão disponíveis como proprieda
 
 ### Componentes compartilhados (E2)
 
-Classes `.btn` (variantes `-primary`, `-secondary`, `-control`, `-danger`, `-sm`, `-icon`), `.tabs`/`.tab`, `.chip`, `.badge` e variantes de cor, `.panel`/`.panel-head`/`.panel-title`, `.data-table`, `.empty-state`, `.field`/`.input`/`.select`/`.textarea` e `.page-head` fornecem a base para migração gradual. As classes anteriores permanecem durante a migração; `.add-button`, `.secondary-button` e `.process-button` compartilham altura e raio da base de botão.
+Classes canônicas sem uso foram removidas. `.data-table` e `.page-head` permanecem em uso; `.add-button`, `.secondary-button` e `.process-button` compartilham altura, peso e raio. As demais classes legadas mantêm suas regras específicas.
 
 ### Navegação (E3)
 
@@ -187,6 +187,20 @@ Exceções e regras finais da validação (E9):
 - Texto branco sobre as telhas do treemap de Estoque usa o gradiente escuro da própria telha em ambos os temas.
 - Desabilitado (`:disabled`) fica isento de contraste mínimo, como previsto pelo WCAG.
 
-Os textos de badges usam âmbar `#985500`, verde `#087a57` e roxo `#7e22ce` no tema claro; no escuro usam `#f59e0b`, `#10b981` e `#a855f7`. O preenchimento azul ativo usa `#2563eb`.
+Textos usam `--amber-text` (`#985500` claro, `#f59e0b` escuro), `--green-text` (`#087a57`, `#10b981`) e `--purple-text` (`#6b21a8`, `#c084fc`). O preenchimento azul ativo usa `#2563eb`.
 
 O título da seção usa `.page-head` e os rótulos existentes da navegação. Abas administrativas indicam rolagem e mantêm a aba selecionada visível.
+
+
+Estados existentes e classes:
+
+| Estado | Classe | Telas |
+|---|---|---|
+| Sem dados | `.so-empty` | Sell Out, Gerencial, Clientes, Pirâmide |
+| Sem dados | `.sort-empty`, `.stock-treemap-empty`, `.empty` | Sortimento, Estoque, Administração |
+| Sem vendedor ou resultado | `.rca-empty` | Administração / Vendedores |
+| Processando | `.process-button:disabled`, `aria-busy` | Administração / Uploads |
+| Erro | `.rca-errors`, mensagens existentes | Administração / Vendedores e Uploads |
+| Desabilitado | `:disabled` nos controles existentes | Telas com ações indisponíveis |
+
+Os vazios compartilham cor, alinhamento e quebra; a marcação compacta de ausência em baldes permanece `—`, sem caixa de mensagem. Texto de linha comercial usa `--text`; cores de dado ficam em marcadores e barras. A tabela de clientes tem contêiner rolável por teclado. Raios compostos das extremidades de filtros foram normalizados; 50% continua reservado a círculos e 3px a barras de gráfico.

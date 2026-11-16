@@ -34,7 +34,7 @@ function TwoSegmentDonut({ label, segA, segALabel, segAVal, segB, segBLabel, seg
     <div className="so-hero-card so-hero-card-lg">
       <div className="so-hero-label">{label}</div>
       <div className="so-hero-svg-wrap-lg">
-        <svg viewBox="0 0 132 132">
+        <svg viewBox="0 0 132 132" aria-hidden="true">
           <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--border)" strokeWidth={13} />
           {hasData && (
             <g transform={`rotate(-90 ${cx} ${cy})`}>

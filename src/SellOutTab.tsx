@@ -59,7 +59,7 @@ function TwoSegmentDonut({ label, segA, segALabel, segAVal, segB, segBLabel, seg
     <div className="so-hero-card so-hero-card-lg">
       <div className="so-hero-label">{label}</div>
       <div className="so-hero-svg-wrap-lg">
-        <svg viewBox="0 0 132 132">
+        <svg viewBox="0 0 132 132" aria-hidden="true">
           {/* trilha (meta) */}
           <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--border)" strokeWidth={13} />
           {hasData && (
@@ -371,7 +371,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
                     </div>
                   </div>
                   <div className="e5-scroll">
-                    <svg viewBox={`0 0 ${W} ${H_FIN + PAD.t + PAD.b}`} width="100%"
+                    <svg role="img" aria-label="Sell Out diário" viewBox={`0 0 ${W} ${H_FIN + PAD.t + PAD.b}`} width="100%"
                       style={{ display: 'block', minWidth: Math.max(260, n * 38) }}>
                       <defs>
                         <linearGradient id="gso" x1="0" y1="0" x2="0" y2="1">
@@ -425,7 +425,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
                     </div>
                   </div>
                   <div className="e5-scroll">
-                    <svg viewBox={`0 0 ${W} ${H_POS + PAD.t + PAD.b}`} width="100%"
+                    <svg role="img" aria-label="Clientes positivados por dia" viewBox={`0 0 ${W} ${H_POS + PAD.t + PAD.b}`} width="100%"
                       style={{ display: 'block', minWidth: Math.max(260, n * 38) }}>
                       <defs>
                         <linearGradient id="gpostot" x1="0" y1="0" x2="0" y2="1">
@@ -478,7 +478,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
                     {compact ? 'Expandir' : 'Compactar'}
                   </button>
                 </div>
-                <div className="so-table-wrap">
+                <div className="so-table-wrap" tabIndex={0} role="region" aria-label="Planilha diária">
                   <table className="so-daily-table data-table">
                     {!compact && (
                       <thead>
@@ -579,7 +579,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
                     <span className="so-lb-dot" style={{ background: color }} />
                     <span className="so-lb-name">{row.line}</span>
                     <div className="so-lb-bar-wrap"><div className="so-lb-bar" style={{ width: `${(row.pct * 100).toFixed(1)}%`, background: color }} /></div>
-                    <span className="so-lb-value" style={{ color }}>{kpiCurrency(row.fat)}</span>
+                    <span className="so-lb-value">{kpiCurrency(row.fat)}</span>
                     <span className="so-lb-pct">{(row.pct * 100).toFixed(1)}%</span>
                     <span className="so-lb-pos">{fmtNum(row.pos)} pos.</span>
                     {row.afat > 0 && <span className="so-lb-afat">+{kpiCurrency(row.afat)}</span>}
