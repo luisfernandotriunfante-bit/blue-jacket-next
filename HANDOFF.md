@@ -27,22 +27,23 @@ especializadas.
 | Abas ativas | App (admin), Clientes, Cadastro Cliente, Pirâmide, Carteira, Estoque, Sortimento, Sell Out, Gerencial, Campanhas (placeholder), RCA Manager |
 | Dados | Importados via planilhas Excel/XLS; persistidos em IndexedDB; sincronizados via Firebase Realtime Database |
 | Testes automatizados | Nenhum. Único gate: `npm run build` (TypeScript + Vite). **Decisão do Luis: adicionar testes.** |
-| PR #142 | Aberta, NÃO mergear. **Decisão do Luis: fechar.** Contém documentação aspiracional do "Nemo" que foi substituído pelo OpenBot. |
-| Segurança | **URGENTE.** `.env` com credenciais reais do Firebase está commitado em repo público. Pasta `arquivos/` com 126 MB de dados comerciais está commitada. Ambos precisam ser removidos e as credenciais rotacionadas. |
+| PR #142 | Fechada sem merge em 16/11/2026. A documentação do Nemo não faz parte do Red Jacket. |
+| Segurança | `.env` e `arquivos/` foram retirados da versão atual e adicionados ao `.gitignore`. O histórico ainda precisa ser avaliado; regras, restrições e configurações do Firebase precisam ser revisadas. |
 
 ---
 
 ## 3. Objetivos ativos
 
 1. **Segurança e limpeza** (prioridade imediata):
-   - Remover `.env` do rastreamento git e rotacionar credenciais Firebase.
-   - Remover `arquivos/` do rastreamento git (dados comerciais sensíveis em repo público).
-   - Remover branch de desenvolvimento hardcoded do workflow de deploy.
+   - **Concluído na versão atual:** retirar `.env` e `arquivos/` do rastreamento e limitar o deploy à `main`.
+   - **Pendente:** revisar o histórico Git, decidir se deve ser reescrito e conferir regras/restrições do Firebase.
+   - **Pendente:** substituir ou restringir qualquer configuração que o responsável pelo Firebase considere exposta.
 
 2. **Padronização da execução e governança** (esta etapa):
    - Consolidar documentação para guiar agentes de IA via OpenBot.
    - Definir fluxo de trabalho coerente e executável.
-   - Fechar PR #142.
+   - **Concluído:** fechar a PR #142 sem merge.
+   - Alinhar `PROTOCOLO.md`, `AGENTS.md` e `CLAUDE.md` ao fluxo funcional.
 
 3. **Padronização visual** (próxima etapa):
    - Tarefa especificada em `tarefas/2026-11-14-padronizacao-visual.md`.
@@ -145,7 +146,7 @@ pela estrutura do cabeçalho, não pelo nome do arquivo.
 2. O workflow faz: checkout → Node 20 → `npm ci` → `npm run build` → upload artifact → deploy.
 3. O site fica disponível em `https://luisfernandotriunfante-bit.github.io/blue-jacket-next/`.
 4. Não há smoke test, health check nem rollback automático após deploy.
-5. **Alerta:** A branch `claude/affectionate-wright-4mal4c` também está no trigger — deve ser removida.
+5. O trigger foi corrigido: somente a branch `main` dispara a publicação.
 
 **Não existe:** rollback automático, preview de PRs, ambientes de staging.
 
@@ -187,12 +188,14 @@ pela estrutura do cabeçalho, não pelo nome do arquivo.
 
 ## 9. Fluxo de uma tarefa
 
-### Fluxo real atual (confirmado no histórico de PRs)
+### Fluxo oficial definido pelo Luis — ainda precisa ser validado integralmente no OpenBot
 ```
-Luis pede → Architect (bot) planeja → Bot designado implementa
-→ PR para main → Revisão cruzada (se aplicável) → Publisher faz merge
-→ Deploy automático via GitHub Pages
+Luis pede → Architect planeja → Lead distribui → bot designado implementa
+→ PR para main → revisão cruzada → Lead integra → Architect confere quando necessário → Publisher faz merge
+→ deploy automático via GitHub Pages
 ```
+
+O uso de branches, pull requests e deploy está comprovado. A coordenação completa entre múltiplos bots pelo OpenBot e a memória compartilhada ainda não foram comprovadas em uma execução de ponta a ponta.
 
 ### Regras
 1. Ninguém faz commit direto na `main`.
@@ -222,7 +225,7 @@ A lógica entra na main primeiro; o branch visual nasce depois.
 
 **Definido por regra** (PROTOCOLO.md §4):
 
-- `main` — protegida, publica o site a cada push.
+- `main` — branch de produção; publica o site a cada push. A regra operacional proíbe commits diretos, mas a proteção técnica do GitHub ainda precisa ser verificada.
 - `claude/<assunto>` ou `<agente>/<assunto>` — branches de trabalho.
 - `gpt/<assunto>` — branches visuais (autoria do agente de frontend).
 - Arquivos reservados ao **backend**: `src/domain/**`.
@@ -286,8 +289,24 @@ Para qualquer IA que comece a trabalhar neste repositório:
 | 7 | `revisao/pendente.md` | Trabalho pendente de revisão | **Ativo** (vazio) |
 | 8 | `README.md` | Descrição do projeto | **Desatualizado, precisa reescrita** |
 
+### Auditoria dos documentos
+
+| Documento | Por que existe | Autoridade e recomendação |
+|---|---|---|
+| `HANDOFF.md` | Estado, arquitetura, decisões, riscos e passagem entre equipes | Fonte oficial do estado atual; atualizar após entregas significativas |
+| `PROTOCOLO.md` | Processo de trabalho, branches, revisão e publicação | Fonte oficial das regras operacionais |
+| `AGENTS.md` | Instruções específicas para GPT/Codex | Complementa o protocolo; não pode contradizê-lo |
+| `CLAUDE.md` | Instruções específicas para Claude | Complementa o protocolo; não pode contradizê-lo |
+| `PADRAO-VISUAL.md` | Design system e validação visual | Fonte oficial da aparência; mantido pelo frontend |
+| `README.md` | Apresentação pública e início rápido | Manter, mas reescrever para refletir o produto atual |
+| `tarefas/*.md` | Especificações de trabalhos concretos | Histórico/execução; cada arquivo deve declarar status |
+| `revisao/pendente.md` | Exceções aguardando revisão | Manter enquanto houver modo de contingência; hoje vazio |
+| `revisao/revisado.md` | Histórico das exceções revisadas | Manter como registro; hoje vazio |
+
+Não há duplicação exata na documentação oficial. Há sobreposição necessária: o protocolo define regras gerais e `AGENTS.md`/`CLAUDE.md` traduzem apenas o papel de cada executor. Em conflito, vale `PROTOCOLO.md`; para aparência, vale `PADRAO-VISUAL.md`; para estado factual, vale este `HANDOFF.md`.
+
 ### Documentos que NÃO são oficiais
-- `docs/nemo/*` (PR #142) — **Não mergear. Fechar PR.** Conteúdo aspiracional do Nemo, substituído por OpenBot.
+- `docs/nemo/*` (PR #142) — PR fechada sem merge. Os seis arquivos misturavam governança do orquestrador com o produto Red Jacket e não pertencem a este repositório.
 - Qualquer referência a C:\nemo, `perguntar_ao_gpt`, `resultado_do_gpt` — **Descontinuados.**
 
 ---
@@ -329,15 +348,12 @@ Para qualquer IA que comece a trabalhar neste repositório:
 ## 16. Riscos conhecidos
 
 ### Crítico
-1. **Credenciais Firebase expostas em repo público.** `.env` com API key, project ID e demais
-   valores reais está commitado e no histórico do git. Rotacionar credenciais imediatamente.
-2. **Dados comerciais em repo público.** `arquivos/` (126 MB) contém planilhas com dados de
-   clientes, vendas, preços e estoque.
+1. **Configuração Firebase e histórico Git.** A configuração pública de um app web não equivale, por si só, a uma senha de servidor. Mesmo assim, regras do Realtime Database/Storage, restrições de chave e histórico do repositório precisam ser revisados. Nunca registrar chaves administrativas ou contas de serviço.
+2. **Dados comerciais no histórico.** `arquivos/` saiu da versão atual, mas commits anteriores podem continuar contendo planilhas de clientes, vendas, preços e estoque. Avaliar limpeza do histórico e impactos antes de reescrevê-lo.
 
 ### Alto
 3. **Sem testes automatizados.** Qualquer regressão só é detectada manualmente.
-4. **Branch de desenvolvimento no trigger de deploy.** `claude/affectionate-wright-4mal4c` no
-   `deploy.yml` permite deploy de código não mergeado.
+4. **Proteção técnica da `main` não comprovada.** A regra operacional existe, mas branch protection e revisões obrigatórias ainda precisam ser verificadas no GitHub.
 
 ### Médio
 5. **PROTOCOLO.md desatualizado.** Referências a C:\nemo, ferramentas de ponte e divisão
@@ -357,10 +373,10 @@ Para qualquer IA que comece a trabalhar neste repositório:
 
 | # | Pendência | Prioridade | Responsável | Status |
 |---|---|---|---|---|
-| P-01 | Remover `.env` do git + rotacionar credenciais Firebase | **Crítica** | Luis (credenciais) + bot (git) | Aguardando |
-| P-02 | Remover `arquivos/` do git | **Crítica** | Bot | Aguardando |
-| P-03 | Remover branch dev do deploy.yml trigger | **Alta** | Bot | Aguardando |
-| P-04 | Fechar PR #142 | **Alta** | Bot ou Luis | Aguardando |
+| P-01 | Revisar regras/restrições do Firebase e decidir substituição de configurações | **Crítica** | Luis + responsável Firebase | Aguardando |
+| P-02 | Avaliar e, se autorizado, limpar `.env` e `arquivos/` do histórico Git | **Crítica** | Especialista Git + Luis | Versão atual já limpa |
+| P-03 | Verificar proteção técnica e revisões obrigatórias da `main` | **Alta** | Publisher | Aguardando |
+| P-04 | PR #142 fechada sem merge | **Concluída** | GPT | Concluída em 16/11/2026 |
 | P-05 | Atualizar PROTOCOLO.md para v8 (remover C:\nemo, atualizar papéis) | **Alta** | Bot | Aguardando |
 | P-06 | Atualizar README.md | **Média** | Bot | Aguardando |
 | P-07 | Executar padronização visual | **Média** | Agente frontend | Especificada, aguardando |
@@ -378,9 +394,9 @@ Para qualquer IA que comece a trabalhar neste repositório:
 - Ambos mergeados e deployed com sucesso.
 
 ### Próxima ação recomendada
-1. **Imediato:** Resolver segurança (P-01 e P-02).
-2. **Em seguida:** Limpar deploy.yml (P-03), fechar PR #142 (P-04), atualizar PROTOCOLO.md (P-05).
-3. **Depois:** Padronização visual (P-07).
+1. **Imediato:** revisar Firebase e histórico Git (P-01 e P-02).
+2. **Em seguida:** verificar proteção da `main` e concluir o alinhamento documental (P-03 e P-05).
+3. **Depois:** executar a padronização visual (P-07).
 
 ---
 
