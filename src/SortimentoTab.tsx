@@ -473,12 +473,12 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
       {viewMode === 'cnpj' && selectedClient && (
         <div className="sort-header-info">
           <div className="sort-client-selected">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <div className="visual-u-80" >
               <strong>{selectedClient.tradeName ?? selectedClient.legalName ?? selectedClient.document}</strong>
-              <span style={{ color: 'var(--muted)', fontSize: 12 }}>{selectedClient.document}</span>
+              <span className="visual-u-48" >{selectedClient.document}</span>
               {selectedClient.premiseRange && <span className="cad-badge-range">{/faixa/i.test(selectedClient.premiseRange) ? selectedClient.premiseRange : `Faixa ${selectedClient.premiseRange}`}</span>}
               {detectedChannel && <span className="sort-channel-badge">{detectedChannel}</span>}
-              {selectedClient.premiseNetwork && <span style={{ color: 'var(--blue)', fontSize: 11 }}>Rede: {selectedClient.premiseNetwork}</span>}
+              {selectedClient.premiseNetwork && <span className="visual-u-81" >Rede: {selectedClient.premiseNetwork}</span>}
               {pexSet.has(selectedClient.document) && <span className="badge-pex">PEX</span>}
               <button type="button" className="sort-clear-btn" onClick={clearSelection}>Trocar</button>
             </div>
@@ -489,9 +489,9 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
       {viewMode === 'rede' && selectedRede && selectedRedeClients.length > 0 && (
         <div className="sort-header-info">
           <div className="sort-client-selected">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <div className="visual-u-80" >
               <strong>{selectedRede}</strong>
-              <span style={{ color: 'var(--blue)', fontSize: 12 }}>{selectedRedeClients.length} loja{selectedRedeClients.length !== 1 ? 's' : ''}</span>
+              <span className="visual-u-82" >{selectedRedeClients.length} loja{selectedRedeClients.length !== 1 ? 's' : ''}</span>
               <button type="button" className="sort-clear-btn" onClick={clearSelection}>Trocar</button>
             </div>
             {redeChannelBreakdown.size > 0 && (
@@ -505,18 +505,18 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
                   ))}
               </div>
             )}
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+            <div className="visual-u-83" >
               {selectedRedeClients.slice(0, 8).map(c => {
                 const clientCh = resolveChannel(c)
                 return (
-                  <span key={c.document} style={{ fontSize: 10, color: 'var(--muted)', background: 'var(--surface)', padding: '2px 6px', borderRadius: 4 }}>
+                  <span key={c.document} className="visual-u-84" >
                     {c.tradeName ?? c.document}
-                    {clientCh && <span className="sort-channel-badge" style={{ fontSize: 9, marginLeft: 4, padding: '1px 5px' }}>{clientCh}</span>}
+                    {clientCh && <span className="sort-channel-badge visual-u-85" >{clientCh}</span>}
                   </span>
                 )
               })}
               {selectedRedeClients.length > 8 && (
-                <span style={{ fontSize: 10, color: 'var(--muted)' }}>+{selectedRedeClients.length - 8} mais</span>
+                <span className="visual-u-86" >+{selectedRedeClients.length - 8} mais</span>
               )}
             </div>
           </div>
@@ -539,19 +539,19 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
               </div>
               <div className="donut-legend">
                 <div className="donut-leg-item">
-                  <span className="donut-leg-dot" style={{ background: 'var(--blue)' }} />
+                  <span className="donut-leg-dot visual-u-54"  />
                   <span className="donut-leg-label">Comprados</span>
                   <span className="donut-leg-val">{analysis.skusComprados}</span>
                 </div>
                 <div className="donut-leg-item">
-                  <span className="donut-leg-dot" style={{ background: 'var(--border)' }} />
+                  <span className="donut-leg-dot visual-u-87"  />
                   <span className="donut-leg-label">Total SKUs</span>
                   <span className="donut-leg-val">{analysis.skusRecom}</span>
                 </div>
               </div>
             </div>
 
-            <div className="stock-kpis" style={{ flex: 1 }}>
+            <div className="stock-kpis visual-u-59" >
               <div className="kpi-card">
                 <div className="kpi-card-body">
                   <div className="kpi-label">Mandatório</div>
@@ -575,7 +575,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
               <div className="kpi-card">
                 <div className="kpi-card-body">
                   <div className="kpi-label">Fora Sortimento</div>
-                  <div className="kpi-val" style={{ color: 'var(--amber-text)' }}>{kpiCurrency(analysis.valorForaSortimento)}</div>
+                  <div className="kpi-val visual-u-88" >{kpiCurrency(analysis.valorForaSortimento)}</div>
                   <div className="kpi-sub">{analysis.skusFora} SKUs</div>
                 </div>
               </div>
@@ -591,7 +591,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          <div className="visual-u-89" >
             <fieldset className="pf-range">
               <legend>Classificação</legend>
               <div>
@@ -640,10 +640,10 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
                   <span className="p-name">{item.description}</span>
                   <span className="p-meta">
                     <code>{item.code}</code>
-                    {item.brand && <span style={{ color: 'var(--muted)' }}>{item.brand}</span>}
+                    {item.brand && <span className="visual-u-23" >{item.brand}</span>}
                   </span>
                 </span>
-                <span className="sc-num" style={{ fontSize: 11 }}>{item.subcategory || '—'}</span>
+                <span className="sc-num visual-u-28" >{item.subcategory || '—'}</span>
                 <span className="sc-num">
                   {item.classification === 'Mandatório' && <span className="sort-class-badge sort-mand">Mand.</span>}
                   {item.classification === 'Importante' && <span className="sort-class-badge sort-imp">Import.</span>}
@@ -652,7 +652,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
                 {viewMode === 'rede' && (
                   <span className="sc-num">
                     {item.storesPurchased != null
-                      ? <span style={{ fontSize: 11 }}>{item.storesPurchased}/{analysis.totalStores} <span style={{ color: 'var(--muted)' }}>({pct(item.storesPurchased / analysis.totalStores)})</span></span>
+                      ? <span className="visual-u-28" >{item.storesPurchased}/{analysis.totalStores} <span className="visual-u-23" >({pct(item.storesPurchased / analysis.totalStores)})</span></span>
                       : <span className="c-muted">—</span>}
                   </span>
                 )}
@@ -663,9 +663,9 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
                 </span>
                 <span className="sc-num">
                   {item.value > 0
-                    ? <strong className="c-blue" style={{ fontSize: 12 }}>{kpiCurrency(item.value)}</strong>
+                    ? <strong className="c-blue visual-u-50" >{kpiCurrency(item.value)}</strong>
                     : item.value < 0
-                    ? <strong style={{ fontSize: 12, color: 'var(--red-text)' }}>{kpiCurrency(item.value)}</strong>
+                    ? <strong className="visual-u-90" >{kpiCurrency(item.value)}</strong>
                     : <span className="c-muted">—</span>}
                 </span>
               </div>
@@ -675,9 +675,9 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
       )}
 
       {hasSelection && !analysis && (
-        <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>
+        <div className="visual-u-91" >
           <p>Não foi possível detectar o canal do sortimento para este cliente.</p>
-          <p style={{ fontSize: 12, marginTop: 8 }}>
+          <p className="visual-u-92" >
             {availableSortChannels.length > 0
               ? `Canais disponíveis no sortimento: ${availableSortChannels.join(', ')}.`
               : 'Verifique se o arquivo de sortimento com canais foi carregado.'}
@@ -686,8 +686,8 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
       )}
 
       {!hasSelection && viewMode === 'cnpj' && clientBase.length > 0 && (
-        <div style={{ marginTop: 8 }}>
-          <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, marginBottom: 8 }}>
+        <div className="visual-u-5" >
+          <div className="visual-u-93" >
             {q.length >= 2 ? `${clientList.length} cliente${clientList.length !== 1 ? 's' : ''} encontrado${clientList.length !== 1 ? 's' : ''}` : `${clientBase.length} clientes na base`}
           </div>
           <div className="sort-client-list">
@@ -708,24 +708,24 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
                   className="sort-client-row" role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedDoc(c.document); setSearch(c.tradeName ?? c.legalName ?? c.document) } }}
                   onClick={() => { setSelectedDoc(c.document); setSearch(c.tradeName ?? c.legalName ?? c.document) }}
                 >
-                  <span style={{ fontWeight: 600, fontSize: 13 }}>
+                  <span className="visual-u-94" >
                     {c.tradeName ?? c.legalName ?? c.document}
-                    {c.winthorCode && <span style={{ color: 'var(--muted)', fontSize: 10, marginLeft: 6 }}>#{c.winthorCode}</span>}
+                    {c.winthorCode && <span className="visual-u-95" >#{c.winthorCode}</span>}
                   </span>
-                  <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'monospace' }}>{c.document}</span>
-                  <span style={{ fontSize: 11, color: 'var(--muted)' }}>{c.city || '—'}</span>
+                  <span className="visual-u-96" >{c.document}</span>
+                  <span className="visual-u-35" >{c.city || '—'}</span>
                   <span>
                     {c.premiseRange
-                      ? <span className="cad-badge-range" style={{ fontSize: 9 }}>{/faixa/i.test(c.premiseRange) ? c.premiseRange : `F${c.premiseRange}`}</span>
-                      : <span style={{ color: 'var(--muted)', fontSize: 10 }}>—</span>}
+                      ? <span className="cad-badge-range visual-u-97" >{/faixa/i.test(c.premiseRange) ? c.premiseRange : `F${c.premiseRange}`}</span>
+                      : <span className="visual-u-98" >—</span>}
                   </span>
                   <span>
                     {ch
-                      ? <span className="sort-channel-badge" style={{ fontSize: 9, padding: '1px 5px' }}>{ch}</span>
-                      : <span style={{ color: 'var(--muted)', fontSize: 10 }}>—</span>}
+                      ? <span className="sort-channel-badge visual-u-99" >{ch}</span>
+                      : <span className="visual-u-98" >—</span>}
                   </span>
-                  <span style={{ fontSize: 10, color: 'var(--blue)' }}>{c.premiseNetwork || '—'}</span>
-                  <span>{pexSet.has(c.document) && <span className="badge-pex" style={{ fontSize: 9 }}>PEX</span>}</span>
+                  <span className="visual-u-100" >{c.premiseNetwork || '—'}</span>
+                  <span>{pexSet.has(c.document) && <span className="badge-pex visual-u-97" >PEX</span>}</span>
                 </div>
               )
             })}
@@ -733,7 +733,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
           {totalPages > 1 && (
             <div className="sort-cards-pagination">
               <button type="button" disabled={listPage === 0} onClick={() => setListPage(p => p - 1)}>Anterior</button>
-              <span style={{ fontSize: 11, color: 'var(--muted)' }}>{listPage + 1} de {totalPages}</span>
+              <span className="visual-u-35" >{listPage + 1} de {totalPages}</span>
               <button type="button" disabled={listPage >= totalPages - 1} onClick={() => setListPage(p => p + 1)}>Próxima</button>
             </div>
           )}
@@ -741,8 +741,8 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
       )}
 
       {!hasSelection && viewMode === 'rede' && availableRedes.length > 0 && (
-        <div style={{ marginTop: 8 }}>
-          <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, marginBottom: 8 }}>
+        <div className="visual-u-5" >
+          <div className="visual-u-93" >
             {q.length >= 2 ? `${redeList.length} rede${redeList.length !== 1 ? 's' : ''} encontrada${redeList.length !== 1 ? 's' : ''}` : `${availableRedes.length} redes disponíveis`}
           </div>
           <div className="sort-client-list">
@@ -764,15 +764,15 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
                   className="sort-rede-row" role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedRede(r.name); setSearch(r.name) } }}
                   onClick={() => { setSelectedRede(r.name); setSearch(r.name) }}
                 >
-                  <span style={{ fontWeight: 600, fontSize: 13 }}>{r.name}</span>
-                  <span style={{ fontSize: 12, color: 'var(--blue)' }}>{r.count} loja{r.count !== 1 ? 's' : ''}</span>
-                  <span style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  <span className="visual-u-94" >{r.name}</span>
+                  <span className="visual-u-101" >{r.count} loja{r.count !== 1 ? 's' : ''}</span>
+                  <span className="visual-u-102" >
                     {channels.map(([ch, n]) => (
                       <span key={ch} className="sort-channel-pill">
                         {ch} <span className="sort-channel-pill-count">{n}</span>
                       </span>
                     ))}
-                    {channels.length === 0 && <span style={{ color: 'var(--muted)', fontSize: 10 }}>—</span>}
+                    {channels.length === 0 && <span className="visual-u-98" >—</span>}
                   </span>
                 </div>
               )
@@ -781,7 +781,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
           {totalPages > 1 && (
             <div className="sort-cards-pagination">
               <button type="button" disabled={listPage === 0} onClick={() => setListPage(p => p - 1)}>Anterior</button>
-              <span style={{ fontSize: 11, color: 'var(--muted)' }}>{listPage + 1} de {totalPages}</span>
+              <span className="visual-u-35" >{listPage + 1} de {totalPages}</span>
               <button type="button" disabled={listPage >= totalPages - 1} onClick={() => setListPage(p => p + 1)}>Próxima</button>
             </div>
           )}
@@ -789,9 +789,9 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
       )}
 
       {!hasSelection && clientBase.length === 0 && (
-        <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>
+        <div className="visual-u-91" >
           <p>Nenhum cliente carregado.</p>
-          <p style={{ fontSize: 12, marginTop: 8 }}>Carregue os arquivos de clientes e sortimento para começar a análise.</p>
+          <p className="visual-u-92" >Carregue os arquivos de clientes e sortimento para começar a análise.</p>
         </div>
       )}
     </section>

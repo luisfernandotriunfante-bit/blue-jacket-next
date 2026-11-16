@@ -162,8 +162,8 @@ export function RcaManager() {
     <div className="rca-manager">
       <div className="rca-toolbar">
         <input
-          className="stock-search"
-          style={{ flex: 1 }}
+          className="stock-search visual-u-59"
+
           placeholder="Buscar por nome, código, supervisor, cidade…"
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -173,23 +173,23 @@ export function RcaManager() {
           Mostrar inativos
         </label>
         <input ref={fileRef} type="file" accept=".xlsx,.xls" hidden onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFile(f); e.target.value = '' }} />
-        <button className="add-button" style={{ margin: 0, flexShrink: 0 }} type="button" onClick={() => fileRef.current?.click()}>
+        <button className="add-button visual-u-69"  type="button" onClick={() => fileRef.current?.click()}>
           Importar planilha
         </button>
-        <button className="process-button" style={{ margin: 0, flexShrink: 0 }} type="button" onClick={openNew}>
+        <button className="process-button visual-u-69"  type="button" onClick={openNew}>
           + Novo vendedor
         </button>
       </div>
 
       {importMsg && (
-        <div className="rca-import-msg" style={{ padding: '8px 14px', margin: '0 0 8px', borderRadius: 8, background: 'var(--glass)', fontSize: 13, color: 'var(--text)' }}>
+        <div className="rca-import-msg visual-u-70" >
           {importMsg}
         </div>
       )}
 
       <div className="rca-count">
         {filtered.length} vendedor{filtered.length !== 1 ? 'es' : ''} {showInactive ? '' : 'ativos'}
-        <span style={{ marginLeft: 12, color: 'var(--muted)' }}>· {rcas.filter(r => !r.active).length} inativos no total</span>
+        <span className="visual-u-71" >· {rcas.filter(r => !r.active).length} inativos no total</span>
       </div>
 
       {/* ── modal ─────────────────────────────────────── */}
@@ -197,7 +197,7 @@ export function RcaManager() {
         <div className="modal-backdrop" onMouseDown={() => setEditing(null)}>
           <section ref={dialogRef} className="modal rca-modal" role="dialog" aria-modal="true" aria-labelledby="rca-modal-title" onMouseDown={e => e.stopPropagation()}>
             <button className="close" type="button" aria-label="Fechar" onClick={() => setEditing(null)}>×</button>
-            <h2 id="rca-modal-title" style={{ marginBottom: 18 }}>{isNew ? 'Novo vendedor' : 'Editar vendedor'}</h2>
+            <h2 id="rca-modal-title" className="visual-u-72" >{isNew ? 'Novo vendedor' : 'Editar vendedor'}</h2>
             {formErrors.length > 0 && (
               <ul className="rca-errors">
                 {formErrors.map(e => <li key={e}>{e}</li>)}
@@ -285,15 +285,15 @@ export function RcaManager() {
               </div>
             </div>
             <div className="rca-modal-actions">
-              <button className="process-button" style={{ margin: 0 }} type="button" onClick={save}>Salvar</button>
-              <button className="add-button" style={{ marginTop: 0 }} type="button" onClick={() => setEditing(null)}>Cancelar</button>
+              <button className="process-button visual-u-10"  type="button" onClick={save}>Salvar</button>
+              <button className="add-button visual-u-65"  type="button" onClick={() => setEditing(null)}>Cancelar</button>
             </div>
           </section>
         </div>
       )}
 
       {/* ── tabela ────────────────────────────────────── */}
-      <div style={{ overflowX: 'auto' }}>
+      <div className="visual-u-73" >
         <table className="gr-table">
           <thead>
             <tr>
@@ -305,7 +305,7 @@ export function RcaManager() {
               <th>Classe</th>
               <th className="n-right">Meta</th>
               <th>Status</th>
-              <th style={{ width: 1 }}></th>
+              <th className="visual-u-74" ></th>
             </tr>
           </thead>
           <tbody>
@@ -315,18 +315,18 @@ export function RcaManager() {
                 <td>
                   <div className="gr-seller-name">{r.name}</div>
                 </td>
-                <td style={{ color: 'var(--muted)', fontSize: 12 }}>{r.city || '—'}</td>
-                <td style={{ fontSize: 12 }}>{r.supervisor || '—'}</td>
+                <td className="visual-u-48" >{r.city || '—'}</td>
+                <td className="visual-u-50" >{r.supervisor || '—'}</td>
                 <td>
                   {r.type
                     ? <span className={`rca-badge rca-type-${r.type}`}>{r.type.toUpperCase()}</span>
-                    : <span style={{ color: 'var(--muted)' }}>—</span>}
+                    : <span className="visual-u-23" >—</span>}
                 </td>
-                <td style={{ fontSize: 11, color: 'var(--muted)' }}>{r.class ? (CLASS_LABEL[r.class] ?? r.class) : '—'}</td>
-                <td className="n-right" style={{ fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', fontSize: 13 }}>
+                <td className="visual-u-35" >{r.class ? (CLASS_LABEL[r.class] ?? r.class) : '—'}</td>
+                <td className="n-right visual-u-75" >
                   {r.goal
                     ? `R$ ${r.goal.toLocaleString('pt-BR')}`
-                    : <span style={{ color: 'var(--muted)', fontWeight: 400 }}>—</span>}
+                    : <span className="visual-u-76" >—</span>}
                 </td>
                 <td>
                   <span className={`rca-badge ${r.active ? 'rca-badge-active' : 'rca-badge-inac'}`}>
@@ -346,7 +346,7 @@ export function RcaManager() {
             ))}
             {!filtered.length && (
               <tr>
-                <td colSpan={9} style={{ textAlign: 'center', color: 'var(--muted)', padding: '28px 0' }}>
+                <td colSpan={9} className="visual-u-77" >
                   {rcas.length ? 'Nenhum resultado para a busca.' : 'Nenhum vendedor cadastrado. Clique em "+ Novo vendedor" para começar.'}
                 </td>
               </tr>

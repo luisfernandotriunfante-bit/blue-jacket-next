@@ -1043,8 +1043,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                 />
                 <button
                   type="button"
-                  className="pf-select"
-                  style={{ minWidth: 'auto', padding: '0 14px', cursor: 'pointer', background: showLncImport ? 'var(--red)' : undefined, color: showLncImport ? '#fff' : undefined, border: showLncImport ? '1px solid var(--red)' : undefined }}
+                  className={`pf-select upload-toggle${showLncImport ? ' is-active' : ''}`} aria-pressed={showLncImport}
                   onClick={() => setShowLncImport(v => !v)}
                 >
                   {showLncImport ? 'Fechar' : 'Importar'}
@@ -1061,13 +1060,13 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                         onChange={e => setLncImportText(e.target.value)}
                         rows={4}
                       />
-                      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                        <select className="pf-select" style={{ minWidth: 'auto', padding: '4px 10px' }} value={lncImportMode} onChange={e => setLncImportMode(e.target.value as 'launch' | 'pex')}>
+                      <div className="visual-u-103" >
+                        <select className="pf-select visual-u-104"  value={lncImportMode} onChange={e => setLncImportMode(e.target.value as 'launch' | 'pex')}>
                           <option value="pex">PEX</option>
                           <option value="launch">Lançamento</option>
                         </select>
                         {lncImportMode === 'pex' && (
-                          <select className="pf-select" style={{ minWidth: 'auto', padding: '4px 10px' }} value={lncImportTheme} onChange={e => setLncImportTheme(e.target.value)}>
+                          <select className="pf-select visual-u-104"  value={lncImportTheme} onChange={e => setLncImportTheme(e.target.value)}>
                             {PEX_THEMES.map(t => <option key={t} value={t}>Tema {t}</option>)}
                           </select>
                         )}
@@ -1075,12 +1074,12 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                           const n = importTagsBatch(lncImportText, lncImportMode, lncImportTheme)
                           if (n) { setLncImportText(''); setShowLncImport(false) }
                         }}>Marcar em lote</button>
-                        <button type="button" className="cad-pex-btn" style={{ background: 'var(--surface-raised)', color: 'var(--text)', border: '1px solid var(--border)' }} onClick={() => {
+                        <button type="button" className="cad-pex-btn visual-u-105"  onClick={() => {
                           const items = processImportCodes(lncImportText)
                           if (items.length > 0) setLncPendingItems(items)
                         }}>Revisar individual</button>
                       </div>
-                      <small style={{ color: 'var(--muted)' }}>
+                      <small className="visual-u-23" >
                         {lncCounts.pexLaunch > 0 && <span>{lncCounts.pexLaunch} PEX lanç.</span>}
                         {lncCounts.pexLaunch > 0 && (lncCounts.launch > 0 || lncCounts.pex > 0) && ' · '}
                         {lncCounts.launch > 0 && <span>{lncCounts.launch} lançamento{lncCounts.launch !== 1 ? 's' : ''}</span>}
@@ -1092,9 +1091,9 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                     <div className="import-review">
                       <div className="import-review-header">
                         <strong>{lncPendingItems.length} produto{lncPendingItems.length !== 1 ? 's' : ''} encontrado{lncPendingItems.length !== 1 ? 's' : ''}</strong>
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: 12, color: 'var(--muted)' }}>Marcar todos:</span>
-                          <select className="pf-select" style={{ minWidth: 'auto', padding: '4px 10px', fontSize: 12 }} value={lncBatchMode} onChange={e => {
+                        <div className="visual-u-106" >
+                          <span className="visual-u-107" >Marcar todos:</span>
+                          <select className="pf-select visual-u-108"  value={lncBatchMode} onChange={e => {
                             const m = e.target.value as 'launch' | 'pex'
                             setLncBatchMode(m)
                             setLncPendingItems(prev => prev.map(item => ({ ...item, mode: m, theme: m === 'pex' ? lncBatchTheme : '' })))
@@ -1103,7 +1102,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                             <option value="launch">Lançamento</option>
                           </select>
                           {lncBatchMode === 'pex' && (
-                            <select className="pf-select" style={{ minWidth: 'auto', padding: '4px 10px', fontSize: 12 }} value={lncBatchTheme} onChange={e => {
+                            <select className="pf-select visual-u-108"  value={lncBatchTheme} onChange={e => {
                               const th = e.target.value
                               setLncBatchTheme(th)
                               setLncPendingItems(prev => prev.map(item => item.mode === 'pex' ? { ...item, theme: th } : item))
@@ -1117,7 +1116,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                         {lncPendingItems.map(item => (
                           <div key={item.id} className="import-review-item">
                             <span className="import-review-desc">{item.desc}</span>
-                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                            <div className="visual-u-109" >
                               <select className="import-review-tag" value={item.mode} onChange={e => {
                                 const m = e.target.value as 'launch' | 'pex'
                                 setLncPendingItems(prev => prev.map(x => x.id === item.id ? { ...x, mode: m, theme: m === 'pex' ? PEX_THEMES[0] : '' } : x))
@@ -1136,8 +1135,8 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                           </div>
                         ))}
                       </div>
-                      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                        <button type="button" className="cad-pex-btn" style={{ background: 'var(--surface-raised)', color: 'var(--text)', border: '1px solid var(--border)' }} onClick={() => setLncPendingItems([])}>Voltar</button>
+                      <div className="visual-u-110" >
+                        <button type="button" className="cad-pex-btn visual-u-105"  onClick={() => setLncPendingItems([])}>Voltar</button>
                         <button type="button" className="cad-pex-btn" onClick={confirmImport}>Confirmar {lncPendingItems.length} itens</button>
                       </div>
                     </div>
@@ -1184,14 +1183,14 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
               </div>
             </div>
 
-            <div className="stock-count" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div className="stock-count visual-u-111" >
               <span>
                 <strong>{filteredLnc.length.toLocaleString('pt-BR')}</strong>{' '}
                 produto{filteredLnc.length !== 1 ? 's' : ''}
                 {lncCounts.total !== filteredLnc.length && ` de ${lncCounts.total.toLocaleString('pt-BR')}`}
               </span>
               {filteredLnc.length > 0 && (
-                <button type="button" className="cad-pex-btn" style={{ fontSize: 11, padding: '2px 10px', background: 'var(--surface-raised)', color: 'var(--red)', border: '1px solid var(--red)' }} onClick={() => {
+                <button type="button" className="cad-pex-btn visual-u-112"  onClick={() => {
                   if (!confirm(`Desmarcar ${filteredLnc.length} item(ns) filtrado(s)? Os outros itens não serão afetados.`)) return
                   const ids = new Set(filteredLnc.map(p => p.id))
                   setTags(cur => {
@@ -1209,9 +1208,9 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
             </div>
 
             {lncCounts.total === 0 && (
-              <p className="empty" style={{ padding: '40px 0', textAlign: 'center' }}>
+              <p className="empty visual-u-113" >
                 Nenhum produto marcado como Itens Foco.<br />
-                <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>Use o botão Importar acima para adicionar itens PEX, Lançamentos ou PEX + Lançamento.</span>
+                <span className="visual-u-114" >Use o botão Importar acima para adicionar itens PEX, Lançamentos ou PEX + Lançamento.</span>
               </p>
             )}
 
@@ -1469,8 +1468,8 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
               <div className="notas-section-head">
                 <span className="notas-section-title">Notas Recebidas</span>
                 <input
-                  className="pf-input"
-                  style={{ maxWidth: 240, height: 32, fontSize: 12, padding: '0 10px' }}
+                  className="pf-input visual-u-115"
+
                   placeholder="Buscar NF, fornecedor ou produto…"
                   value={notasSearch}
                   onChange={e => setNotasSearch(e.target.value)}
@@ -1479,17 +1478,17 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                   type="date"
                   value={notasDate}
                   onChange={e => setNotasDate(e.target.value)}
-                  style={{ height: 32, fontSize: 12, padding: '0 8px', background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6 }}
+                  className="stock-date-select"
                 />
                 {filteredReceived.some(inv => inv.date === notasDate) && (
-                  <button type="button" className="secondary-button" style={{ margin: 0, padding: '5px 12px', fontSize: 12 }} onClick={exportReceivedCsv}>
+                  <button type="button" className="secondary-button visual-u-116"  onClick={exportReceivedCsv}>
                     ↓ CSV do dia
                   </button>
                 )}
               </div>
               <div className="notas-section-body">
                 {filteredReceived.length === 0 && (
-                  <p className="empty compact" style={{ padding: '28px 18px' }}>
+                  <p className="empty compact visual-u-117" >
                     {receivedInvoices.length === 0 ? 'Nenhuma nota recebida importada ainda.' : 'Nenhuma nota encontrada para a busca.'}
                   </p>
                 )}
@@ -1548,7 +1547,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                                     const boxes = upb && r.quantity ? r.quantity / upb : undefined
                                     return (
                                     <tr key={i}>
-                                      <td><code style={{ fontSize: 11 }}>{r.productCode ?? '—'}</code></td>
+                                      <td><code className="visual-u-28" >{r.productCode ?? '—'}</code></td>
                                       <td>{r.description ?? '—'}</td>
                                       <td className="n-right">{(r.quantity ?? 0).toLocaleString('pt-BR')}</td>
                                       <td className="n-right">{boxes !== undefined ? boxes.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '—'}</td>
@@ -1580,7 +1579,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
               </div>
               <div className="notas-section-body">
                 {arrivalInvoices.length === 0 && (
-                  <p className="empty compact" style={{ padding: '28px 18px' }}>Carteira vazia. Importe um arquivo de carteira no motor de notas.</p>
+                  <p className="empty compact visual-u-117" >Carteira vazia. Importe um arquivo de carteira no motor de notas.</p>
                 )}
                 {arrivalInvoices.map(inv => (
                   <div key={inv.invoice} className="notas-cart-row">
@@ -1705,7 +1704,7 @@ function KpiCard({ label, value, accent, sub, percent, pctLabel }: {
         {(showRing || showSub) && (
           <div className="kpi-ring-row">
             {showRing && (
-              <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="kpi-ring-svg" style={{ transform: 'rotate(-90deg)', flexShrink: 0 }}>
+              <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="kpi-ring-svg visual-u-118" >
                 <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--border)" strokeWidth={2.5} />
                 <circle cx={cx} cy={cy} r={r} fill="none" stroke={ringColor} strokeWidth={2.5}
                   strokeDasharray={`${filled} ${circ}`} strokeLinecap="round" />
@@ -1761,7 +1760,7 @@ function StockDonut({ segments, total, centerLabel, centerValue }: {
           <div key={s.label} className="donut-leg-item">
             <span className="donut-leg-dot" style={{ background: s.color }} />
             <span className="donut-leg-label">{s.label}</span>
-            <span className="donut-leg-val" style={{ color: s.color }}>{s.value.toLocaleString('pt-BR')}</span>
+            <span className="donut-leg-val" style={{ color: s.color === 'var(--border)' ? 'var(--muted)' : s.color === 'var(--red)' ? 'var(--red-text)' : s.color }}>{s.value.toLocaleString('pt-BR')}</span>
           </div>
         ))}
       </div>
@@ -1813,7 +1812,7 @@ function FilterDrop({ label, options, selected, onSelect, single, open, onToggle
           ) : (
             <>
               {selected.length > 0 && (
-                <label style={{ color: 'var(--red)', fontWeight: 600 }}><input type="checkbox" checked={false} onChange={() => onSelect([])} /> Limpar seleção</label>
+                <label className="visual-u-36" ><input type="checkbox" checked={false} onChange={() => onSelect([])} /> Limpar seleção</label>
               )}
               {vis.map(o => (
                 <label key={o}><input type="checkbox" checked={selected.includes(o)} onChange={() => {

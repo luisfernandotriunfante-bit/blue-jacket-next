@@ -67,20 +67,20 @@ function TwoSegmentDonut({ label, segA, segALabel, segAVal, segB, segBLabel, seg
       </div>
       <div className="so-hero-info">
         <div className="so-hero-info-row">
-          <span className="so-hero-info-dot" style={{ background: 'var(--blue)' }} />
+          <span className="so-hero-info-dot visual-u-54"  />
           <span className="so-hero-info-key">{segALabel}</span>
-          <span className="so-hero-info-val" style={{ color: 'var(--blue)' }}>{segAVal}</span>
+          <span className="so-hero-info-val visual-u-20" >{segAVal}</span>
         </div>
         <div className="so-hero-info-row">
-          <span className="so-hero-info-dot" style={{ background: 'var(--red)' }} />
+          <span className="so-hero-info-dot visual-u-55"  />
           <span className="so-hero-info-key">{segBLabel}</span>
-          <span className="so-hero-info-val" style={{ color: 'var(--red-text)' }}>{segBVal}</span>
+          <span className="so-hero-info-val visual-u-56" >{segBVal}</span>
         </div>
         {net !== undefined && (
           <div className="so-hero-info-row">
-            <span className="so-hero-info-dot" style={{ background: 'transparent', border: '1.5px solid var(--muted)' }} />
+            <span className="so-hero-info-dot visual-u-57"  />
             <span className="so-hero-info-key">líquido</span>
-            <span className="so-hero-info-val" style={{ color: 'var(--text)' }}>{netLabel}</span>
+            <span className="so-hero-info-val visual-u-58" >{netLabel}</span>
           </div>
         )}
         <div className="so-hero-info-divider" />
@@ -112,7 +112,7 @@ function Podium({ sellers }: { sellers: { name: string; achievement: number; fat
           <div key={rank} className={`gr-podium-card gr-podium-card-${rank + 1}`}>
             <div className="gr-podium-medal">{MEDAL_EMOJI[rank]}</div>
             <div className="gr-podium-name" title={s.name}>{s.name.split(' ').slice(0, 2).join(' ')}</div>
-            <div className="gr-podium-pct" style={{ color: isFirst ? 'var(--blue)' : 'var(--text)' }}>
+            <div className="gr-podium-pct" style={{ color: isFirst ? 'var(--blue-text)' : 'var(--text)' }}>
               {fmtPct(s.achievement)}
             </div>
             <div className="gr-podium-fat">{kpiCurrency(s.fat)}</div>
@@ -125,7 +125,7 @@ function Podium({ sellers }: { sellers: { name: string; achievement: number; fat
 
 /* ── achievement badge ───────────────────────────────── */
 function AtingBadge({ pct }: { pct: number | null }) {
-  if (pct === null) return <span style={{ color: 'var(--muted)' }}>—</span>
+  if (pct === null) return <span className="visual-u-23" >—</span>
   const cls = pct >= 100 ? 'gr-ating-ok' : pct >= 70 ? 'gr-ating-mid' : 'gr-ating-low'
   return <span className={`gr-ating ${cls}`}>{fmtPct(pct)}</span>
 }
@@ -292,7 +292,7 @@ export function GerencialTab({ movementBase, monthLabel, activeComp }: {
         />
 
         {podiumSellers.length > 0 && (
-          <div className="so-hero-card" style={{ flex: 1 }}>
+          <div className="so-hero-card visual-u-59" >
             <div className="so-hero-label">PÓDIO · {monthLabel}</div>
             <Podium sellers={podiumSellers} />
           </div>
@@ -343,29 +343,29 @@ export function GerencialTab({ movementBase, monthLabel, activeComp }: {
                       <div className="gr-seller-name">{s.name}</div>
                       <div className="gr-seller-code">
                         {s.code}
-                        {!s.rca && <span className="rca-badge rca-badge-warn" style={{ marginLeft: 4 }}>sem cadastro</span>}
-                        {!s.activeThisMonth && <span className="rca-badge rca-badge-inac" style={{ marginLeft: 4 }}>inativo</span>}
+                        {!s.rca && <span className="rca-badge rca-badge-warn visual-u-60" >sem cadastro</span>}
+                        {!s.activeThisMonth && <span className="rca-badge rca-badge-inac visual-u-60" >inativo</span>}
                       </div>
                     </td>
-                    <td style={{ color: 'var(--muted)', fontSize: 12 }}>{s.rca?.supervisor || '—'}</td>
-                    <td style={{ fontSize: 11, color: 'var(--muted)' }}>
+                    <td className="visual-u-48" >{s.rca?.supervisor || '—'}</td>
+                    <td className="visual-u-35" >
                       {s.rca?.class ? ({ varejo: 'Varejo', medias_contas: 'Médias Contas', grandes_contas: 'Grandes Contas', televendas: 'Televendas' }[s.rca.class] ?? s.rca.class) : '—'}
                     </td>
                     <td className="n-right" style={{ color: s.fat > 0 ? 'var(--blue)' : 'var(--muted)', fontWeight: 700 }}>
                       {s.fat > 0 ? kpiCurrency(s.fat) : '—'}
                     </td>
-                    <td className="n-right" style={{ color: s.afat > 0 ? 'var(--red)' : 'var(--muted)', fontSize: 12 }}>
+                    <td className="n-right" style={{ color: s.afat > 0 ? 'var(--red-text)' : 'var(--muted)', fontSize: 12 }}>
                       {s.afat > 0 ? kpiCurrency(s.afat) : '—'}
                     </td>
                     <td className="n-right">{s.customers || '—'}</td>
-                    <td className="n-right" style={{ color: 'var(--muted)', fontSize: 12 }}>
+                    <td className="n-right visual-u-48" >
                       {s.goal ? kpiCurrency(s.goal) : '—'}
                     </td>
                     <td className="n-right"><AtingBadge pct={s.achievement} /></td>
                   </tr>
                 ))}
                 {!ranked.length && (
-                  <tr><td colSpan={9} style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>Nenhum vendedor ativo este mês.</td></tr>
+                  <tr><td colSpan={9} className="visual-u-52" >Nenhum vendedor ativo este mês.</td></tr>
                 )}
               </tbody>
             </table>
@@ -375,7 +375,7 @@ export function GerencialTab({ movementBase, monthLabel, activeComp }: {
 
       {/* ── Por equipes ────────────────────────────────── */}
       {view === 'equipes' && hasRcas && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="visual-u-61" >
           {teams.map(team => {
             const isExpanded = expandedTeam === team.supervisor
             return (
@@ -392,10 +392,10 @@ export function GerencialTab({ movementBase, monthLabel, activeComp }: {
                         <span className="gr-team-goal-val">{kpiCurrency(team.teamGoal)}</span>
                       </div>
                     )}
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ color: 'var(--blue)', fontWeight: 800, fontFamily: 'Space Grotesk, sans-serif', fontSize: 14 }}>{kpiCurrency(team.totalFat)}</div>
+                    <div className="visual-u-62" >
+                      <div className="visual-u-63" >{kpiCurrency(team.totalFat)}</div>
                       {team.teamAchievement !== null && (
-                        <div style={{ fontSize: 11, color: team.teamAchievement >= 100 ? 'var(--blue)' : team.teamAchievement >= 70 ? 'var(--amber)' : 'var(--red)', fontWeight: 700 }}>
+                        <div style={{ fontSize: 11, color: team.teamAchievement >= 100 ? 'var(--blue)' : team.teamAchievement >= 70 ? 'var(--amber-text)' : 'var(--red-text)', fontWeight: 700 }}>
                           {fmtPct(team.teamAchievement)}
                         </div>
                       )}
@@ -416,7 +416,7 @@ export function GerencialTab({ movementBase, monthLabel, activeComp }: {
                             <th className="n-right">Faturado</th>
                             <th className="n-right">Meta</th>
                             <th className="n-right">Atingimento</th>
-                            <th style={{ minWidth: 80 }}>Progresso</th>
+                            <th className="visual-u-64" >Progresso</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -427,13 +427,13 @@ export function GerencialTab({ movementBase, monthLabel, activeComp }: {
                                 <div className="gr-seller-name">{s.name}</div>
                                 <div className="gr-seller-code">{s.code}{!s.activeThisMonth && ' · inativo'}</div>
                               </td>
-                              <td style={{ fontSize: 11, color: 'var(--muted)' }}>
+                              <td className="visual-u-35" >
                                 {s.rca?.class ? ({ varejo: 'Varejo', medias_contas: 'Médias Contas', grandes_contas: 'Grandes Contas', televendas: 'Televendas' }[s.rca.class] ?? s.rca.class) : '—'}
                               </td>
                               <td className="n-right" style={{ color: s.fat > 0 ? 'var(--blue)' : 'var(--muted)', fontWeight: 700 }}>
                                 {s.fat > 0 ? kpiCurrency(s.fat) : '—'}
                               </td>
-                              <td className="n-right" style={{ color: 'var(--muted)', fontSize: 12 }}>
+                              <td className="n-right visual-u-48" >
                                 {s.goal ? kpiCurrency(s.goal) : '—'}
                               </td>
                               <td className="n-right"><AtingBadge pct={s.achievement} /></td>
@@ -444,7 +444,7 @@ export function GerencialTab({ movementBase, monthLabel, activeComp }: {
                                       className="gr-progress-bar"
                                       style={{
                                         width: `${Math.min(100, s.achievement).toFixed(1)}%`,
-                                        background: s.achievement >= 100 ? 'var(--blue)' : s.achievement >= 70 ? 'var(--amber)' : 'var(--red)',
+                                        background: s.achievement >= 100 ? 'var(--blue)' : s.achievement >= 70 ? 'var(--amber-text)' : 'var(--red-text)',
                                       }}
                                     />
                                   </div>
@@ -464,7 +464,7 @@ export function GerencialTab({ movementBase, monthLabel, activeComp }: {
       )}
 
       {!hasRcas && view === 'equipes' && (
-        <div className="so-empty" style={{ marginTop: 0 }}>
+        <div className="so-empty visual-u-65" >
           <p>Cadastre os vendedores para ver por equipes.</p>
           <small>Vá em <strong>Administração → Vendedores</strong> e registre cada RCA com seu supervisor.</small>
         </div>

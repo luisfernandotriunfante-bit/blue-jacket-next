@@ -567,7 +567,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
             <div className="crt-meta"><span><b>{sl.length}</b> vendedor{sl.length > 1 ? 'es' : ''} na cidade</span></div>
             {sl.map(s => (
               <button key={s.code} type="button" onClick={() => { setSelectedSeller(s.code); setSelectedCity(null); setExpandedClient(null) }} className="crt-city-seller">
-                <div style={{ fontWeight: 600 }}>{s.name}</div>
+                <div className="visual-u-43" >{s.name}</div>
                 <div className="crt-sub">Cód. {s.code} · {s.cities[selectedCity]?.clients ?? 0} clientes</div>
               </button>
             ))}
@@ -623,7 +623,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
           <div className="crt-meta">
             <span><b>{clients.length}</b> {mode === 'nao' ? 'clientes sem roteiro' : 'clientes sem cadastro'}</span>
             {comp && comp.assigned > 0 && (
-              <span style={{ color: comp.assigned === comp.total ? GREEN_DONE : 'var(--red)' }}>
+              <span style={{ color: comp.assigned === comp.total ? 'var(--green-text)' : 'var(--red-text)' }}>
                 <b>{comp.assigned}/{comp.total}</b> atribuídos
               </span>
             )}
@@ -704,8 +704,8 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
         {totalAssigned.assigned > 0 && (
           <>
             <div className="crt-meta">
-              <span style={{ color: GREEN_DONE }}><b>{totalAssigned.assigned}/{totalAssigned.total}</b> atribuídos</span>
-              <span style={{ color: GREEN_DONE }}><b>{completeCities}/{sorted.length}</b> cidades completas</span>
+              <span className="text-green"><b>{totalAssigned.assigned}/{totalAssigned.total}</b> atribuídos</span>
+              <span className="text-green"><b>{completeCities}/{sorted.length}</b> cidades completas</span>
             </div>
             <div className="crt-progress">
               <div className="crt-progress-bar" style={{ width: `${totalAssigned.assigned / totalAssigned.total * 100}%`, background: totalAssigned.assigned === totalAssigned.total ? GREEN_DONE : 'var(--red)' }} />
@@ -733,10 +733,10 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
             return (
               <button key={ck} type="button" className="crt-rowbtn" onClick={() => setSelectedCity(selectedCity === ck ? null : ck)}>
                 <div className="crt-row">
-                  <span style={done ? { color: GREEN_DONE } : undefined}>{done ? '✓ ' : ''}{msGeo[ck]?.n ?? ck}</span>
+                  <span className={done ? 'text-green' : undefined}>{done ? '✓ ' : ''}{msGeo[ck]?.n ?? ck}</span>
                   <span>{data[ck].length} cli</span>
                   {comp && comp.assigned > 0 && !done && (
-                    <span className="crt-sub" style={{ color: 'var(--red)' }}>{comp.assigned}/{comp.total} atribuídos</span>
+                    <span className="crt-sub visual-u-44" >{comp.assigned}/{comp.total} atribuídos</span>
                   )}
                   {!comp?.assigned && (
                     <span className="crt-sub">{(() => {
@@ -780,7 +780,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
           </div>
         )}
       </div>
-      <div className="pf-filters-row" style={{ padding: '0 16px' }} onClick={() => setOpenFilter(null)}>
+      <div className="pf-filters-row visual-u-45"  onClick={() => setOpenFilter(null)}>
         {availableRanges.length > 0 && (
           <FilterDrop label="Faixa" options={availableRanges} selected={filterRange} onSelect={setFilterRange} open={openFilter === 'range'} onToggle={() => setOpenFilter(openFilter === 'range' ? null : 'range')} />
         )}
@@ -841,7 +841,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
                         aria-pressed={selectedSeller === s.code}
                         onClick={() => { setSelectedSeller(s.code); setSelectedCity(null); setExpandedClient(null) }}
                       >
-                        <span>{s.name} <small style={{ opacity: .6 }}>({s.code})</small></span>
+                        <span>{s.name} <small className="visual-u-46" >({s.code})</small></span>
                         <small>{s.totalClients}</small>
                       </button>
                     </div>
@@ -903,8 +903,8 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
             {RAMP.map((r, i) => (
               <span key={i}><i className="crt-sw" style={{ background: r }} />{i === 0 ? '1' : i === 4 ? `${maxLegend}+` : ''}</span>
             ))}
-            <span><i className="crt-sw" style={{ background: 'var(--surface-raised)' }} />nenhum</span>
-            {mode !== 'rot' && <span><i className="crt-sw" style={{ background: GREEN_DONE, borderRadius: 2 }} />completo</span>}
+            <span><i className="crt-sw visual-u-47"  />nenhum</span>
+            {mode !== 'rot' && <span><i className="crt-sw crt-sw-complete" />completo</span>}
           </div>
         </main>
 
@@ -952,7 +952,7 @@ function FilterDrop({ label, options, selected, onSelect, single, open, onToggle
           ) : (
             <>
               {selected.length > 0 && (
-                <label style={{ color: 'var(--red)', fontWeight: 600 }}><input type="checkbox" checked={false} onChange={() => onSelect([])} /> Limpar</label>
+                <label className="visual-u-36" ><input type="checkbox" checked={false} onChange={() => onSelect([])} /> Limpar</label>
               )}
               {vis.map(o => (
                 <label key={o}><input type="checkbox" checked={selected.includes(o)} onChange={() => {

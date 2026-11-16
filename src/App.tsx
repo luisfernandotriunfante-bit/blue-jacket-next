@@ -621,14 +621,14 @@ export function App() {
         <button type="button" className={`stock-nav-btn${tab === 'rcas' ? ' on' : ''}`} onClick={() => { setTab('rcas'); setActiveNotice(null) }}>Vendedores</button>
         <button type="button" className={`stock-nav-btn${tab === 'dados' ? ' on' : ''}`} onClick={() => { setTab('dados'); setActiveNotice(null) }}>Dados</button>
       </header>
-      {tab === 'uploads' ? <section className="content">
+      {tab === 'uploads' ? <section className="content" aria-busy={processingAll}>
         <h2>ARQUIVOS DIÁRIOS</h2>
         <div className="quick-upload" role="button" tabIndex={0} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); dailyInput.current?.click() } }} onClick={() => dailyInput.current?.click()} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); void distributeFiles(Array.from(event.dataTransfer.files)) }}><strong>Solte todos os arquivos aqui</strong><span>ou escolha os arquivos</span><input ref={dailyInput} aria-label="Adicionar arquivos diários" type="file" multiple onChange={event => { if (event.target.files) void distributeFiles(Array.from(event.target.files)); event.target.value = '' }} /></div>
-        {(Object.values(productSlots).some(f => f && rawFiles[f.id]) || Object.values(clientSlots).some(f => f && rawFiles[f.id]) || (historySlots.sales ?? []).some(f => rawFiles[f.id]) || Object.values(movementSlots).flat().some(f => rawFiles[f.id]) || Object.values(receiptSlots).flat().some(f => rawFiles[f.id])) ? <button className="process-button" type="button" disabled={processingAll || productProcessing || clientProcessing || historyProcessing || movementProcessing || receiptProcessing} onClick={() => void processAll()} style={{marginBottom: '16px'}}>{processingAll ? 'Processando todos os motores…' : 'Processar todos os motores'}</button> : null}
+        {(Object.values(productSlots).some(f => f && rawFiles[f.id]) || Object.values(clientSlots).some(f => f && rawFiles[f.id]) || (historySlots.sales ?? []).some(f => rawFiles[f.id]) || Object.values(movementSlots).flat().some(f => rawFiles[f.id]) || Object.values(receiptSlots).flat().some(f => rawFiles[f.id])) ? <button className="process-button process-all" type="button" disabled={processingAll || productProcessing || clientProcessing || historyProcessing || movementProcessing || receiptProcessing} onClick={() => void processAll()}>{processingAll ? 'Processando todos os motores…' : 'Processar todos os motores'}</button> : null}
         <FileList files={filesIn('diario')} onRemove={removeFile} />
         <h2 className="section-title">MOTORES</h2>
-        <div className="motor-grid">{motors.map(motor => <article className="motor-card" key={motor.id}><h3>{motor.name}</h3>{motor.id === 'produtos' ? <><div className="client-source-list">{productSources.map(source => { const uploaded = productSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded ? <small style={{display:'flex',gap:'6px',alignItems:'center'}}>{uploaded.name} <span style={{opacity:0.5,fontSize:10}}>{uploaded.receivedAt}</span> <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeProductSlotFile(source.id, uploaded.id)}>Remover</button></small> : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => productSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={productProcessing || !Object.values(productSlots).some(file => file && rawFiles[file.id])} onClick={processProducts}>{productProcessing ? 'Conferindo arquivos' : 'Criar base de produtos'}</button>{productIndicators ? <div className="indicators"><span>{productIndicators.total.toLocaleString('pt-BR')} produtos</span><span>{productIndicators.inTransit.toLocaleString('pt-BR')} em trânsito</span><button type="button" onClick={downloadProductBase}>Baixar JSON</button><button type="button" onClick={downloadProductExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'clientes' ? <><div className="client-source-list">{clientSources.map(source => { const uploaded = clientSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded ? <small style={{display:'flex',gap:'6px',alignItems:'center'}}>{uploaded.name} <span style={{opacity:0.5,fontSize:10}}>{uploaded.receivedAt}</span> <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeClientSlotFile(source.id, uploaded.id)}>Remover</button></small> : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => clientSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={clientProcessing || !Object.values(clientSlots).some(file => file && rawFiles[file.id])} onClick={processClients}>{clientProcessing ? 'Conferindo arquivos' : 'Criar base de clientes'}</button>{clientIndicators ? <div className="indicators"><span>{clientIndicators.totalClients.toLocaleString('pt-BR')} clientes</span><span>{clientIndicators.complete.toLocaleString('pt-BR')} completos</span><span>{clientIndicators.internal.toLocaleString('pt-BR')} interno</span><span>{clientIndicators.route.toLocaleString('pt-BR')} roteiro</span><span>{clientIndicators.portfolio.toLocaleString('pt-BR')} carteira</span><span>{clientIndicators.premises.toLocaleString('pt-BR')} pirâmide</span><button type="button" onClick={downloadClientBase}>Baixar JSON</button><button type="button" onClick={downloadClientExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'historico' ? <><div className="client-source-list">{historySources.map(source => { const uploaded = historySlots[source.id] ?? []; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file => <small key={file.id} style={{display:'flex',gap:'6px',alignItems:'center'}}>{file.name} <span style={{opacity:0.5,fontSize:10}}>{file.receivedAt}</span> <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeHistoryFile(file.id)}>Remover</button></small>) : <small>{source.id === 'catalog' ? 'Opcional' : 'Ainda não enviado'}</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".txt" multiple={source.id !== 'catalog'} onChange={event => historySourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={historyProcessing || !(historySlots.sales ?? []).some(f => rawFiles[f.id])} onClick={processHistory}>{historyProcessing ? 'Conferindo arquivos' : 'Criar base histórica'}</button>{historyIndicators ? <div className="indicators"><span>{historyIndicators.competencies.toLocaleString('pt-BR')} competências</span><span>{historyIndicators.salesLines.toLocaleString('pt-BR')} vendas</span><button type="button" onClick={downloadHistoryBase}>Baixar JSON</button><button type="button" onClick={downloadHistoryExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'movimentacoes' ? <><div className="client-source-list">{movementSources.map(source => { const uploaded = movementSlots[source.id] ?? []; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file => <small key={file.id} style={{display:'flex',gap:'6px',alignItems:'center'}}>{file.name} <span style={{opacity:0.5,fontSize:10}}>{file.receivedAt}</span> <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeMovementFile(file.id)}>Remover</button></small>) : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" multiple onChange={event => movementSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={movementProcessing || !Object.values(movementSlots).flat().some(file => rawFiles[file.id])} onClick={processMovements}>{movementProcessing ? 'Conferindo arquivos' : 'Criar base de movimentações'}</button>{movementIndicators ? <div className="indicators"><span>{movementIndicators.sales.toLocaleString('pt-BR')} vendas faturadas</span><span>{movementIndicators.pendingRetyping.toLocaleString('pt-BR')} para redigitar</span><button type="button" onClick={downloadMovementBase}>Baixar JSON</button><button type="button" onClick={downloadMovementExcel}>Baixar Excel</button></div> : null}</> : <><button type="button" className="add-button" onClick={() => motorInputs.current[motor.id]?.click()}>Adicionar arquivos</button><input ref={element => { motorInputs.current[motor.id] = element }} aria-label={`Adicionar arquivos de ${motor.name}`} type="file" multiple onChange={event => fileChange(motor.id, event)} /><FileList files={filesIn(motor.id)} onRemove={removeFile} compact /></>}</article>)}</div>
-        <article className="motor-card"><h3>Chegada de notas</h3><div className="client-source-list">{receiptSources.map(source => { const uploaded=receiptSlots[source.id]??[]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file=><small key={file.id} style={{display:'flex',gap:'6px',alignItems:'center'}}>{file.name} <span style={{opacity:0.5,fontSize:10}}>{file.receivedAt}</span> <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeReceiptFile(file.id)}>Remover</button></small>) : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input type="file" multiple accept={source.id==='legacy'?'.txt':'.xls,.xlsx'} onChange={event=>receiptSourceChange(source.id,event)} /></label></div>})}</div><button className="process-button" type="button" disabled={receiptProcessing||!Object.values(receiptSlots).flat().some(file=>rawFiles[file.id])} onClick={processReceipts}>{receiptProcessing?'Conferindo arquivos':'Criar base de chegada'}</button>{receiptIndicators?<div className="indicators"><span>{receiptIndicators.received.toLocaleString('pt-BR')} recebimentos</span><span>{receiptIndicators.inTransit.toLocaleString('pt-BR')} em trânsito</span><button type="button" onClick={downloadReceiptBase}>Baixar JSON</button><button type="button" onClick={downloadReceiptExcel}>Baixar Excel</button></div>:null}</article>
+        <div className="motor-grid">{motors.map(motor => <article className="motor-card" key={motor.id}><h3>{motor.name}</h3>{motor.id === 'produtos' ? <><div className="client-source-list">{productSources.map(source => { const uploaded = productSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded ? <small className="visual-u-1" >{uploaded.name} <span className="visual-u-2" >{uploaded.receivedAt}</span> <button type="button" className="visual-u-3"  onClick={()=>removeProductSlotFile(source.id, uploaded.id)}>Remover</button></small> : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => productSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={productProcessing || !Object.values(productSlots).some(file => file && rawFiles[file.id])} onClick={processProducts}>{productProcessing ? 'Conferindo arquivos' : 'Criar base de produtos'}</button>{productIndicators ? <div className="indicators"><span>{productIndicators.total.toLocaleString('pt-BR')} produtos</span><span>{productIndicators.inTransit.toLocaleString('pt-BR')} em trânsito</span><button type="button" onClick={downloadProductBase}>Baixar JSON</button><button type="button" onClick={downloadProductExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'clientes' ? <><div className="client-source-list">{clientSources.map(source => { const uploaded = clientSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded ? <small className="visual-u-1" >{uploaded.name} <span className="visual-u-2" >{uploaded.receivedAt}</span> <button type="button" className="visual-u-3"  onClick={()=>removeClientSlotFile(source.id, uploaded.id)}>Remover</button></small> : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => clientSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={clientProcessing || !Object.values(clientSlots).some(file => file && rawFiles[file.id])} onClick={processClients}>{clientProcessing ? 'Conferindo arquivos' : 'Criar base de clientes'}</button>{clientIndicators ? <div className="indicators"><span>{clientIndicators.totalClients.toLocaleString('pt-BR')} clientes</span><span>{clientIndicators.complete.toLocaleString('pt-BR')} completos</span><span>{clientIndicators.internal.toLocaleString('pt-BR')} interno</span><span>{clientIndicators.route.toLocaleString('pt-BR')} roteiro</span><span>{clientIndicators.portfolio.toLocaleString('pt-BR')} carteira</span><span>{clientIndicators.premises.toLocaleString('pt-BR')} pirâmide</span><button type="button" onClick={downloadClientBase}>Baixar JSON</button><button type="button" onClick={downloadClientExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'historico' ? <><div className="client-source-list">{historySources.map(source => { const uploaded = historySlots[source.id] ?? []; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file => <small key={file.id} className="visual-u-1" >{file.name} <span className="visual-u-2" >{file.receivedAt}</span> <button type="button" className="visual-u-3"  onClick={()=>removeHistoryFile(file.id)}>Remover</button></small>) : <small>{source.id === 'catalog' ? 'Opcional' : 'Ainda não enviado'}</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".txt" multiple={source.id !== 'catalog'} onChange={event => historySourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={historyProcessing || !(historySlots.sales ?? []).some(f => rawFiles[f.id])} onClick={processHistory}>{historyProcessing ? 'Conferindo arquivos' : 'Criar base histórica'}</button>{historyIndicators ? <div className="indicators"><span>{historyIndicators.competencies.toLocaleString('pt-BR')} competências</span><span>{historyIndicators.salesLines.toLocaleString('pt-BR')} vendas</span><button type="button" onClick={downloadHistoryBase}>Baixar JSON</button><button type="button" onClick={downloadHistoryExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'movimentacoes' ? <><div className="client-source-list">{movementSources.map(source => { const uploaded = movementSlots[source.id] ?? []; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file => <small key={file.id} className="visual-u-1" >{file.name} <span className="visual-u-2" >{file.receivedAt}</span> <button type="button" className="visual-u-3"  onClick={()=>removeMovementFile(file.id)}>Remover</button></small>) : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" multiple onChange={event => movementSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={movementProcessing || !Object.values(movementSlots).flat().some(file => rawFiles[file.id])} onClick={processMovements}>{movementProcessing ? 'Conferindo arquivos' : 'Criar base de movimentações'}</button>{movementIndicators ? <div className="indicators"><span>{movementIndicators.sales.toLocaleString('pt-BR')} vendas faturadas</span><span>{movementIndicators.pendingRetyping.toLocaleString('pt-BR')} para redigitar</span><button type="button" onClick={downloadMovementBase}>Baixar JSON</button><button type="button" onClick={downloadMovementExcel}>Baixar Excel</button></div> : null}</> : <><button type="button" className="add-button" onClick={() => motorInputs.current[motor.id]?.click()}>Adicionar arquivos</button><input ref={element => { motorInputs.current[motor.id] = element }} aria-label={`Adicionar arquivos de ${motor.name}`} type="file" multiple onChange={event => fileChange(motor.id, event)} /><FileList files={filesIn(motor.id)} onRemove={removeFile} compact /></>}</article>)}</div>
+        <article className="motor-card"><h3>Chegada de notas</h3><div className="client-source-list">{receiptSources.map(source => { const uploaded=receiptSlots[source.id]??[]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file=><small key={file.id} className="visual-u-1" >{file.name} <span className="visual-u-2" >{file.receivedAt}</span> <button type="button" className="visual-u-3"  onClick={()=>removeReceiptFile(file.id)}>Remover</button></small>) : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input type="file" multiple accept={source.id==='legacy'?'.txt':'.xls,.xlsx'} onChange={event=>receiptSourceChange(source.id,event)} /></label></div>})}</div><button className="process-button" type="button" disabled={receiptProcessing||!Object.values(receiptSlots).flat().some(file=>rawFiles[file.id])} onClick={processReceipts}>{receiptProcessing?'Conferindo arquivos':'Criar base de chegada'}</button>{receiptIndicators?<div className="indicators"><span>{receiptIndicators.received.toLocaleString('pt-BR')} recebimentos</span><span>{receiptIndicators.inTransit.toLocaleString('pt-BR')} em trânsito</span><button type="button" onClick={downloadReceiptBase}>Baixar JSON</button><button type="button" onClick={downloadReceiptExcel}>Baixar Excel</button></div>:null}</article>
       </section> : tab === 'auditoria' ? <section className="content">
         <div className="audit-heading"><h2>AUDITORIA</h2><button className="secondary-button" type="button" onClick={downloadAiJson}>Gerar resumo para IA</button></div>
         <div className="notice-list">{audit.map(item => <button className={`notice ${item.level}`} key={item.id} type="button" onClick={() => setActiveNotice(item)}><span>{item.title}</span><small>{item.instruction}</small></button>)}</div>
@@ -658,22 +658,22 @@ export function App() {
           }
           return <article className="motor-card" key={motor.name}>
             <h3>{motor.name}</h3>
-            <div style={{fontSize: '13px', lineHeight: '1.6'}}>
+            <div className="visual-u-4" >
               <div><strong>Registros na base:</strong> {motor.base.length.toLocaleString('pt-BR')}</div>
               <div><strong>Indicadores:</strong> {motor.indicators ? 'Sim' : 'Não processado'}</div>
               {motor.base.length > 0 && <>
-                <div style={{marginTop: '8px'}}><strong>Preenchimento dos campos:</strong></div>
-                {Object.entries(fieldCounts).map(([field, count]) => <div key={field} style={{paddingLeft: '12px'}}>
+                <div className="visual-u-5" ><strong>Preenchimento dos campos:</strong></div>
+                {Object.entries(fieldCounts).map(([field, count]) => <div key={field} className="visual-u-6" >
                   {field}: {count.toLocaleString('pt-BR')} / {motor.base.length.toLocaleString('pt-BR')} ({Math.round(count / motor.base.length * 100)}%)
                 </div>)}
               </>}
               {fileList.length > 0 && <>
-                <div style={{marginTop: '8px'}}><strong>Arquivos carregados ({fileList.length}):</strong></div>
-                {fileList.map((f, i) => <div key={i} style={{paddingLeft: '12px', fontSize: '12px'}}>
+                <div className="visual-u-5" ><strong>Arquivos carregados ({fileList.length}):</strong></div>
+                {fileList.map((f, i) => <div key={i} className="visual-u-7" >
                   {f.name} — {(f.size / 1024).toFixed(0)}KB — {f.receivedAt}
                 </div>)}
               </>}
-              {fileList.length === 0 && <div style={{marginTop: '4px', color: 'var(--red)'}}><strong>Nenhum arquivo nos slots</strong></div>}
+              {fileList.length === 0 && <div className="visual-u-8" ><strong>Nenhum arquivo nos slots</strong></div>}
             </div>
           </article>
         })}
@@ -779,28 +779,28 @@ function ConfigTab({ activeComp, onChangeComp, onFecha }: { activeComp: string; 
         </p>
         <div className="config-input-row">
           <input
-            className="config-input"
-            style={{ width: 110 }}
+            className="config-input visual-u-9"
+
             type="text"
             placeholder="AAAA-MM"
             value={compInput}
             onChange={e => setCompInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleAbrir()}
           />
-          <button className="process-button" style={{ margin: 0 }} type="button" onClick={handleAbrir}>
+          <button className="process-button visual-u-10"  type="button" onClick={handleAbrir}>
             Abrir competência
           </button>
         </div>
-        <div style={{ marginTop: 12 }}>
+        <div className="visual-u-11" >
           <button
-            className="process-button"
-            style={{ margin: 0, background: 'transparent', border: '1px solid var(--red)', color: 'var(--red)' }}
+            className="process-button visual-u-12"
+
             type="button"
             onClick={onFecha}
           >
             Fechar competência atual ({fmtCompetencia(activeComp)})
           </button>
-          <p className="config-help" style={{ marginTop: 6 }}>
+          <p className="config-help visual-u-13" >
             Salva uma fotografia de todos os dados e torna esta competência somente leitura.
           </p>
         </div>
@@ -824,7 +824,7 @@ function ConfigTab({ activeComp, onChangeComp, onFecha }: { activeComp: string; 
             onKeyDown={e => e.key === 'Enter' && saveMarkup()}
           />
           <span className="config-unit">%</span>
-          <button className="process-button" style={{ margin: 0 }} type="button" onClick={saveMarkup}>
+          <button className="process-button visual-u-10"  type="button" onClick={saveMarkup}>
             {savedMarkup ? 'Salvo ✓' : 'Salvar'}
           </button>
         </div>
@@ -837,10 +837,10 @@ function ConfigTab({ activeComp, onChangeComp, onFecha }: { activeComp: string; 
           O cálculo usa a taxa de reposição histórica das notas de entrada como proxy de consumo diário.
         </p>
         <div className="config-input-row">
-          <span className="config-unit" style={{ marginRight: 2 }}>Crítico &lt;</span>
+          <span className="config-unit visual-u-14" >Crítico &lt;</span>
           <input
-            className="config-input"
-            style={{ width: 64 }}
+            className="config-input visual-u-15"
+
             type="number" min={1} max={365}
             placeholder="30"
             value={covLow}
@@ -849,8 +849,8 @@ function ConfigTab({ activeComp, onChangeComp, onFecha }: { activeComp: string; 
           />
           <span className="config-unit">d · Excesso &gt;</span>
           <input
-            className="config-input"
-            style={{ width: 64 }}
+            className="config-input visual-u-15"
+
             type="number" min={1} max={730}
             placeholder="90"
             value={covHigh}
@@ -858,7 +858,7 @@ function ConfigTab({ activeComp, onChangeComp, onFecha }: { activeComp: string; 
             onKeyDown={e => e.key === 'Enter' && saveCovDays()}
           />
           <span className="config-unit">d</span>
-          <button className="process-button" style={{ margin: 0 }} type="button" onClick={saveCovDays}>
+          <button className="process-button visual-u-10"  type="button" onClick={saveCovDays}>
             {savedCov ? 'Salvo ✓' : 'Salvar'}
           </button>
         </div>
@@ -880,7 +880,7 @@ function ConfigTab({ activeComp, onChangeComp, onFecha }: { activeComp: string; 
             onChange={e => { setSelloutMetaInput(e.target.value); setSavedSelloutMeta(false) }}
             onKeyDown={e => e.key === 'Enter' && saveSelloutMeta()}
           />
-          <button className="process-button" style={{ margin: 0 }} type="button" onClick={saveSelloutMeta}>
+          <button className="process-button visual-u-10"  type="button" onClick={saveSelloutMeta}>
             {savedSelloutMeta ? 'Salvo ✓' : 'Salvar'}
           </button>
         </div>
@@ -901,7 +901,7 @@ function ConfigTab({ activeComp, onChangeComp, onFecha }: { activeComp: string; 
             onChange={e => { setPositivMetaInput(e.target.value); setSavedPositivMeta(false) }}
             onKeyDown={e => e.key === 'Enter' && savePositivMeta()}
           />
-          <button className="process-button" style={{ margin: 0 }} type="button" onClick={savePositivMeta}>
+          <button className="process-button visual-u-10"  type="button" onClick={savePositivMeta}>
             {savedPositivMeta ? 'Salvo ✓' : 'Salvar'}
           </button>
         </div>
@@ -1006,22 +1006,22 @@ function SyncSection() {
             Todos os dados são sincronizados automaticamente com a nuvem.
             Qualquer dispositivo que abrir o sistema verá a versão mais recente.
           </p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '8px 0' }}>
+          <div className="visual-u-16" >
             <span className={`cloud-dot cloud-dot-${syncStatus}`} />
-            <span style={{ fontSize: 13 }}>
+            <span className="visual-u-17" >
               {syncStatus === 'synced' ? 'Sincronizado' : syncStatus === 'syncing' ? 'Sincronizando…' : syncStatus === 'error' ? 'Erro' : 'Offline'}
             </span>
           </div>
           {syncDetail && (
-            <p className="config-help" style={{ fontSize: 12, fontFamily: 'monospace', wordBreak: 'break-all' }}>
+            <p className="config-help visual-u-18" >
               {syncDetail}
             </p>
           )}
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
-            <button className="process-button" style={{ margin: 0 }} type="button" disabled={pushing} onClick={handleForceSync}>
+          <div className="visual-u-19" >
+            <button className="process-button visual-u-10"  type="button" disabled={pushing} onClick={handleForceSync}>
               {pushing ? 'Enviando…' : 'Forçar envio'}
             </button>
-            <button className="process-button" style={{ margin: 0 }} type="button" disabled={pulling} onClick={handleForcePull}>
+            <button className="process-button visual-u-10"  type="button" disabled={pulling} onClick={handleForcePull}>
               {pulling ? 'Puxando…' : 'Forçar pull'}
             </button>
           </div>
@@ -1032,7 +1032,7 @@ function SyncSection() {
           <p className="config-help">
             Para que os dados fiquem sincronizados automaticamente entre todos os dispositivos,
             é preciso configurar o Firebase. Crie um projeto gratuito em{' '}
-            <a href="https://console.firebase.google.com/" target="_blank" rel="noreferrer" style={{ color: 'var(--blue)' }}>console.firebase.google.com</a>,
+            <a href="https://console.firebase.google.com/" target="_blank" rel="noreferrer" className="visual-u-20" >console.firebase.google.com</a>,
             ative o <strong>Realtime Database</strong>, e adicione as variáveis de ambiente no deploy (VITE_FB_API_KEY, VITE_FB_DATABASE_URL, etc).
           </p>
         </div>
@@ -1043,17 +1043,17 @@ function SyncSection() {
         <p className="config-help">
           Alternativa manual: exporte os dados para um arquivo JSON e envie para outro dispositivo (WhatsApp, e-mail).
         </p>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
-          <button className="process-button" style={{ margin: 0 }} type="button" disabled={exporting} onClick={handleExport}>
+        <div className="visual-u-19" >
+          <button className="process-button visual-u-10"  type="button" disabled={exporting} onClick={handleExport}>
             {exporting ? 'Exportando…' : 'Exportar dados'}
           </button>
           <label className="process-button" style={{ margin: 0, cursor: importing ? 'wait' : 'pointer', opacity: importing ? 0.6 : 1, display: 'inline-flex', alignItems: 'center' }}>
             {importing ? 'Importando…' : 'Importar dados'}
-            <input ref={importRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} disabled={importing} />
+            <input ref={importRef} type="file" accept=".json" className="visual-u-21"  onChange={handleImport} disabled={importing} />
           </label>
         </div>
         {status ? (
-          <p className="config-help" style={{ marginTop: 10, fontWeight: 600, color: status.startsWith('Erro') || status.startsWith('Arquivo') ? 'var(--red)' : 'var(--green, #10b981)' }}>
+          <p className="config-help" style={{ marginTop: 10, fontWeight: 600, color: status.startsWith('Erro') || status.startsWith('Arquivo') ? 'var(--red-text)' : 'var(--green-text)' }}>
             {status}
           </p>
         ) : null}

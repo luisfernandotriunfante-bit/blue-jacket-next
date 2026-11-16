@@ -32,7 +32,7 @@ refinar, desde que registre a mudança aqui.
 | `--blue` | `#3b82f6` | `#2563eb` | realizado/positivo, estado ativo de controle, foco |
 | `--white` | `#e2e8f0` | `#64748b` | destaque neutro |
 
-### 2.2 Cores a criar como token (hoje estão escritas à mão em vários lugares)
+### 2.2 Cores adicionais
 
 | Token novo | Valor | Substitui | Uso |
 |---|---|---|---|
@@ -40,12 +40,12 @@ refinar, desde que registre a mudança aqui.
 | `--green` | `#10b981` | `#10b981`, `#22c55e`, `#4caf50`, `#2e7d32` | concluído / sincronizado |
 | `--purple` | `#a855f7` | `#a855f7`, `#8b5cf6`, `#9e5bee`, `#a78bfa` | categoria extra (PJ, rede, PEX+lançamento) |
 
-`--bg` **não existe** (é usado em 3 regras e cai em transparente): trocar por `--background`.
+`--background` é o token de fundo; `--bg` não é usado.
 
 ### 2.3 Semáforo de desempenho (um só no site inteiro)
 
 Igual ao Sell Out e ao Gerencial: **bom = `--blue`, médio = `--amber`, ruim = `--red`**.
-O Sortimento usa verde/laranja/vermelho do Material (`#4caf50`/`#ff9800`/`#ef5350`): migrar.
+O Sortimento usa a escala azul/âmbar/vermelho.
 
 ### 2.4 Raios
 
@@ -80,7 +80,7 @@ Distância entre blocos de uma aba: 20px. Grade de KPIs: `gap: 12px`.
 |---|---|
 | Aba de navegação ativa | texto `--red` + sublinhado `--red` de 3px (`.stock-nav-btn.on`) |
 | Controle ativo (filtro, alternador, paginação, "Atual") | fundo `--blue`, texto branco, borda `--blue` |
-| Foco em campo | `border-color: var(--blue)`, sem outline |
+| Foco em campo | borda azul e contorno de foco visível de 2px |
 | Hover em linha | `background: var(--surface-raised)` |
 | Linha selecionada | `background: color-mix(in srgb, var(--blue) 8%, transparent)` |
 | Desabilitado | `opacity: .4; cursor: not-allowed` |
@@ -165,3 +165,24 @@ Os estilos da Carteira residem em `styles.css`. O seletor de modo ativo usa azul
 ### Sortimento e filtros (E8)
 
 O semáforo de sortimento usa azul (bom), âmbar (intermediário) e vermelho (ruim). `--amber-text` usa `#f59e0b` no escuro e `#985500` no claro para leitura em superfícies; o âmbar de preenchimento permanece `--amber`. Controles selecionados usam azul; linhas de seleção respondem ao teclado.
+
+### Contraste e grades (E9)
+
+`--red-fill` é `#c2151c` no tema escuro e `#d4131b` no claro; `--blue-fill` é `#2563eb`. Com branco, as razões calculadas são 6,14:1, 5,37:1 e 5,17:1, respectivamente. São usados nos preenchimentos de ações e controles selecionados. As grades extensas de Cadastro, Pirâmide e Estoque mantêm colunas em rolagem horizontal interna e nomes podem quebrar linhas. Classes `visual-u-*` agrupam estilos estáticos previamente inline e são temporárias enquanto componentes legados forem migrados.
+
+Os tons `--r0` a `--r4` e `--r-soft` mantêm a escala de dados da Carteira em cada tema. `--on-amber` é `#000000`; `--green-text` é `#10b981` no escuro e `#087a57` no claro, para preservar o significado de concluído com leitura adequada.
+
+Aliases legados mantidos nesta entrega: botões `.add-button`, `.secondary-button`, `.process-button`, `.rca-btn`, `.cad-pex-btn`, `.pf-clear-btn`, `.pf-filter-btn`, `.sort-filter-btn`, `.sort-clear-btn`, `.sort-mode-btn`, `.so-compact-btn`, `.so-nav-btn`, `.stock-nav-btn`, `.gr-view-btn`, `.comp-close-btn` e `.rca-opt-btn` compartilham raio; os vazios e painéis antigos compartilham tokens de superfície e texto. As variantes específicas permanecem para preservar seus fluxos.
+`--map-complete` mantém `#22c55e`, cor de dado da Carteira e de sua legenda.
+
+`--blue-text` é `#60a5fa` no escuro e `#1d4ed8` no claro, usado em textos azuis sobre fundos de destaque; `--blue` permanece para séries e elementos de dados.
+
+Exceções e regras finais da validação (E9):
+- Texto vermelho em qualquer superfície usa `--red-text` (inclui a legenda do donut do Estoque, "Remover" e os avisos de vazio de Uploads/Dados). `--red` fica só para fundo, marca e séries de dados.
+- Dicas secundárias usam `--muted` sem `opacity` (a opacidade reduzia o contraste para 2,4–3,6:1).
+- Alvos de toque ≤720px: botões, abas, chips, campos e rótulos de checkbox têm 40px; a caixa do checkbox nativo mede 13px dentro de um rótulo clicável de 40px. Links dentro de parágrafo (ex.: link do console Firebase) são exceção de link em linha.
+- Linhas clicáveis de tabela (`.so-dt-row`) têm altura mínima de 40px em ≤720px.
+- Linhas de ajuste de Configurações (`.config-input-row`) quebram linha para o botão "Salvar" nunca sair da tela; o grid de motores em Uploads usa `minmax(0, 1fr)` para não estourar 4px em 360px.
+- `!important` permanece somente no bloco `prefers-reduced-motion` (precisa vencer animações e transições inline de terceiros). Raios: 5 tokens, `50%` (círculos) e `3px` (barras de gráfico).
+- Texto branco sobre as telhas do treemap de Estoque usa o gradiente escuro da própria telha em ambos os temas.
+- Desabilitado (`:disabled`) fica isento de contraste mínimo, como previsto pelo WCAG.

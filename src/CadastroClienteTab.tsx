@@ -296,8 +296,7 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
           />
           <button
             type="button"
-            className="pf-select"
-            style={{ minWidth: 'auto', padding: '0 14px', cursor: 'pointer', background: showPexUpload ? 'var(--red)' : undefined, color: showPexUpload ? '#fff' : undefined, border: showPexUpload ? '1px solid var(--red)' : undefined }}
+            className={`pf-select upload-toggle${showPexUpload ? ' is-active' : ''}`} aria-pressed={showPexUpload}
             onClick={() => setShowPexUpload(v => !v)}
           >
             {showPexUpload ? 'Fechar' : 'Importar PEX'}
@@ -313,9 +312,9 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
               onChange={e => setPexText(e.target.value)}
               rows={4}
             />
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <div className="visual-u-22" >
               <button type="button" className="cad-pex-btn" onClick={handlePexUpload}>Marcar como PEX</button>
-              {pexSet.size > 0 && <small style={{ color: 'var(--muted)' }}>{pexSet.size} cliente{pexSet.size !== 1 ? 's' : ''} marcado{pexSet.size !== 1 ? 's' : ''} como PEX</small>}
+              {pexSet.size > 0 && <small className="visual-u-23" >{pexSet.size} cliente{pexSet.size !== 1 ? 's' : ''} marcado{pexSet.size !== 1 ? 's' : ''} como PEX</small>}
               {pexSet.size > 0 && <button type="button" className="cad-pex-clear" onClick={() => onPexChange(new Set())}>Limpar PEX</button>}
             </div>
           </div>
@@ -338,7 +337,7 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
         <strong>{filtered.length.toLocaleString('pt-BR')}</strong>{' '}
         cliente{filtered.length !== 1 ? 's' : ''}
         {rows.length !== filtered.length && ` de ${rows.length.toLocaleString('pt-BR')}`}
-        {pexSet.size > 0 && <span style={{ marginLeft: 12, color: 'var(--red)', fontWeight: 700 }}>{pexSet.size} PEX</span>}
+        {pexSet.size > 0 && <span className="visual-u-24" >{pexSet.size} PEX</span>}
       </div>
 
       {/* Layout: list + side panel */}
@@ -354,7 +353,7 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
             <span className="sc-num">Dias s/ compra</span>
           </div>
           {filtered.length === 0 && (
-            <p className="empty" style={{ padding: '24px 16px', color: 'var(--muted)', textAlign: 'center' }}>Nenhum cliente encontrado.</p>
+            <p className="empty visual-u-25" >Nenhum cliente encontrado.</p>
           )}
           {filtered.map(r => {
             const isSelected = expanded === r.document
@@ -370,12 +369,12 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
               >
                 <span className="sc-desc">
                   <span className="p-name">{r.name}</span>
-                  <span className="p-meta" style={{ gap: 6, marginTop: 2 }}>
+                  <span className="p-meta visual-u-26" >
                     <code>{r.code}</code>
-                    <span style={{ color: 'var(--muted)' }}>{r.document}</span>
+                    <span className="visual-u-23" >{r.document}</span>
                     {r.city && <span>{r.city}</span>}
                   </span>
-                  <span className="p-meta" style={{ gap: 5, marginTop: 3 }}>
+                  <span className="p-meta visual-u-27" >
                     {isPex && <span className="badge-pex">PEX</span>}
                     {r.range && <span className="cad-badge-range">Faixa {r.range}</span>}
                     {r.network && <span className="cad-badge-net">{r.network}</span>}
@@ -385,8 +384,8 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
                 </span>
                 <span className="sc-num">
                   {r.crescimento != null
-                    ? <strong style={{ color: r.crescimento >= 0 ? '#4caf50' : '#ef5350', fontSize: 12 }}>{r.crescimento >= 0 ? '▲' : '▼'} {Math.abs(r.crescimento).toFixed(0)}%</strong>
-                    : <strong className="c-muted" style={{ fontSize: 11 }}>—</strong>}
+                    ? <strong style={{ color: r.crescimento >= 0 ? 'var(--green-text)' : 'var(--red-text)', fontSize: 12 }}>{r.crescimento >= 0 ? '▲' : '▼'} {Math.abs(r.crescimento).toFixed(0)}%</strong>
+                    : <strong className="c-muted visual-u-28" >—</strong>}
                 </span>
                 <span className="sc-num">
                   {r.avgAnual > 0
@@ -400,13 +399,13 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
                 </span>
                 <span className="sc-num">
                   {r.premiseAvg12m != null && r.premiseAvg12m > 0
-                    ? <strong style={{ color: '#4caf50' }}>{kpiCurrency(r.premiseAvg12m)}</strong>
+                    ? <strong className="text-green">{kpiCurrency(r.premiseAvg12m)}</strong>
                     : <strong className="c-muted">—</strong>}
                 </span>
                 <span className="sc-num">
                   {r.daysSincePurchase >= 0
                     ? <span className={`cl-dias-badge ${r.daysSincePurchase <= 30 ? 'cl-dias-ok' : r.daysSincePurchase <= 90 ? 'cl-dias-mid' : 'cl-dias-warn'}`}>{r.daysSincePurchase}d</span>
-                    : <span style={{ color: 'var(--muted)', fontSize: 11, fontWeight: 700 }}>nunca</span>}
+                    : <span className="visual-u-29" >nunca</span>}
                 </span>
               </div>
             )
@@ -417,7 +416,7 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
         {selectedRow && (
           <aside className="cad-side-panel">
             <div className="cad-side-header">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div className="visual-u-30" >
                 <div>
                   <h3>{selectedRow.name}</h3>
                   <small>{selectedRow.document} · {selectedRow.code}</small>
@@ -506,11 +505,11 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
 
               {history.length > 0 && (
                 <div className="cad-history">
-                  <div className="cl-history-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div className="cl-history-head visual-u-31" >
                     <span className="so-chart-tag">Histórico</span>
-                    <span style={{ color: 'var(--muted)', fontSize: 11 }}>{history.length} movimentações</span>
+                    <span className="visual-u-32" >{history.length} movimentações</span>
                   </div>
-                  <div style={{ overflowX: 'auto', maxHeight: 280, overflowY: 'auto' }}>
+                  <div className="visual-u-33" >
                     <table className="so-day-detail-table">
                       <thead>
                         <tr>
@@ -525,10 +524,10 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
                       <tbody>
                         {history.map((m, i) => (
                           <tr key={i} className={`so-dm-row so-dm-${m.movementType}`}>
-                            <td style={{ color: 'var(--muted)', fontSize: 11, whiteSpace: 'nowrap' }}>{m.movementDate ? fmtDay(m.movementDate) : '—'}</td>
+                            <td className="visual-u-34" >{m.movementDate ? fmtDay(m.movementDate) : '—'}</td>
                             <td><span className={`so-mov-badge so-mov-${m.movementType}`}>{MOV_LABEL[m.movementType] ?? m.movementType}</span></td>
                             <td className="so-dm-product">{m.description ?? m.productCode ?? '—'}</td>
-                            <td style={{ fontSize: 11, color: 'var(--muted)' }}>{m.seller ?? m.sellerCode ?? '—'}</td>
+                            <td className="visual-u-35" >{m.seller ?? m.sellerCode ?? '—'}</td>
                             <td className="n-right so-dm-qty">{m.quantity != null ? m.quantity.toLocaleString('pt-BR') : '—'}</td>
                             <td className="n-right so-dm-value">{m.value != null ? brlFull(m.value) : '—'}</td>
                           </tr>
@@ -589,7 +588,7 @@ function FilterDrop({ label, options, selected, onSelect, single, open, onToggle
           ) : (
             <>
               {selected.length > 0 && (
-                <label style={{ color: 'var(--red)', fontWeight: 600 }}><input type="checkbox" checked={false} onChange={() => onSelect([])} /> Limpar</label>
+                <label className="visual-u-36" ><input type="checkbox" checked={false} onChange={() => onSelect([])} /> Limpar</label>
               )}
               {vis.map(o => (
                 <label key={o}><input type="checkbox" checked={selected.includes(o)} onChange={() => {

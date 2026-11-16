@@ -96,20 +96,20 @@ function TwoSegmentDonut({ label, segA, segALabel, segAVal, segB, segBLabel, seg
       {/* legenda de valores */}
       <div className="so-hero-info">
         <div className="so-hero-info-row">
-          <span className="so-hero-info-dot" style={{ background: 'var(--blue)' }} />
+          <span className="so-hero-info-dot visual-u-54"  />
           <span className="so-hero-info-key">{segALabel}</span>
-          <span className="so-hero-info-val" style={{ color: 'var(--blue)' }}>{segAVal}</span>
+          <span className="so-hero-info-val visual-u-20" >{segAVal}</span>
         </div>
         <div className="so-hero-info-row">
-          <span className="so-hero-info-dot" style={{ background: 'var(--red)' }} />
+          <span className="so-hero-info-dot visual-u-55"  />
           <span className="so-hero-info-key">{segBLabel}</span>
-          <span className="so-hero-info-val" style={{ color: 'var(--red-text)' }}>{segBVal}</span>
+          <span className="so-hero-info-val visual-u-56" >{segBVal}</span>
         </div>
         {net !== undefined && (
           <div className="so-hero-info-row">
-            <span className="so-hero-info-dot" style={{ background: 'transparent', border: '1.5px solid var(--muted)' }} />
+            <span className="so-hero-info-dot visual-u-57"  />
             <span className="so-hero-info-key">líquido</span>
-            <span className="so-hero-info-val" style={{ color: 'var(--text)' }}>{netLabel}</span>
+            <span className="so-hero-info-val visual-u-58" >{netLabel}</span>
           </div>
         )}
         <div className="so-hero-info-divider" />
@@ -336,7 +336,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
 
         {/* ── Fechamento diário ────────────────────────────── */}
         {allDays.length > 0 && (
-          <div className="notas-section so-detail-section" style={{ maxHeight: 'none', marginBottom: 20 }}>
+          <div className="notas-section so-detail-section visual-u-78" >
             <div className="so-window-bar">
               <div className="so-window-info">
                 <span className="so-window-tag">JANELA SINCRONIZADA · {WINDOW} DIAS</span>
@@ -365,9 +365,9 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
                       <div className="so-chart-title">Sell Out diário</div>
                     </div>
                     <div className="so-chart-legend">
-                      <span className="so-leg-item"><span className="so-leg-line" style={{ background: 'var(--text)' }} />Sell Out</span>
-                      <span className="so-leg-item"><span className="so-leg-line" style={{ background: 'var(--blue)' }} />Faturado</span>
-                      <span className="so-leg-item"><span className="so-leg-line so-leg-dash" style={{ background: 'var(--red)' }} />A Faturar</span>
+                      <span className="so-leg-item"><span className="so-leg-line visual-u-79"  />Sell Out</span>
+                      <span className="so-leg-item"><span className="so-leg-line visual-u-54"  />Faturado</span>
+                      <span className="so-leg-item"><span className="so-leg-line so-leg-dash visual-u-55"  />A Faturar</span>
                     </div>
                   </div>
                   <div className="e5-scroll">
@@ -420,8 +420,8 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
                       <div className="so-chart-title">Clientes positivados por dia</div>
                     </div>
                     <div className="so-chart-legend">
-                      <span className="so-leg-item"><span className="so-leg-line" style={{ background: 'var(--text)' }} />Pos. total</span>
-                      <span className="so-leg-item"><span className="so-leg-line" style={{ background: 'var(--blue)' }} />Pos. faturada</span>
+                      <span className="so-leg-item"><span className="so-leg-line visual-u-79"  />Pos. total</span>
+                      <span className="so-leg-item"><span className="so-leg-line visual-u-54"  />Pos. faturada</span>
                     </div>
                   </div>
                   <div className="e5-scroll">
@@ -504,7 +504,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
                           </td>
                           {!compact && <>
                             <td className="n-right so-dt-fat" style={{ color: d.fat > 0 ? 'var(--blue)' : 'var(--muted)' }}>{brlFull(d.fat)}</td>
-                            <td className="n-right so-dt-afat" style={{ color: d.afat > 0 ? 'var(--red)' : 'var(--muted)' }}>{brlFull(d.afat)}</td>
+                            <td className="n-right so-dt-afat" style={{ color: d.afat > 0 ? 'var(--red-text)' : 'var(--muted)' }}>{brlFull(d.afat)}</td>
                             <td className={`n-right so-dt-pos${d.posFat > 0 ? ' pos-active' : ''}`}>{d.posFat}</td>
                             <td className={`n-right so-dt-pos${d.posTotal > 0 ? ' pos-total' : ''}`}>{d.posTotal}</td>
                           </>}

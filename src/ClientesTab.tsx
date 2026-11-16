@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { Fragment, useState, useMemo } from 'react'
 import type { CanonicalMovement } from './domain/movementMotor'
 import type { CanonicalClient } from './domain/clientMotor'
 
@@ -170,11 +170,10 @@ export function ClientesTab({ movementBase, clientBase, monthLabel, activeComp }
 
       <div className="cl-toolbar">
         <input
-          className="stock-search"
+          className="stock-search e5-flex"
           placeholder="Buscar cliente, código, vendedor…"
           value={search}
           onChange={e => { setSearch(e.target.value); setExpandedCustomer(null) }}
-          style={{ flex: 1 }}
         />
       </div>
 
@@ -227,37 +226,36 @@ export function ClientesTab({ movementBase, clientBase, monthLabel, activeComp }
                 const dias = lastFat ? daysSince(lastFat) : -1
                 const history = movsByCustomer.get(p.code) ?? []
 
-                return <>
+                return <Fragment key={p.code}>
                   <tr
-                    key={p.code}
                     className={`gr-row cl-expandable-row${isExpanded ? ' cl-row-expanded' : ''}`}
                     role="button" tabIndex={0} aria-expanded={isExpanded} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCustomer(p.code) } }}
                     onClick={() => toggleCustomer(p.code)}
                   >
                     <td className="gr-rank">#{i + 1}</td>
-                    <td style={{ color: 'var(--muted)', fontSize: 12 }}>{p.code}</td>
+                    <td className="visual-u-48" >{p.code}</td>
                     <td>
                       <div className="gr-seller-name">{p.name}</div>
                     </td>
-                    <td className="n-right" style={{ color: 'var(--blue)', fontWeight: 700 }}>{kpiCurrency(p.fat)}</td>
-                    <td className="n-right" style={{ color: p.afat > 0 ? 'var(--red)' : 'var(--muted)', fontSize: 12 }}>
+                    <td className="n-right visual-u-49" >{kpiCurrency(p.fat)}</td>
+                    <td className="n-right" style={{ color: p.afat > 0 ? 'var(--red-text)' : 'var(--muted)', fontSize: 12 }}>
                       {p.afat > 0 ? kpiCurrency(p.afat) : '—'}
                     </td>
-                    <td style={{ fontSize: 12 }}>{p.seller}</td>
+                    <td className="visual-u-50" >{p.seller}</td>
                     <td className="n-right">
                       {dias >= 0
                         ? <span className={`cl-dias-badge ${dias <= 7 ? 'cl-dias-ok' : dias <= 30 ? 'cl-dias-mid' : 'cl-dias-warn'}`}>{dias}d</span>
-                        : <span style={{ color: 'var(--muted)' }}>—</span>}
+                        : <span className="visual-u-23" >—</span>}
                     </td>
-                    <td style={{ color: 'var(--muted)', fontSize: 12 }}>{p.lastDate ? fmtDay(p.lastDate) : '—'}</td>
+                    <td className="visual-u-48" >{p.lastDate ? fmtDay(p.lastDate) : '—'}</td>
                   </tr>
                   {isExpanded && history.length > 0 && (
                     <tr key={`${p.code}-hist`} className="cl-history-row">
-                      <td colSpan={8} style={{ padding: 0 }}>
+                      <td colSpan={8} className="visual-u-51" >
                         <div className="cl-history-wrap">
                           <div className="cl-history-head">
                             <span className="so-chart-tag">HISTÓRICO · {p.name}</span>
-                            <span style={{ color: 'var(--muted)', fontSize: 11 }}>{history.length} movimentações</span>
+                            <span className="visual-u-32" >{history.length} movimentações</span>
                           </div>
                           <div>
                             <table className="so-day-detail-table data-table">
@@ -274,10 +272,10 @@ export function ClientesTab({ movementBase, clientBase, monthLabel, activeComp }
                               <tbody>
                                 {history.map((m, mi) => (
                                   <tr key={mi} className={`so-dm-row so-dm-${m.movementType}`}>
-                                    <td style={{ color: 'var(--muted)', fontSize: 11, whiteSpace: 'nowrap' }}>{m.movementDate ? fmtDay(m.movementDate) : '—'}</td>
+                                    <td className="visual-u-34" >{m.movementDate ? fmtDay(m.movementDate) : '—'}</td>
                                     <td><span className={`so-mov-badge so-mov-${m.movementType}`}>{MOV_LABEL[m.movementType] ?? m.movementType}</span></td>
                                     <td className="so-dm-product">{m.description ?? m.productCode ?? '—'}</td>
-                                    <td style={{ fontSize: 11, color: 'var(--muted)' }}>{m.seller ?? m.sellerCode ?? '—'}</td>
+                                    <td className="visual-u-35" >{m.seller ?? m.sellerCode ?? '—'}</td>
                                     <td className="n-right so-dm-qty">{m.quantity != null ? m.quantity.toLocaleString('pt-BR') : '—'}</td>
                                     <td className="n-right so-dm-value">{m.value != null ? brlFull(m.value) : '—'}</td>
                                   </tr>
@@ -289,10 +287,10 @@ export function ClientesTab({ movementBase, clientBase, monthLabel, activeComp }
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               })}
               {!filteredPosit.length && (
-                <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>Nenhum cliente positivado este mês.</td></tr>
+                <tr><td colSpan={8} className="visual-u-52" >Nenhum cliente positivado este mês.</td></tr>
               )}
             </tbody>
           </table>
@@ -336,7 +334,7 @@ function FilterDrop({ label, options, selected, onSelect, single, open, onToggle
           ) : (
             <>
               {selected.length > 0 && (
-                <label style={{ color: 'var(--red-text)', fontWeight: 600 }}><input type="checkbox" checked={false} onChange={() => onSelect([])} /> Limpar</label>
+                <label className="visual-u-53" ><input type="checkbox" checked={false} onChange={() => onSelect([])} /> Limpar</label>
               )}
               {vis.map(o => (
                 <label key={o}><input type="checkbox" checked={selected.includes(o)} onChange={() => {
