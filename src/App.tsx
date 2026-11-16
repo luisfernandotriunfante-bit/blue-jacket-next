@@ -490,23 +490,23 @@ export function App() {
   return <div className={`app theme-${theme}`}>
     <aside className="sidebar">
       <div className="brand"><span className="brand-short">RJ</span><span className="brand-full">RED JACKET</span></div>
-      <button className={`nav-item${section === 'sellout' ? ' active' : ''}`} type="button" onClick={() => setSection('sellout')}>
+      <button className={`nav-item${section === 'sellout' ? ' active' : ''}`} type="button" aria-label="Sell out" title="Sell out" aria-current={section === 'sellout' ? 'page' : undefined} onClick={() => setSection('sellout')}>
         <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" /></svg>
         <span className="nav-label">Sell out</span>
       </button>
-      <button className={`nav-item${section === 'estoque' ? ' active' : ''}`} type="button" onClick={() => setSection('estoque')}>
+      <button className={`nav-item${section === 'estoque' ? ' active' : ''}`} type="button" aria-label="Estoque" title="Estoque" aria-current={section === 'estoque' ? 'page' : undefined} onClick={() => setSection('estoque')}>
         <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z" /><path fillRule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
         <span className="nav-label">Estoque</span>
       </button>
-      <button className={`nav-item${section === 'clientes' ? ' active' : ''}`} type="button" onClick={() => setSection('clientes')}>
+      <button className={`nav-item${section === 'clientes' ? ' active' : ''}`} type="button" aria-label="Clientes" title="Clientes" aria-current={section === 'clientes' ? 'page' : undefined} onClick={() => setSection('clientes')}>
         <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" /></svg>
         <span className="nav-label">Clientes</span>
       </button>
-      <button className={`nav-item${section === 'campanhas' ? ' active' : ''}`} type="button" onClick={() => setSection('campanhas')}>
+      <button className={`nav-item${section === 'campanhas' ? ' active' : ''}`} type="button" aria-label="Campanhas" title="Campanhas" aria-current={section === 'campanhas' ? 'page' : undefined} onClick={() => setSection('campanhas')}>
         <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z" /></svg>
         <span className="nav-label">Campanhas</span>
       </button>
-      <button className={`nav-item${section === 'administracao' ? ' active' : ''}`} type="button" onClick={() => setSection('administracao')}>
+      <button className={`nav-item${section === 'administracao' ? ' active' : ''}`} type="button" aria-label="Administração" title="Administração" aria-current={section === 'administracao' ? 'page' : undefined} onClick={() => setSection('administracao')}>
         <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" /></svg>
         <span className="nav-label">Administração</span>
       </button>
@@ -526,30 +526,30 @@ export function App() {
             <span className="nav-label">{cloudStatus === 'synced' ? 'Sincronizado' : cloudStatus === 'syncing' ? 'Sincronizando…' : cloudStatus === 'error' ? 'Erro' : 'Offline'}</span>
           </div>
         )}
-        <button className="theme-toggle" type="button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+        <button className="theme-toggle" type="button" aria-label={theme === 'dark' ? 'Tema claro' : 'Tema escuro'} title={theme === 'dark' ? 'Tema claro' : 'Tema escuro'} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
           <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" /></svg>
           <span className="nav-label">{theme === 'dark' ? 'Tema claro' : 'Tema escuro'}</span>
         </button>
       </div>
     </aside>
     <nav className="bottom-nav" aria-label="Navegação principal">
-      <button className={`bn-item${section === 'sellout' ? ' active' : ''}`} type="button" onClick={() => setSection('sellout')}>
+      <button className={`bn-item${section === 'sellout' ? ' active' : ''}`} type="button" aria-label="Sell out" title="Sell out" aria-current={section === 'sellout' ? 'page' : undefined} onClick={() => setSection('sellout')}>
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" /></svg>
         <span>Sell out</span>
       </button>
-      <button className={`bn-item${section === 'estoque' ? ' active' : ''}`} type="button" onClick={() => setSection('estoque')}>
+      <button className={`bn-item${section === 'estoque' ? ' active' : ''}`} type="button" aria-label="Estoque" title="Estoque" aria-current={section === 'estoque' ? 'page' : undefined} onClick={() => setSection('estoque')}>
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z" /><path fillRule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
         <span>Estoque</span>
       </button>
-      <button className={`bn-item${section === 'clientes' ? ' active' : ''}`} type="button" onClick={() => setSection('clientes')}>
+      <button className={`bn-item${section === 'clientes' ? ' active' : ''}`} type="button" aria-label="Clientes" title="Clientes" aria-current={section === 'clientes' ? 'page' : undefined} onClick={() => setSection('clientes')}>
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" /></svg>
         <span>Clientes</span>
       </button>
-      <button className={`bn-item${section === 'campanhas' ? ' active' : ''}`} type="button" onClick={() => setSection('campanhas')}>
+      <button className={`bn-item${section === 'campanhas' ? ' active' : ''}`} type="button" aria-label="Campanhas" title="Campanhas" aria-current={section === 'campanhas' ? 'page' : undefined} onClick={() => setSection('campanhas')}>
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z" /></svg>
         <span>Camp.</span>
       </button>
-      <button className={`bn-item${section === 'administracao' ? ' active' : ''}`} type="button" onClick={() => setSection('administracao')}>
+      <button className={`bn-item${section === 'administracao' ? ' active' : ''}`} type="button" aria-label="Administração" title="Administração" aria-current={section === 'administracao' ? 'page' : undefined} onClick={() => setSection('administracao')}>
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" /></svg>
         <span>Admin</span>
       </button>
@@ -566,14 +566,13 @@ export function App() {
         </div>
       )}
       {section === 'sellout' ? (<>
-        <header className="topbar" aria-label="Sell out" style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'stretch', borderBottom: '1px solid var(--border)' }}>
-          <div />
-          <div style={{ display: 'flex' }}>
+        <header className="topbar section-topbar" aria-label="Sell out">
+          <div className="section-tabs">
             <button type="button" className={`stock-nav-btn${selloutTab === 'dashboard' ? ' on' : ''}`} onClick={() => setSelloutTab('dashboard')}>Dashboard</button>
             <button type="button" className={`stock-nav-btn${selloutTab === 'gerencial' ? ' on' : ''}`} onClick={() => setSelloutTab('gerencial')}>Gerencial</button>
             <button type="button" className={`stock-nav-btn${selloutTab === 'clientes' ? ' on' : ''}`} onClick={() => setSelloutTab('clientes')}>Clientes</button>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 16 }}>
+          <div className="section-month">
             <span className="so-month-label">{monthLabel}</span>
           </div>
         </header>
@@ -583,15 +582,14 @@ export function App() {
       </>) : section === 'estoque' ? <>
         <StockTab productBase={effectiveProducts} receiptBase={effectiveReceipts} movementBase={effectiveMovements} productIndicators={snap ? null : productIndicators} activeComp={displayComp} />
       </> : section === 'clientes' ? (<>
-        <header className="topbar" style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'stretch', borderBottom: '1px solid var(--border)' }}>
-          <div />
-          <div style={{ display: 'flex' }}>
+        <header className="topbar section-topbar" aria-label="Clientes">
+          <div className="section-tabs">
             <button type="button" className={`stock-nav-btn${clientesTab === 'carteira' ? ' on' : ''}`} onClick={() => setClientesTab('carteira')}>Carteira</button>
             <button type="button" className={`stock-nav-btn${clientesTab === 'cadastro' ? ' on' : ''}`} onClick={() => setClientesTab('cadastro')}>Cadastro</button>
             <button type="button" className={`stock-nav-btn${clientesTab === 'piramide' ? ' on' : ''}`} onClick={() => setClientesTab('piramide')}>Pirâmide</button>
             <button type="button" className={`stock-nav-btn${clientesTab === 'sortimento' ? ' on' : ''}`} onClick={() => setClientesTab('sortimento')}>Sortimento</button>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 16 }}>
+          <div className="section-month">
             <span className="so-month-label">{monthLabel}</span>
           </div>
         </header>

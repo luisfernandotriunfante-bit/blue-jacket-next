@@ -141,3 +141,7 @@ As escalas de cor, espaço, raio e tipografia estão disponíveis como proprieda
 ### Componentes compartilhados (E2)
 
 Classes `.btn` (variantes `-primary`, `-secondary`, `-control`, `-danger`, `-sm`, `-icon`), `.tabs`/`.tab`, `.chip`, `.badge` e variantes de cor, `.panel`/`.panel-head`/`.panel-title`, `.data-table`, `.empty-state`, `.field`/`.input`/`.select`/`.textarea` e `.page-head` fornecem a base para migração gradual. As classes anteriores permanecem durante a migração; `.add-button`, `.secondary-button` e `.process-button` compartilham altura e raio da base de botão.
+
+### Navegação (E3)
+
+A sidebar compacta também expande com foco do teclado; entre 721 e 1024px permanece compacta com títulos nos controles. As abas rolam horizontalmente e a navegação móvel preserva alvos de pelo menos 40px.
