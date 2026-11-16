@@ -153,3 +153,7 @@ Os diálogos têm título associado, foco inicial, retorno ao controle de origem
 ### Texto vermelho e tabelas comerciais (E5)
 
 `--red-text` usa `#f43f46` no tema escuro (4,68:1 sobre `#1a1a1a`) e `#d4131b` no claro; `--red` permanece para fundos e marca. Linhas expansíveis aceitam Enter e Espaço. Tabelas mantêm todas as colunas em contêiner rolável.
+
+### Estoque (E6)
+
+O cabeçalho e a superfície dos cartões do treemap usam os tokens do tema; os blocos coloridos permanecem calculados pelos dados. Linhas interativas respondem a Enter e Espaço.

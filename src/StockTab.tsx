@@ -822,7 +822,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                   <span className="sc-num">Preço com ST</span>
                 </div>
                 {filtered.length === 0 && (
-                  <p className="empty" style={{ padding: '24px 16px' }}>Nenhum produto encontrado.</p>
+                  <p className="empty stock-empty-padded">Nenhum produto encontrado.</p>
                 )}
                 {filtered.map(p => {
                   const isSel = selected?.id === p.id
@@ -837,7 +837,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                       role="button"
                       tabIndex={0}
                       onClick={() => setSelected(isSel ? null : p)}
-                      onKeyDown={e => e.key === 'Enter' && setSelected(isSel ? null : p)}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelected(isSel ? null : p) } }}
                     >
                       <span className="sc-desc">
                         <span className="p-name">{p.description ?? '—'}</span>
@@ -915,7 +915,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                         {selected.ean && <span>EAN <strong>{selected.ean}</strong></span>}
                       </div>
                     </div>
-                    <button type="button" className="close" onClick={() => setSelected(null)}>×</button>
+                    <button type="button" className="close" aria-label="Fechar" onClick={() => setSelected(null)}>×</button>
                   </div>
 
                   <div className="sd-tags">
@@ -926,7 +926,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                       {tags[selected.id]?.pex ? '★ PEX' : '☆ PEX'}
                     </button>
                     {tags[selected.id]?.pex && (
-                      <select className="pf-select" style={{ minWidth: 'auto', padding: '2px 8px', fontSize: 11 }} value={tags[selected.id]?.pexTheme ?? ''} onChange={e => setPexTheme(selected.id, e.target.value)}>
+                      <select className="pf-select stock-compact-select" value={tags[selected.id]?.pexTheme ?? ''} onChange={e => setPexTheme(selected.id, e.target.value)}>
                         <option value="">Sem tema</option>
                         {PEX_THEMES.map(t => <option key={t} value={t}>Tema {t}</option>)}
                       </select>
@@ -987,7 +987,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                     <DI label="Status" value={selected.sortimentStatus ?? '—'} />
                     <DI label="Ciclo de vida" value={selected.lifestageStatus ?? '—'} />
                     {selected.sortimentChannels && Object.keys(selected.sortimentChannels).length > 0 && (
-                      <div className="channel-grid" style={{ marginTop: 8 }}>
+                      <div className="channel-grid stock-channel-gap">
                         {Object.entries(selected.sortimentChannels)
                           .sort((a, b) => b[1] - a[1])
                           .map(([ch, lv]) => (
@@ -1225,7 +1225,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                     <span className="sc-num">Preço com ST</span>
                   </div>
                   {filteredLnc.length === 0 && (
-                    <p className="empty" style={{ padding: '24px 16px' }}>Nenhum produto encontrado.</p>
+                    <p className="empty stock-empty-padded">Nenhum produto encontrado.</p>
                   )}
                   {filteredLnc.map(p => {
                     const isSel = selected?.id === p.id
@@ -1240,7 +1240,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                         role="button"
                         tabIndex={0}
                         onClick={() => setSelected(isSel ? null : p)}
-                        onKeyDown={e => e.key === 'Enter' && setSelected(isSel ? null : p)}
+                        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelected(isSel ? null : p) } }}
                       >
                         <span className="sc-desc">
                           <span className="p-name">{p.description ?? '—'}</span>
@@ -1318,7 +1318,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                           {selected.ean && <span>EAN <strong>{selected.ean}</strong></span>}
                         </div>
                       </div>
-                      <button type="button" className="close" onClick={() => setSelected(null)}>×</button>
+                      <button type="button" className="close" aria-label="Fechar" onClick={() => setSelected(null)}>×</button>
                     </div>
 
                     <div className="sd-tags">
@@ -1329,7 +1329,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                         {tags[selected.id]?.pex ? '★ PEX' : '☆ PEX'}
                       </button>
                       {tags[selected.id]?.pex && (
-                        <select className="pf-select" style={{ minWidth: 'auto', padding: '2px 8px', fontSize: 11 }} value={tags[selected.id]?.pexTheme ?? ''} onChange={e => setPexTheme(selected.id, e.target.value)}>
+                        <select className="pf-select stock-compact-select" value={tags[selected.id]?.pexTheme ?? ''} onChange={e => setPexTheme(selected.id, e.target.value)}>
                           <option value="">Sem tema</option>
                           {PEX_THEMES.map(t => <option key={t} value={t}>Tema {t}</option>)}
                         </select>
@@ -1390,7 +1390,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                       <DI label="Status" value={selected.sortimentStatus ?? '—'} />
                       <DI label="Ciclo de vida" value={selected.lifestageStatus ?? '—'} />
                       {selected.sortimentChannels && Object.keys(selected.sortimentChannels).length > 0 && (
-                        <div className="channel-grid" style={{ marginTop: 8 }}>
+                        <div className="channel-grid stock-channel-gap">
                           {Object.entries(selected.sortimentChannels)
                             .sort((a, b) => b[1] - a[1])
                             .map(([ch, lv]) => (
@@ -1510,7 +1510,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                             role="button"
                             tabIndex={0}
                             onClick={() => toggleExpanded(inv.invoice)}
-                            onKeyDown={e => e.key === 'Enter' && toggleExpanded(inv.invoice)}
+                            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpanded(inv.invoice) } }}
                           >
                             <span className={`notas-inv-toggle${expandedNotas.has(inv.invoice) ? ' open' : ''}`}>▶</span>
                             <span className="notas-inv-num">NF {inv.displayInvoice}</span>
