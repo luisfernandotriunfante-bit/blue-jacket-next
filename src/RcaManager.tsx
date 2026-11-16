@@ -47,6 +47,24 @@ export function RcaManager() {
   const [formErrors, setFormErrors] = useState<string[]>([])
   const [importMsg, setImportMsg] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const dialogRef = useRef<HTMLElement>(null)
+  const returnFocus = useRef<HTMLElement | null>(null)
+  const dialogOpen = editing !== null
+  useEffect(() => {
+    if (!dialogOpen) return
+    const dialog = dialogRef.current
+    dialog?.querySelector<HTMLElement>('input:not(:disabled)')?.focus()
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); setEditing(null); return }
+      if (event.key !== 'Tab' || !dialog) return
+      const controls = Array.from(dialog.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]'))
+      if (!controls.length) return
+      if (event.shiftKey && document.activeElement === controls[0]) { event.preventDefault(); controls[controls.length - 1].focus() }
+      else if (!event.shiftKey && document.activeElement === controls[controls.length - 1]) { event.preventDefault(); controls[0].focus() }
+    }
+    document.addEventListener('keydown', keydown)
+    return () => { document.removeEventListener('keydown', keydown); returnFocus.current?.focus() }
+  }, [dialogOpen])
 
   useEffect(() => {
     const onUpdate = () => setRcas(readRcas())
@@ -59,8 +77,8 @@ export function RcaManager() {
     persistRcas(updated)
   }
 
-  function openNew() { setEditing({ ...EMPTY }); setIsNew(true); setFormErrors([]) }
-  function openEdit(r: RcaRecord) { setEditing({ ...r }); setIsNew(false); setFormErrors([]) }
+  function openNew() { returnFocus.current = document.activeElement as HTMLElement; setEditing({ ...EMPTY }); setIsNew(true); setFormErrors([]) }
+  function openEdit(r: RcaRecord) { returnFocus.current = document.activeElement as HTMLElement; setEditing({ ...r }); setIsNew(false); setFormErrors([]) }
 
   function validate(r: RcaRecord): string[] {
     const e: string[] = []
@@ -177,9 +195,9 @@ export function RcaManager() {
       {/* ── modal ─────────────────────────────────────── */}
       {editing && (
         <div className="modal-backdrop" onMouseDown={() => setEditing(null)}>
-          <section className="modal rca-modal" role="dialog" aria-modal="true" onMouseDown={e => e.stopPropagation()}>
+          <section ref={dialogRef} className="modal rca-modal" role="dialog" aria-modal="true" aria-labelledby="rca-modal-title" onMouseDown={e => e.stopPropagation()}>
             <button className="close" type="button" aria-label="Fechar" onClick={() => setEditing(null)}>×</button>
-            <h2 style={{ marginBottom: 18 }}>{isNew ? 'Novo vendedor' : 'Editar vendedor'}</h2>
+            <h2 id="rca-modal-title" style={{ marginBottom: 18 }}>{isNew ? 'Novo vendedor' : 'Editar vendedor'}</h2>
             {formErrors.length > 0 && (
               <ul className="rca-errors">
                 {formErrors.map(e => <li key={e}>{e}</li>)}
@@ -187,8 +205,8 @@ export function RcaManager() {
             )}
             <div className="rca-form">
               <div className="rca-field">
-                <label>Código *</label>
-                <input
+                <label htmlFor="rca-code">Código *</label>
+                <input id="rca-code"
                   disabled={!isNew}
                   value={editing.code}
                   onChange={e => setField('code', e.target.value)}
@@ -197,24 +215,24 @@ export function RcaManager() {
                 />
               </div>
               <div className="rca-field">
-                <label>Nome *</label>
-                <input
+                <label htmlFor="rca-name">Nome *</label>
+                <input id="rca-name"
                   value={editing.name}
                   onChange={e => setField('name', e.target.value)}
                   placeholder="Nome completo"
                 />
               </div>
               <div className="rca-field">
-                <label>Cidade</label>
-                <input
+                <label htmlFor="rca-city">Cidade</label>
+                <input id="rca-city"
                   value={editing.city}
                   onChange={e => setField('city', e.target.value)}
                   placeholder="Ex.: Rio de Janeiro"
                 />
               </div>
               <div className="rca-field">
-                <label>Supervisor</label>
-                <input
+                <label htmlFor="rca-supervisor">Supervisor</label>
+                <input id="rca-supervisor"
                   value={editing.supervisor}
                   onChange={e => setField('supervisor', e.target.value)}
                   placeholder="Nome do supervisor"
@@ -227,8 +245,8 @@ export function RcaManager() {
                 </datalist>
               </div>
               <div className="rca-field">
-                <label>Cód. Supervisor</label>
-                <input
+                <label htmlFor="rca-supervisor-code">Cód. Supervisor</label>
+                <input id="rca-supervisor-code"
                   value={editing.supervisorCode}
                   onChange={e => setField('supervisorCode', e.target.value)}
                   placeholder="Ex.: 10"
@@ -255,8 +273,8 @@ export function RcaManager() {
                 </div>
               </div>
               <div className="rca-field rca-field-full">
-                <label>Meta mensal (R$)</label>
-                <input
+                <label htmlFor="rca-goal">Meta mensal (R$)</label>
+                <input id="rca-goal"
                   type="number"
                   min={0}
                   step={1000}

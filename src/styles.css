@@ -810,3 +810,18 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
  .sidebar:is(:hover, :focus-within) .nav-item, .sidebar:is(:hover, :focus-within) .theme-toggle { justify-content: center; padding: 10px; }
 }
 @media (max-width: 720px) { .stock-nav-btn, .bn-item { min-height: 40px; } .stock-nav-btn { padding-inline: var(--space-4); } .topbar { scrollbar-width: thin; } }
+
+/* Dialogos permanecem dentro da tela e rolam sem cortar campos. */
+.modal-backdrop { padding: var(--space-4); background: var(--overlay); }
+.modal { width: min(560px, calc(100vw - 32px)); max-width: 100%; max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; }
+.rca-form > *, .rca-field input { min-width: 0; }
+.rca-modal-actions { position: sticky; bottom: -30px; background: var(--surface); padding: var(--space-3) 0; }
+@media (max-width: 720px) {
+ .modal-backdrop { align-items: end; }
+ .modal { padding: var(--space-4); }
+ .rca-form { grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+ .rca-field-full { grid-column: auto; }
+ .rca-modal-actions { bottom: -16px; }
+ .rca-modal button, .rca-modal input { min-height: 40px; }
+}
+.app :is(button, a, input, select, textarea, [tabindex]):focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }

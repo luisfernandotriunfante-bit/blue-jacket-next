@@ -145,3 +145,7 @@ Classes `.btn` (variantes `-primary`, `-secondary`, `-control`, `-danger`, `-sm`
 ### Navegação (E3)
 
 A sidebar compacta também expande com foco do teclado; entre 721 e 1024px permanece compacta com títulos nos controles. As abas rolam horizontalmente e a navegação móvel preserva alvos de pelo menos 40px.
+
+### Diálogos (E4)
+
+Os diálogos têm título associado, foco inicial, retorno ao controle de origem e Escape para fechar. O foco permanece no diálogo. Sua largura e altura respeitam a tela; em telas pequenas o conteúdo rola e os campos empilham.

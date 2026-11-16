@@ -148,6 +148,20 @@ export function App() {
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [rawFiles, setRawFiles] = useState<Record<string, File>>({})
   const [activeNotice, setActiveNotice] = useState<AuditItem | null>(null)
+  const noticeDialogRef = useRef<HTMLElement>(null)
+  const noticeOpen = activeNotice !== null
+  useEffect(() => {
+    if (!noticeOpen) return
+    const previous = document.activeElement as HTMLElement | null
+    const dialog = noticeDialogRef.current
+    dialog?.querySelector<HTMLElement>('button')?.focus()
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); setActiveNotice(null) }
+      if (event.key === 'Tab' && dialog) { event.preventDefault(); dialog.querySelector<HTMLElement>('button')?.focus() }
+    }
+    document.addEventListener('keydown', keydown)
+    return () => { document.removeEventListener('keydown', keydown); previous?.focus() }
+  }, [noticeOpen])
   const [clientAudit, setClientAudit] = useState<AuditItem[]>([])
   const [clientBase, setClientBase] = useState<CanonicalClient[]>([])
   const [clientSlots, setClientSlots] = useState<Partial<Record<(typeof clientSources)[number]['id'], UploadedFile>>>({})
@@ -668,7 +682,7 @@ export function App() {
       </section>}
       </>}
     </main>
-    {tab === 'auditoria' && activeNotice ? <div className="modal-backdrop" onMouseDown={() => setActiveNotice(null)}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="notice-title" onMouseDown={event => event.stopPropagation()}><button className="close" aria-label="Fechar" type="button" onClick={() => setActiveNotice(null)}>×</button><h2 id="notice-title">{activeNotice.title}</h2><p>{activeNotice.detail}</p><strong>{activeNotice.instruction}</strong></section></div> : null}
+    {tab === 'auditoria' && activeNotice ? <div className="modal-backdrop" onMouseDown={() => setActiveNotice(null)}><section ref={noticeDialogRef} className="modal" role="dialog" aria-modal="true" aria-labelledby="notice-title" onMouseDown={event => event.stopPropagation()}><button className="close" aria-label="Fechar" type="button" onClick={() => setActiveNotice(null)}>×</button><h2 id="notice-title">{activeNotice.title}</h2><p>{activeNotice.detail}</p><strong>{activeNotice.instruction}</strong></section></div> : null}
   </div>
 }
 
