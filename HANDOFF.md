@@ -24,25 +24,26 @@ especializadas.
 | Item | Estado |
 |---|---|
 | Aplicação | Funcional, publicada em GitHub Pages |
-| Abas ativas | App (admin), Clientes, Cadastro Cliente, Pirâmide, Carteira, Estoque, Sortimento, Sell Out, Gerencial, Campanhas (placeholder), RCA Manager |
+| Abas ativas | 10 funcionais + 1 placeholder: App (admin), Clientes, Cadastro Cliente, Pirâmide, Carteira, Estoque, Sortimento, Sell Out, Gerencial, RCA Manager. Campanhas é placeholder (20 linhas). |
 | Dados | Importados via planilhas Excel/XLS; persistidos em IndexedDB; sincronizados via Firebase Realtime Database |
 | Testes automatizados | Nenhum. Único gate: `npm run build` (TypeScript + Vite). **Decisão do Luis: adicionar testes.** |
-| PR #142 | Aberta, NÃO mergear. **Decisão do Luis: fechar.** Contém documentação aspiracional do "Nemo" que foi substituído pelo OpenBot. |
-| Segurança | **URGENTE.** `.env` com credenciais reais do Firebase está commitado em repo público. Pasta `arquivos/` com 126 MB de dados comerciais está commitada. Ambos precisam ser removidos e as credenciais rotacionadas. |
+| PR #142 | Fechada sem merge em 16/11/2026. A documentação do Nemo não faz parte do Red Jacket. |
+| Segurança | `.env` e `arquivos/` foram retirados da versão atual e adicionados ao `.gitignore`. O histórico ainda precisa ser avaliado; regras, restrições e configurações do Firebase precisam ser revisadas. |
 
 ---
 
 ## 3. Objetivos ativos
 
 1. **Segurança e limpeza** (prioridade imediata):
-   - Remover `.env` do rastreamento git e rotacionar credenciais Firebase.
-   - Remover `arquivos/` do rastreamento git (dados comerciais sensíveis em repo público).
-   - Remover branch de desenvolvimento hardcoded do workflow de deploy.
+   - **Concluído na versão atual:** retirar `.env` e `arquivos/` do rastreamento e limitar o deploy à `main`.
+   - **Pendente:** revisar o histórico Git, decidir se deve ser reescrito e conferir regras/restrições do Firebase.
+   - **Pendente:** substituir ou restringir qualquer configuração que o responsável pelo Firebase considere exposta.
 
 2. **Padronização da execução e governança** (esta etapa):
    - Consolidar documentação para guiar agentes de IA via OpenBot.
    - Definir fluxo de trabalho coerente e executável.
-   - Fechar PR #142.
+   - **Concluído:** fechar a PR #142 sem merge.
+   - Alinhar `PROTOCOLO.md`, `AGENTS.md` e `CLAUDE.md` ao fluxo funcional.
 
 3. **Padronização visual** (próxima etapa):
    - Tarefa especificada em `tarefas/2026-11-14-padronizacao-visual.md`.
@@ -57,7 +58,7 @@ especializadas.
 ## 4. Arquitetura real (confirmada no código)
 
 ```
-React 19 + TypeScript 6 + Vite 8
+React 19.2 + TypeScript 6.0 + Vite 8.3
 │
 ├── src/
 │   ├── App.tsx              — Shell principal, navegação por abas, uploads, admin
@@ -65,6 +66,9 @@ React 19 + TypeScript 6 + Vite 8
 │   ├── RcaManager.tsx       — Gestão de representantes
 │   ├── styles.css           — Todo CSS do projeto (765 linhas)
 │   ├── firebaseConfig.ts    — Inicialização Firebase
+│   ├── msGeo.ts             — Dados geográficos SVG dos municípios de MS (mapa)
+│   ├── vite-env.d.ts        — Declarações de tipo do Vite
+│   ├── main.tsx             — Entry point React
 │   └── domain/              — Motores de processamento de dados
 │       ├── clientMotor.ts   — Processa planilhas de clientes
 │       ├── productMotor.ts  — Processa planilhas de produtos + sortimento
@@ -83,7 +87,12 @@ React 19 + TypeScript 6 + Vite 8
 ├── .github/workflows/
 │   └── deploy.yml           — Deploy automático: push to main → GitHub Pages
 │
-└── index.html               — Entry point (título: "Red Jacket")
+├── index.html               — Entry point HTML (título: "Red Jacket")
+├── package.json             — Dependências e scripts (name: "red-jacket")
+├── package-lock.json        — Lock de versões
+├── vite.config.ts           — Configuração do Vite (base: /blue-jacket-next/)
+├── tsconfig.json            — Configuração raiz do TypeScript
+└── tsconfig.app.json        — Configuração TS da aplicação
 ```
 
 **Confirmado no código:**
@@ -145,7 +154,7 @@ pela estrutura do cabeçalho, não pelo nome do arquivo.
 2. O workflow faz: checkout → Node 20 → `npm ci` → `npm run build` → upload artifact → deploy.
 3. O site fica disponível em `https://luisfernandotriunfante-bit.github.io/blue-jacket-next/`.
 4. Não há smoke test, health check nem rollback automático após deploy.
-5. **Alerta:** A branch `claude/affectionate-wright-4mal4c` também está no trigger — deve ser removida.
+5. O trigger foi corrigido: somente a branch `main` dispara a publicação.
 
 **Não existe:** rollback automático, preview de PRs, ambientes de staging.
 
@@ -187,12 +196,14 @@ pela estrutura do cabeçalho, não pelo nome do arquivo.
 
 ## 9. Fluxo de uma tarefa
 
-### Fluxo real atual (confirmado no histórico de PRs)
+### Fluxo oficial definido pelo Luis — ainda precisa ser validado integralmente no OpenBot
 ```
-Luis pede → Architect (bot) planeja → Bot designado implementa
-→ PR para main → Revisão cruzada (se aplicável) → Publisher faz merge
-→ Deploy automático via GitHub Pages
+Luis pede → Architect planeja → Lead distribui → bot designado implementa
+→ PR para main → revisão cruzada → Lead integra → Architect confere quando necessário → Publisher faz merge
+→ deploy automático via GitHub Pages
 ```
+
+O uso de branches, pull requests e deploy está comprovado. A coordenação completa entre múltiplos bots pelo OpenBot e a memória compartilhada ainda não foram comprovadas em uma execução de ponta a ponta.
 
 ### Regras
 1. Ninguém faz commit direto na `main`.
@@ -222,7 +233,7 @@ A lógica entra na main primeiro; o branch visual nasce depois.
 
 **Definido por regra** (PROTOCOLO.md §4):
 
-- `main` — protegida, publica o site a cada push.
+- `main` — branch de produção; publica o site a cada push. A regra operacional proíbe commits diretos, mas a proteção técnica do GitHub ainda precisa ser verificada.
 - `claude/<assunto>` ou `<agente>/<assunto>` — branches de trabalho.
 - `gpt/<assunto>` — branches visuais (autoria do agente de frontend).
 - Arquivos reservados ao **backend**: `src/domain/**`.
@@ -286,8 +297,24 @@ Para qualquer IA que comece a trabalhar neste repositório:
 | 7 | `revisao/pendente.md` | Trabalho pendente de revisão | **Ativo** (vazio) |
 | 8 | `README.md` | Descrição do projeto | **Desatualizado, precisa reescrita** |
 
+### Auditoria dos documentos
+
+| Documento | Por que existe | Autoridade e recomendação |
+|---|---|---|
+| `HANDOFF.md` | Estado, arquitetura, decisões, riscos e passagem entre equipes | Fonte oficial do estado atual; atualizar após entregas significativas |
+| `PROTOCOLO.md` | Processo de trabalho, branches, revisão e publicação | Fonte oficial das regras operacionais |
+| `AGENTS.md` | Instruções específicas para GPT/Codex | Complementa o protocolo; não pode contradizê-lo |
+| `CLAUDE.md` | Instruções específicas para Claude | Complementa o protocolo; não pode contradizê-lo |
+| `PADRAO-VISUAL.md` | Design system e validação visual | Fonte oficial da aparência; mantido pelo frontend |
+| `README.md` | Apresentação pública e início rápido | Manter, mas reescrever para refletir o produto atual |
+| `tarefas/*.md` | Especificações de trabalhos concretos | Histórico/execução; cada arquivo deve declarar status |
+| `revisao/pendente.md` | Exceções aguardando revisão | Manter enquanto houver modo de contingência; hoje vazio |
+| `revisao/revisado.md` | Histórico das exceções revisadas | Manter como registro; hoje vazio |
+
+Não há duplicação exata na documentação oficial. Há sobreposição necessária: o protocolo define regras gerais e `AGENTS.md`/`CLAUDE.md` traduzem apenas o papel de cada executor. Em conflito, vale `PROTOCOLO.md`; para aparência, vale `PADRAO-VISUAL.md`; para estado factual, vale este `HANDOFF.md`.
+
 ### Documentos que NÃO são oficiais
-- `docs/nemo/*` (PR #142) — **Não mergear. Fechar PR.** Conteúdo aspiracional do Nemo, substituído por OpenBot.
+- `docs/nemo/*` (PR #142) — PR fechada sem merge. Os seis arquivos misturavam governança do orquestrador com o produto Red Jacket e não pertencem a este repositório.
 - Qualquer referência a C:\nemo, `perguntar_ao_gpt`, `resultado_do_gpt` — **Descontinuados.**
 
 ---
@@ -329,15 +356,12 @@ Para qualquer IA que comece a trabalhar neste repositório:
 ## 16. Riscos conhecidos
 
 ### Crítico
-1. **Credenciais Firebase expostas em repo público.** `.env` com API key, project ID e demais
-   valores reais está commitado e no histórico do git. Rotacionar credenciais imediatamente.
-2. **Dados comerciais em repo público.** `arquivos/` (126 MB) contém planilhas com dados de
-   clientes, vendas, preços e estoque.
+1. **Configuração Firebase e histórico Git.** A configuração pública de um app web não equivale, por si só, a uma senha de servidor. Mesmo assim, regras do Realtime Database/Storage, restrições de chave e histórico do repositório precisam ser revisados. Nunca registrar chaves administrativas ou contas de serviço.
+2. **Dados comerciais no histórico.** `arquivos/` saiu da versão atual, mas commits anteriores podem continuar contendo planilhas de clientes, vendas, preços e estoque. Avaliar limpeza do histórico e impactos antes de reescrevê-lo.
 
 ### Alto
 3. **Sem testes automatizados.** Qualquer regressão só é detectada manualmente.
-4. **Branch de desenvolvimento no trigger de deploy.** `claude/affectionate-wright-4mal4c` no
-   `deploy.yml` permite deploy de código não mergeado.
+4. **Proteção técnica da `main` não comprovada.** A regra operacional existe, mas branch protection e revisões obrigatórias ainda precisam ser verificadas no GitHub.
 
 ### Médio
 5. **PROTOCOLO.md desatualizado.** Referências a C:\nemo, ferramentas de ponte e divisão
@@ -357,10 +381,10 @@ Para qualquer IA que comece a trabalhar neste repositório:
 
 | # | Pendência | Prioridade | Responsável | Status |
 |---|---|---|---|---|
-| P-01 | Remover `.env` do git + rotacionar credenciais Firebase | **Crítica** | Luis (credenciais) + bot (git) | Aguardando |
-| P-02 | Remover `arquivos/` do git | **Crítica** | Bot | Aguardando |
-| P-03 | Remover branch dev do deploy.yml trigger | **Alta** | Bot | Aguardando |
-| P-04 | Fechar PR #142 | **Alta** | Bot ou Luis | Aguardando |
+| P-01 | Revisar regras/restrições do Firebase e decidir substituição de configurações | **Crítica** | Luis + responsável Firebase | Aguardando |
+| P-02 | Avaliar e, se autorizado, limpar `.env` e `arquivos/` do histórico Git | **Crítica** | Especialista Git + Luis | Versão atual já limpa |
+| P-03 | Verificar proteção técnica e revisões obrigatórias da `main` | **Alta** | Publisher | Aguardando |
+| P-04 | PR #142 fechada sem merge | **Concluída** | GPT | Concluída em 16/11/2026 |
 | P-05 | Atualizar PROTOCOLO.md para v8 (remover C:\nemo, atualizar papéis) | **Alta** | Bot | Aguardando |
 | P-06 | Atualizar README.md | **Média** | Bot | Aguardando |
 | P-07 | Executar padronização visual | **Média** | Agente frontend | Especificada, aguardando |
@@ -378,13 +402,117 @@ Para qualquer IA que comece a trabalhar neste repositório:
 - Ambos mergeados e deployed com sucesso.
 
 ### Próxima ação recomendada
-1. **Imediato:** Resolver segurança (P-01 e P-02).
-2. **Em seguida:** Limpar deploy.yml (P-03), fechar PR #142 (P-04), atualizar PROTOCOLO.md (P-05).
-3. **Depois:** Padronização visual (P-07).
+1. **Imediato:** revisar Firebase e histórico Git (P-01 e P-02).
+2. **Em seguida:** verificar proteção da `main` e concluir o alinhamento documental (P-03 e P-05).
+3. **Depois:** executar a padronização visual (P-07).
 
 ---
 
-## 19. Como atualizar este documento
+## 19. Inventário completo de arquivos
+
+Atualizado em 16/11/2026. Cada entrada informa: caminho relativo, propósito, linhas e data da
+última mudança significativa.
+
+### Documentação (raiz)
+
+| Arquivo | Propósito | Linhas | Última mudança |
+|---|---|---|---|
+| `HANDOFF.md` | Estado, decisões, inventário, passagem entre equipes | ~460 | 16/11/2026 |
+| `PROTOCOLO.md` | Regras operacionais de trabalho (v8) | 163 | 16/11/2026 |
+| `CLAUDE.md` | Instruções para Claude por papel | 74 | 16/11/2026 |
+| `AGENTS.md` | Instruções para GPT/Codex por papel | 60 | 16/11/2026 |
+| `PADRAO-VISUAL.md` | Design system e tokens visuais | 136 | 14/11/2026 |
+| `README.md` | Apresentação pública (desatualizado) | 16 | 01/11/2026 |
+
+### Tarefas e revisão
+
+| Arquivo | Propósito | Linhas | Última mudança |
+|---|---|---|---|
+| `tarefas/2026-11-14-padronizacao-visual.md` | Especificação da padronização visual | 60 | 14/11/2026 |
+| `revisao/pendente.md` | Template para trabalho pendente de revisão | ~15 | Criação |
+| `revisao/revisado.md` | Registro de revisões concluídas | ~7 | Criação |
+
+### Configuração e build
+
+| Arquivo | Propósito | Linhas | Última mudança |
+|---|---|---|---|
+| `package.json` | Dependências, scripts, nome do projeto | ~25 | 06/11/2026 |
+| `package-lock.json` | Lock de versões | Auto | 06/11/2026 |
+| `vite.config.ts` | Configuração Vite (base path: `/blue-jacket-next/`) | ~15 | 01/11/2026 |
+| `tsconfig.json` | Configuração raiz TypeScript | ~5 | 01/11/2026 |
+| `tsconfig.app.json` | Configuração TS da aplicação | ~15 | 01/11/2026 |
+| `index.html` | Entry point HTML (título: "Red Jacket") | ~15 | 01/11/2026 |
+| `.gitignore` | Ignora node_modules, dist, .env, arquivos/ | 7 | 16/11/2026 |
+| `.github/workflows/deploy.yml` | Deploy automático: push to main → GitHub Pages | 38 | 16/11/2026 |
+
+### Código-fonte — Componentes (`src/`)
+
+| Arquivo | Propósito | Linhas | Última mudança |
+|---|---|---|---|
+| `src/App.tsx` | Shell principal, navegação, uploads, admin | 1056 | 06/11/2026 |
+| `src/StockTab.tsx` | Estoque, notas recebidas, treemap, caixas | 1830 | 06/11/2026 |
+| `src/CarteiraTab.tsx` | Gestão de carteira de clientes | 1516 | 01/11/2026 |
+| `src/SortimentoTab.tsx` | Análise de sortimento por canal | 799 | 06/11/2026 |
+| `src/CadastroClienteTab.tsx` | Cadastro e edição de clientes | 606 | 01/11/2026 |
+| `src/SellOutTab.tsx` | Dashboard de sell-out (referência visual) | 594 | 01/11/2026 |
+| `src/PiramideTab.tsx` | Análise de premissas/pirâmide | 543 | 01/11/2026 |
+| `src/GerencialTab.tsx` | Dashboard financeiro/gerencial | 474 | 01/11/2026 |
+| `src/ClientesTab.tsx` | Listagem de clientes | 352 | 01/11/2026 |
+| `src/RcaManager.tsx` | Gestão de representantes comerciais | 341 | 01/11/2026 |
+| `src/CampaignTab.tsx` | Placeholder — campanhas (sem funcionalidade) | 20 | 01/11/2026 |
+| `src/styles.css` | Todo CSS do projeto | 765 | 01/11/2026 |
+| `src/firebaseConfig.ts` | Inicialização Firebase (lê do `.env`) | 26 | 01/11/2026 |
+| `src/main.tsx` | Entry point React (monta App no DOM) | 6 | 01/11/2026 |
+| `src/msGeo.ts` | Dados SVG geográficos dos municípios de MS | ~5* | 01/11/2026 |
+| `src/vite-env.d.ts` | Declarações de tipo do Vite | 1 | 01/11/2026 |
+
+\* `msGeo.ts` tem 5 linhas de código mas ~227 KB de dados SVG inlined (paths de municípios).
+
+### Código-fonte — Domínio (`src/domain/`)
+
+| Arquivo | Propósito | Linhas | Última mudança |
+|---|---|---|---|
+| `src/domain/cloudSync.ts` | Sincronização Firebase Realtime DB | 228 | 06/11/2026 |
+| `src/domain/productMotor.ts` | Processa planilhas de produtos + sortimento | 207 | 06/11/2026 |
+| `src/domain/clientMotor.ts` | Processa planilhas de clientes | 160 | 01/11/2026 |
+| `src/domain/historyMotor.ts` | Processa histórico de vendas | 158 | 01/11/2026 |
+| `src/domain/movementMotor.ts` | Processa movimentações de estoque | 119 | 01/11/2026 |
+| `src/domain/syncEngine.ts` | Coordenação de sync | 93 | 01/11/2026 |
+| `src/domain/receiptMotor.ts` | Processa notas fiscais | 85 | 01/11/2026 |
+| `src/domain/competenciaEngine.ts` | Motor de competência por período | 85 | 01/11/2026 |
+| `src/domain/persistence.ts` | Persistência IndexedDB | 82 | 01/11/2026 |
+| `src/domain/productGrouping.ts` | Agrupamento de produtos | 72 | 01/11/2026 |
+| `src/domain/fileDetector.ts` | Detecção de tipo de arquivo pelo cabeçalho | 67 | 01/11/2026 |
+| `src/domain/audit.ts` | Tipos e utilidades de auditoria | 37 | 01/11/2026 |
+| `src/domain/types.ts` | Tipos compartilhados do domínio | 20 | 01/11/2026 |
+
+**Totais:** 12 componentes TSX (8928 linhas) · 13 módulos de domínio (1413 linhas) ·
+1 CSS (765 linhas) · 3 utilitários TS (33 linhas) · Total src: ~11139 linhas.
+
+---
+
+## 20. Regra permanente — Inventário de arquivos
+
+**Vigência:** a partir de 16/11/2026. Aplica-se a qualquer bot ou pessoa.
+
+1. **Arquivo novo** → inventário (§19) atualizado no mesmo commit ou PR.
+2. **Arquivo removido** → entrada removida do inventário no mesmo commit ou PR.
+3. **Arquivo renomeado** → caminho atualizado no inventário.
+4. **Mudança significativa de propósito** → descrição atualizada.
+5. **Contagem de linhas** → atualizada quando a variação for ≥ 20% em relação ao registrado.
+6. **Formato de cada entrada:** caminho relativo, propósito em uma frase, linhas, data da última
+   mudança significativa.
+7. **Agrupamento:** Documentação, Tarefas/Revisão, Configuração/Build, Componentes (`src/`),
+   Domínio (`src/domain/`).
+8. **Vale para qualquer bot.** Nenhum modelo de IA está isento.
+9. **PR bloqueada se inventário desatualizado.** Revisor deve rejeitar PR que adicione, remova
+   ou renomeie arquivo sem atualizar o inventário.
+10. **Revisores verificam inventário.** Checklist de revisão inclui: "Inventário do HANDOFF.md
+    está atualizado?".
+
+---
+
+## 21. Como atualizar este documento
 
 Este documento é atualizado pelo bot que concluir uma entrega significativa:
 
@@ -392,6 +520,7 @@ Este documento é atualizado pelo bot que concluir uma entrega significativa:
 2. Mova pendências concluídas para a seção 14 (decisões confirmadas) ou remova se irrelevante.
 3. Adicione novas pendências à seção 17.
 4. Atualize a seção 18 com a última entrega.
-5. Marque claramente: "Confirmado no código", "Confirmado na configuração", "Definido por regra", "Ainda não comprovado" ou "Depende de decisão do Luis".
-6. Não adicione informação aspiracional como se fosse fato. Se algo é planejado mas não implementado, diga explicitamente.
-7. Commit no mesmo branch da entrega, com mensagem: `docs: atualizar HANDOFF.md — <o que mudou>`.
+5. Atualize o inventário (§19) conforme a regra permanente (§20).
+6. Marque claramente: "Confirmado no código", "Confirmado na configuração", "Definido por regra", "Ainda não comprovado" ou "Depende de decisão do Luis".
+7. Não adicione informação aspiracional como se fosse fato. Se algo é planejado mas não implementado, diga explicitamente.
+8. Commit no mesmo branch da entrega, com mensagem: `docs: atualizar HANDOFF.md — <o que mudou>`.
