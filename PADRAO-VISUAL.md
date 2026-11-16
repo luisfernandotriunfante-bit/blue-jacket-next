@@ -137,3 +137,7 @@ Hoje existem 15 classes de botão com raio de 5 a 8px e paddings diferentes (`.a
 ### Base de interação (E1)
 
 As escalas de cor, espaço, raio e tipografia estão disponíveis como propriedades CSS globais. `--focus` usa o azul do tema; `--on-accent` é branco e `--overlay` é preto a 60%. Os temas definem `color-scheme`. Controles recebem contorno de foco visível e animações respeitam movimento reduzido; a fonte usa `system-ui` como alternativa.
+
+### Componentes compartilhados (E2)
+
+Classes `.btn` (variantes `-primary`, `-secondary`, `-control`, `-danger`, `-sm`, `-icon`), `.tabs`/`.tab`, `.chip`, `.badge` e variantes de cor, `.panel`/`.panel-head`/`.panel-title`, `.data-table`, `.empty-state`, `.field`/`.input`/`.select`/`.textarea` e `.page-head` fornecem a base para migração gradual. As classes anteriores permanecem durante a migração; `.add-button`, `.secondary-button` e `.process-button` compartilham altura e raio da base de botão.
