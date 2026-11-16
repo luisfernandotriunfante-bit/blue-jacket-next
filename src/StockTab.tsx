@@ -572,17 +572,17 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
       <header className="topbar stock-topbar">
         <button
           type="button"
-          className={`stock-nav-btn${subTab === 'estoque' ? ' on' : ''}`}
+          className={`stock-nav-btn${subTab === 'estoque' ? ' on' : ''}`} aria-current={subTab === 'estoque' ? 'page' : undefined}
           onClick={() => setSubTab('estoque')}
         >Estoque</button>
         <button
           type="button"
-          className={`stock-nav-btn${subTab === 'produtos' ? ' on' : ''}`}
+          className={`stock-nav-btn${subTab === 'produtos' ? ' on' : ''}`} aria-current={subTab === 'produtos' ? 'page' : undefined}
           onClick={() => setSubTab('produtos')}
         >Produtos</button>
         <button
           type="button"
-          className={`stock-nav-btn${subTab === 'lancamentos' ? ' on' : ''}`}
+          className={`stock-nav-btn${subTab === 'lancamentos' ? ' on' : ''}`} aria-current={subTab === 'lancamentos' ? 'page' : undefined}
           onClick={() => { setSubTab('lancamentos'); setSelected(null) }}
         >
           Itens Foco
@@ -590,7 +590,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
         </button>
         <button
           type="button"
-          className={`stock-nav-btn${subTab === 'notas' ? ' on' : ''}`}
+          className={`stock-nav-btn${subTab === 'notas' ? ' on' : ''}`} aria-current={subTab === 'notas' ? 'page' : undefined}
           onClick={visitNotas}
         >
           Notas

@@ -186,3 +186,7 @@ Exceções e regras finais da validação (E9):
 - `!important` permanece somente no bloco `prefers-reduced-motion` (precisa vencer animações e transições inline de terceiros). Raios: 5 tokens, `50%` (círculos) e `3px` (barras de gráfico).
 - Texto branco sobre as telhas do treemap de Estoque usa o gradiente escuro da própria telha em ambos os temas.
 - Desabilitado (`:disabled`) fica isento de contraste mínimo, como previsto pelo WCAG.
+
+Os textos de badges usam âmbar `#985500`, verde `#087a57` e roxo `#7e22ce` no tema claro; no escuro usam `#f59e0b`, `#10b981` e `#a855f7`. O preenchimento azul ativo usa `#2563eb`.
+
+O título da seção usa `.page-head` e os rótulos existentes da navegação. Abas administrativas indicam rolagem e mantêm a aba selecionada visível.

@@ -166,7 +166,7 @@ h1 { font-size: var(--fs-28); } h2 { font-size: var(--fs-18); } h3 { font-size: 
 .config-label { display: block; font-weight: 800; font-size: var(--fs-14); margin-bottom: 6px; }
 .config-help { color: var(--muted); font-size: var(--fs-13); line-height: 1.6; margin: 0 0 16px; }
 .config-input-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
-.config-input { width: 120px; min-height: 40px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); color: var(--text); padding: 0 13px; font: inherit; font-size: var(--fs-16); font-weight: 700; }
+.config-input { min-width: 0; width: 120px; min-height: 40px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); color: var(--text); padding: 0 13px; font: inherit; font-size: var(--fs-16); font-weight: 700; }
 .config-input:focus { border-color: var(--red-text); }
 .config-unit { font-size: var(--fs-16); font-weight: 700; color: var(--muted); }
 .arrivals-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
@@ -766,7 +766,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .tab { flex: 0 0 auto; border: 0; border-bottom: 3px solid transparent; color: var(--muted); background: transparent; padding: var(--space-3) var(--space-4); }
 .tab.on, .tab[aria-selected="true"] { color: var(--red-text); border-bottom-color: var(--red-text); }
 .chip { border: 1px solid var(--border); border-radius: var(--radius-pill); background: var(--surface); color: var(--text); padding: var(--space-2) var(--space-3); }
-.chip.is-active { background: var(--blue); border-color: var(--blue); color: var(--on-accent); }
+.chip.is-active { background: var(--blue-fill); border-color: var(--blue-fill); color: var(--on-accent); }
 .badge { display: inline-flex; align-items: center; padding: 2px 7px; border: 1px solid currentColor; border-radius: var(--radius-xs); font-size: var(--fs-10); font-weight: 800; }
 .badge-blue { color: var(--blue); } .badge-red { color: var(--red-text); } .badge-amber { color: var(--amber); } .badge-green { color: var(--green); } .badge-purple { color: var(--purple); } .badge-neutral { color: var(--muted); }
 .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
@@ -782,7 +782,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .page-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
 @media (max-width: 720px) { .btn, .tab, .chip { min-height: 40px; } }
 
-/* Navega??o: r?tulos acess?veis por teclado e abas rol?veis. */
+/* Navegação: rótulos acessíveis por teclado e abas roláveis. */
 .section-topbar { display: flex; align-items: stretch; justify-content: space-between; }
 .section-tabs { display: flex; flex: 0 0 auto; }
 .section-month { display: flex; align-items: center; padding: 0 var(--space-4); }
@@ -798,7 +798,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 @media (max-width: 720px) { .stock-nav-btn, .bn-item { min-height: 40px; } .stock-nav-btn { padding-inline: var(--space-4); } .topbar { scrollbar-width: thin; } }
 
-/* Dialogos permanecem dentro da tela e rolam sem cortar campos. */
+/* Diálogos permanecem dentro da tela e rolam sem cortar campos. */
 .modal-backdrop { padding: var(--space-4); background: var(--overlay); }
 .modal { width: min(560px, calc(100vw - 32px)); max-width: 100%; max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; }
 .rca-form > *, .rca-field input { min-width: 0; }
@@ -1531,3 +1531,14 @@ button.cloud-status { width: 100%; border: 0; background: transparent; text-alig
 
 .app .visual-u-2 { opacity: 1; }
 .app :is(.rca-badge-active, .rca-type-clt) { color: var(--blue-text); }
+
+/* Ajustes de acessibilidade do RC1. */
+.theme-light { --badge-amber: #985500; --badge-green: #087a57; --badge-purple: #7e22ce; }
+.theme-dark { --badge-amber: #f59e0b; --badge-green: #10b981; --badge-purple: #a855f7; }
+.badge-amber { color: var(--badge-amber); } .badge-green { color: var(--badge-green); } .badge-purple, .badge-pex-launch, .rca-type-pj, .cad-badge-net { color: var(--badge-purple); }
+@media (max-width: 720px) { .app :is(.add-button, .process-button, .rca-btn, .rca-show-inactive) { min-height: 40px; } .rca-show-inactive { display: inline-flex; align-items: center; } .rca-toolbar .stock-search { flex: 1 1 100%; min-width: 0; } }
+
+.page-head { padding: var(--space-4) var(--space-6) 0; }
+.page-head h1 { color: var(--text); font-size: var(--fs-18); }
+@media (max-width: 1024px) { .stock-topbar { mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%); } }
+.stock-topbar:has(.stock-nav-btn:last-child.on) { mask-image: none; }

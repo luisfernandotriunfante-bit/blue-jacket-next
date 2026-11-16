@@ -157,7 +157,7 @@ export function App() {
     dialog?.querySelector<HTMLElement>('button')?.focus()
     const keydown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') { event.preventDefault(); setActiveNotice(null) }
-      if (event.key === 'Tab' && dialog) { event.preventDefault(); dialog.querySelector<HTMLElement>('button')?.focus() }
+      if (event.key === 'Tab' && dialog?.isConnected) { event.preventDefault(); dialog.querySelector<HTMLElement>('button')?.focus() }
     }
     document.addEventListener('keydown', keydown)
     return () => { document.removeEventListener('keydown', keydown); previous?.focus() }
@@ -567,7 +567,7 @@ export function App() {
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" /></svg>
         <span>Admin</span>
       </button>
-      <button className="bn-item bn-theme" type="button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+      <button className="bn-item bn-theme" type="button" aria-label={theme === 'dark' ? 'Tema claro' : 'Tema escuro'} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" /></svg>
         <span>{theme === 'dark' ? 'Claro' : 'Escuro'}</span>
       </button>
@@ -579,12 +579,13 @@ export function App() {
           <button type="button" className="comp-close-btn" onClick={() => setViewingComp(null)}>Voltar ao vivo</button>
         </div>
       )}
+      <div className="page-head"><h1>{({ sellout: 'Sell out', estoque: 'Estoque', clientes: 'Clientes', campanhas: 'Campanhas', administracao: 'Administra\u00e7\u00e3o' } as const)[section]}</h1></div>
       {section === 'sellout' ? (<>
         <header className="topbar section-topbar" aria-label="Sell out">
           <div className="section-tabs">
-            <button type="button" className={`stock-nav-btn${selloutTab === 'dashboard' ? ' on' : ''}`} onClick={() => setSelloutTab('dashboard')}>Dashboard</button>
-            <button type="button" className={`stock-nav-btn${selloutTab === 'gerencial' ? ' on' : ''}`} onClick={() => setSelloutTab('gerencial')}>Gerencial</button>
-            <button type="button" className={`stock-nav-btn${selloutTab === 'clientes' ? ' on' : ''}`} onClick={() => setSelloutTab('clientes')}>Clientes</button>
+            <button type="button" className={`stock-nav-btn${selloutTab === 'dashboard' ? ' on' : ''}`} aria-current={selloutTab === 'dashboard' ? 'page' : undefined} onClick={() => setSelloutTab('dashboard')}>Dashboard</button>
+            <button type="button" className={`stock-nav-btn${selloutTab === 'gerencial' ? ' on' : ''}`} aria-current={selloutTab === 'gerencial' ? 'page' : undefined} onClick={() => setSelloutTab('gerencial')}>Gerencial</button>
+            <button type="button" className={`stock-nav-btn${selloutTab === 'clientes' ? ' on' : ''}`} aria-current={selloutTab === 'clientes' ? 'page' : undefined} onClick={() => setSelloutTab('clientes')}>Clientes</button>
           </div>
           <div className="section-month">
             <span className="so-month-label">{monthLabel}</span>
@@ -598,10 +599,10 @@ export function App() {
       </> : section === 'clientes' ? (<>
         <header className="topbar section-topbar" aria-label="Clientes">
           <div className="section-tabs">
-            <button type="button" className={`stock-nav-btn${clientesTab === 'carteira' ? ' on' : ''}`} onClick={() => setClientesTab('carteira')}>Carteira</button>
-            <button type="button" className={`stock-nav-btn${clientesTab === 'cadastro' ? ' on' : ''}`} onClick={() => setClientesTab('cadastro')}>Cadastro</button>
-            <button type="button" className={`stock-nav-btn${clientesTab === 'piramide' ? ' on' : ''}`} onClick={() => setClientesTab('piramide')}>Pirâmide</button>
-            <button type="button" className={`stock-nav-btn${clientesTab === 'sortimento' ? ' on' : ''}`} onClick={() => setClientesTab('sortimento')}>Sortimento</button>
+            <button type="button" className={`stock-nav-btn${clientesTab === 'carteira' ? ' on' : ''}`} aria-current={clientesTab === 'carteira' ? 'page' : undefined} onClick={() => setClientesTab('carteira')}>Carteira</button>
+            <button type="button" className={`stock-nav-btn${clientesTab === 'cadastro' ? ' on' : ''}`} aria-current={clientesTab === 'cadastro' ? 'page' : undefined} onClick={() => setClientesTab('cadastro')}>Cadastro</button>
+            <button type="button" className={`stock-nav-btn${clientesTab === 'piramide' ? ' on' : ''}`} aria-current={clientesTab === 'piramide' ? 'page' : undefined} onClick={() => setClientesTab('piramide')}>Pirâmide</button>
+            <button type="button" className={`stock-nav-btn${clientesTab === 'sortimento' ? ' on' : ''}`} aria-current={clientesTab === 'sortimento' ? 'page' : undefined} onClick={() => setClientesTab('sortimento')}>Sortimento</button>
           </div>
           <div className="section-month">
             <span className="so-month-label">{monthLabel}</span>
@@ -615,11 +616,11 @@ export function App() {
         <CampaignTab />
       </> : <>
       <header className="topbar stock-topbar" aria-label="Administração">
-        <button type="button" className={`stock-nav-btn${tab === 'uploads' ? ' on' : ''}`} onClick={() => { setTab('uploads'); setActiveNotice(null) }}>Uploads</button>
-        <button type="button" className={`stock-nav-btn${tab === 'auditoria' ? ' on' : ''}`} onClick={() => { setTab('auditoria'); setActiveNotice(null) }}>Auditoria</button>
-        <button type="button" className={`stock-nav-btn${tab === 'config' ? ' on' : ''}`} onClick={() => { setTab('config'); setActiveNotice(null) }}>Configurações</button>
-        <button type="button" className={`stock-nav-btn${tab === 'rcas' ? ' on' : ''}`} onClick={() => { setTab('rcas'); setActiveNotice(null) }}>Vendedores</button>
-        <button type="button" className={`stock-nav-btn${tab === 'dados' ? ' on' : ''}`} onClick={() => { setTab('dados'); setActiveNotice(null) }}>Dados</button>
+        <button type="button" className={`stock-nav-btn${tab === 'uploads' ? ' on' : ''}`} aria-current={tab === 'uploads' ? 'page' : undefined} onClick={event => { event.currentTarget.scrollIntoView({ inline: 'nearest', block: 'nearest' }); setTab('uploads'); setActiveNotice(null) }}>Uploads</button>
+        <button type="button" className={`stock-nav-btn${tab === 'auditoria' ? ' on' : ''}`} aria-current={tab === 'auditoria' ? 'page' : undefined} onClick={event => { event.currentTarget.scrollIntoView({ inline: 'nearest', block: 'nearest' }); setTab('auditoria'); setActiveNotice(null) }}>Auditoria</button>
+        <button type="button" className={`stock-nav-btn${tab === 'config' ? ' on' : ''}`} aria-current={tab === 'config' ? 'page' : undefined} onClick={event => { event.currentTarget.scrollIntoView({ inline: 'nearest', block: 'nearest' }); setTab('config'); setActiveNotice(null) }}>Configurações</button>
+        <button type="button" className={`stock-nav-btn${tab === 'rcas' ? ' on' : ''}`} aria-current={tab === 'rcas' ? 'page' : undefined} onClick={event => { event.currentTarget.scrollIntoView({ inline: 'nearest', block: 'nearest' }); setTab('rcas'); setActiveNotice(null) }}>Vendedores</button>
+        <button type="button" className={`stock-nav-btn${tab === 'dados' ? ' on' : ''}`} aria-current={tab === 'dados' ? 'page' : undefined} onClick={event => { event.currentTarget.scrollIntoView({ inline: 'nearest', block: 'nearest' }); setTab('dados'); setActiveNotice(null) }}>Dados</button>
       </header>
       {tab === 'uploads' ? <section className="content" aria-busy={processingAll}>
         <h2>ARQUIVOS DIÁRIOS</h2>
