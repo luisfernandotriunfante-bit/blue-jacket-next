@@ -43,7 +43,7 @@ especializadas.
    - Consolidar documentação para guiar agentes de IA via OpenBot.
    - Definir fluxo de trabalho coerente e executável.
    - **Concluído:** fechar a PR #142 sem merge.
-   - Alinhar `PROTOCOLO.md`, `AGENTS.md` e `CLAUDE.md` ao fluxo funcional.
+   - **Concluído:** alinhar `PROTOCOLO.md`, `AGENTS.md` e `CLAUDE.md` ao fluxo funcional.
 
 3. **Padronização visual** (próxima etapa):
    - Tarefa especificada em `tarefas/2026-11-14-padronizacao-visual.md`.
@@ -289,7 +289,7 @@ Para qualquer IA que comece a trabalhar neste repositório:
 | Ordem | Documento | Conteúdo | Status |
 |---|---|---|---|
 | 1 | `HANDOFF.md` (este) | Visão geral, decisões, situação atual | **Ativo** |
-| 2 | `PROTOCOLO.md` | Regras de trabalho entre IAs | **Ativo, precisa atualização** (v7 → v8: remover C:\nemo, atualizar papéis) |
+| 2 | `PROTOCOLO.md` | Regras de trabalho entre IAs | **Ativo — v8 concluída em 16/11/2026** |
 | 3 | `CLAUDE.md` | Instruções para Claude | **Ativo** |
 | 4 | `AGENTS.md` | Instruções para GPT/Codex | **Ativo** |
 | 5 | `PADRAO-VISUAL.md` | Design system | **Ativo** |
@@ -364,8 +364,7 @@ Não há duplicação exata na documentação oficial. Há sobreposição necess
 4. **Proteção técnica da `main` não comprovada.** A regra operacional existe, mas branch protection e revisões obrigatórias ainda precisam ser verificadas no GitHub.
 
 ### Médio
-5. **PROTOCOLO.md desatualizado.** Referências a C:\nemo, ferramentas de ponte e divisão
-   Claude/GPT rígida não refletem mais a realidade.
+5. **Validação prática do protocolo v8 pendente.** O texto está atualizado, mas o fluxo multiagente completo no OpenBot ainda precisa ser comprovado de ponta a ponta.
 6. **README.md desatualizado.** Descreve apenas o "primeiro ciclo" — o sistema tem 10+ abas
    e funcionalidades não documentadas.
 7. **Todas as dependências em `dependencies`.** Dev tools (TypeScript, Vite, @types) deveriam
@@ -385,7 +384,7 @@ Não há duplicação exata na documentação oficial. Há sobreposição necess
 | P-02 | Avaliar e, se autorizado, limpar `.env` e `arquivos/` do histórico Git | **Crítica** | Especialista Git + Luis | Versão atual já limpa |
 | P-03 | Verificar proteção técnica e revisões obrigatórias da `main` | **Alta** | Publisher | Aguardando |
 | P-04 | PR #142 fechada sem merge | **Concluída** | GPT | Concluída em 16/11/2026 |
-| P-05 | Atualizar PROTOCOLO.md para v8 (remover C:\nemo, atualizar papéis) | **Alta** | Bot | Aguardando |
+| P-05 | Atualizar PROTOCOLO.md para v8 | **Concluída** | GPT + revisão Claude | Concluída em 16/11/2026 — PR #144 |
 | P-06 | Atualizar README.md | **Média** | Bot | Aguardando |
 | P-07 | Executar padronização visual | **Média** | Agente frontend | Especificada, aguardando |
 | P-08 | Adicionar ESLint + testes básicos | **Média** | Bot | Aguardando |
@@ -403,7 +402,7 @@ Não há duplicação exata na documentação oficial. Há sobreposição necess
 
 ### Próxima ação recomendada
 1. **Imediato:** revisar Firebase e histórico Git (P-01 e P-02).
-2. **Em seguida:** verificar proteção da `main` e concluir o alinhamento documental (P-03 e P-05).
+2. **Em seguida:** verificar a proteção técnica da `main` e executar o primeiro piloto multiagente no OpenBot.
 3. **Depois:** executar a padronização visual (P-07).
 
 ---
