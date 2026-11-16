@@ -38,8 +38,9 @@ fora da tarefa.
 3. Envie a branch e abra pull request para a `main`.
 4. Não faça merge quando estiver como executor.
 5. Informe arquivos, testes, evidências, decisões, riscos e pendências.
-6. Atualize `HANDOFF.md` apenas quando a entrega mudar estado, arquitetura, processo, segurança ou
-   próxima prioridade.
+6. Atualize `HANDOFF.md` quando a entrega mudar estado, arquitetura, processo, segurança ou
+   próxima prioridade. Inclua o inventário de arquivos (§19–§20 do HANDOFF) sempre que criar,
+   remover ou renomear arquivos.
 
 ## Outros papéis
 

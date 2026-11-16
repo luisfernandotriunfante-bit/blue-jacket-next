@@ -90,8 +90,8 @@ Tarefa mista não começa pela interface antes de o contrato de dados e ações 
 
 ## 6. Revisão cruzada
 
-- Backend produzido por Claude deve ser revisado por GPT/Codex quando esses forem os modelos
-  designados; frontend produzido por GPT/Codex deve ser revisado por Claude.
+- Quem produz não revisa a própria entrega. De preferência, o revisor usa uma família de modelo
+  diferente do executor; quando isso não for possível, o acúmulo deve ser declarado.
 - A regra essencial é independência: o revisor não pode apenas repetir a conclusão do executor.
 - O revisor deve abrir o diff inteiro, conferir contratos, erros, regressões, segurança e testes.
 - Aprovação deve citar o que foi verificado. “Aprovado” sem evidência não vale.
@@ -110,7 +110,8 @@ Antes de integrar:
 6. Interface foi conferida em tema claro/escuro, largura móvel, teclado, foco, contraste, rótulos,
    loading, vazio, erro e disabled quando aplicável.
 7. Dados sensíveis, credenciais administrativas e informações comerciais não foram commitidos.
-8. Documentação afetada, inclusive `HANDOFF.md`, foi atualizada quando necessário.
+8. Documentação afetada, inclusive `HANDOFF.md` e seu inventário de arquivos (§19–§20), foi
+   atualizada quando necessário.
 
 Antes de publicar:
 1. branch, commit e ambiente estão identificados;

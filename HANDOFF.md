@@ -24,7 +24,7 @@ especializadas.
 | Item | Estado |
 |---|---|
 | Aplicação | Funcional, publicada em GitHub Pages |
-| Abas ativas | App (admin), Clientes, Cadastro Cliente, Pirâmide, Carteira, Estoque, Sortimento, Sell Out, Gerencial, Campanhas (placeholder), RCA Manager |
+| Abas ativas | 10 funcionais + 1 placeholder: App (admin), Clientes, Cadastro Cliente, Pirâmide, Carteira, Estoque, Sortimento, Sell Out, Gerencial, RCA Manager. Campanhas é placeholder (20 linhas). |
 | Dados | Importados via planilhas Excel/XLS; persistidos em IndexedDB; sincronizados via Firebase Realtime Database |
 | Testes automatizados | Nenhum. Único gate: `npm run build` (TypeScript + Vite). **Decisão do Luis: adicionar testes.** |
 | PR #142 | Fechada sem merge em 16/11/2026. A documentação do Nemo não faz parte do Red Jacket. |
@@ -58,7 +58,7 @@ especializadas.
 ## 4. Arquitetura real (confirmada no código)
 
 ```
-React 19 + TypeScript 6 + Vite 8
+React 19.2 + TypeScript 6.0 + Vite 8.3
 │
 ├── src/
 │   ├── App.tsx              — Shell principal, navegação por abas, uploads, admin
@@ -66,6 +66,9 @@ React 19 + TypeScript 6 + Vite 8
 │   ├── RcaManager.tsx       — Gestão de representantes
 │   ├── styles.css           — Todo CSS do projeto (765 linhas)
 │   ├── firebaseConfig.ts    — Inicialização Firebase
+│   ├── msGeo.ts             — Dados geográficos SVG dos municípios de MS (mapa)
+│   ├── vite-env.d.ts        — Declarações de tipo do Vite
+│   ├── main.tsx             — Entry point React
 │   └── domain/              — Motores de processamento de dados
 │       ├── clientMotor.ts   — Processa planilhas de clientes
 │       ├── productMotor.ts  — Processa planilhas de produtos + sortimento
@@ -84,7 +87,12 @@ React 19 + TypeScript 6 + Vite 8
 ├── .github/workflows/
 │   └── deploy.yml           — Deploy automático: push to main → GitHub Pages
 │
-└── index.html               — Entry point (título: "Red Jacket")
+├── index.html               — Entry point HTML (título: "Red Jacket")
+├── package.json             — Dependências e scripts (name: "red-jacket")
+├── package-lock.json        — Lock de versões
+├── vite.config.ts           — Configuração do Vite (base: /blue-jacket-next/)
+├── tsconfig.json            — Configuração raiz do TypeScript
+└── tsconfig.app.json        — Configuração TS da aplicação
 ```
 
 **Confirmado no código:**
@@ -400,7 +408,111 @@ Não há duplicação exata na documentação oficial. Há sobreposição necess
 
 ---
 
-## 19. Como atualizar este documento
+## 19. Inventário completo de arquivos
+
+Atualizado em 16/11/2026. Cada entrada informa: caminho relativo, propósito, linhas e data da
+última mudança significativa.
+
+### Documentação (raiz)
+
+| Arquivo | Propósito | Linhas | Última mudança |
+|---|---|---|---|
+| `HANDOFF.md` | Estado, decisões, inventário, passagem entre equipes | ~460 | 16/11/2026 |
+| `PROTOCOLO.md` | Regras operacionais de trabalho (v8) | 163 | 16/11/2026 |
+| `CLAUDE.md` | Instruções para Claude por papel | 74 | 16/11/2026 |
+| `AGENTS.md` | Instruções para GPT/Codex por papel | 60 | 16/11/2026 |
+| `PADRAO-VISUAL.md` | Design system e tokens visuais | 136 | 14/11/2026 |
+| `README.md` | Apresentação pública (desatualizado) | 16 | 01/11/2026 |
+
+### Tarefas e revisão
+
+| Arquivo | Propósito | Linhas | Última mudança |
+|---|---|---|---|
+| `tarefas/2026-11-14-padronizacao-visual.md` | Especificação da padronização visual | 60 | 14/11/2026 |
+| `revisao/pendente.md` | Template para trabalho pendente de revisão | ~15 | Criação |
+| `revisao/revisado.md` | Registro de revisões concluídas | ~7 | Criação |
+
+### Configuração e build
+
+| Arquivo | Propósito | Linhas | Última mudança |
+|---|---|---|---|
+| `package.json` | Dependências, scripts, nome do projeto | ~25 | 06/11/2026 |
+| `package-lock.json` | Lock de versões | Auto | 06/11/2026 |
+| `vite.config.ts` | Configuração Vite (base path: `/blue-jacket-next/`) | ~15 | 01/11/2026 |
+| `tsconfig.json` | Configuração raiz TypeScript | ~5 | 01/11/2026 |
+| `tsconfig.app.json` | Configuração TS da aplicação | ~15 | 01/11/2026 |
+| `index.html` | Entry point HTML (título: "Red Jacket") | ~15 | 01/11/2026 |
+| `.gitignore` | Ignora node_modules, dist, .env, arquivos/ | 7 | 16/11/2026 |
+| `.github/workflows/deploy.yml` | Deploy automático: push to main → GitHub Pages | 38 | 16/11/2026 |
+
+### Código-fonte — Componentes (`src/`)
+
+| Arquivo | Propósito | Linhas | Última mudança |
+|---|---|---|---|
+| `src/App.tsx` | Shell principal, navegação, uploads, admin | 1056 | 06/11/2026 |
+| `src/StockTab.tsx` | Estoque, notas recebidas, treemap, caixas | 1830 | 06/11/2026 |
+| `src/CarteiraTab.tsx` | Gestão de carteira de clientes | 1516 | 01/11/2026 |
+| `src/SortimentoTab.tsx` | Análise de sortimento por canal | 799 | 06/11/2026 |
+| `src/CadastroClienteTab.tsx` | Cadastro e edição de clientes | 606 | 01/11/2026 |
+| `src/SellOutTab.tsx` | Dashboard de sell-out (referência visual) | 594 | 01/11/2026 |
+| `src/PiramideTab.tsx` | Análise de premissas/pirâmide | 543 | 01/11/2026 |
+| `src/GerencialTab.tsx` | Dashboard financeiro/gerencial | 474 | 01/11/2026 |
+| `src/ClientesTab.tsx` | Listagem de clientes | 352 | 01/11/2026 |
+| `src/RcaManager.tsx` | Gestão de representantes comerciais | 341 | 01/11/2026 |
+| `src/CampaignTab.tsx` | Placeholder — campanhas (sem funcionalidade) | 20 | 01/11/2026 |
+| `src/styles.css` | Todo CSS do projeto | 765 | 01/11/2026 |
+| `src/firebaseConfig.ts` | Inicialização Firebase (lê do `.env`) | 26 | 01/11/2026 |
+| `src/main.tsx` | Entry point React (monta App no DOM) | 6 | 01/11/2026 |
+| `src/msGeo.ts` | Dados SVG geográficos dos municípios de MS | ~5* | 01/11/2026 |
+| `src/vite-env.d.ts` | Declarações de tipo do Vite | 1 | 01/11/2026 |
+
+\* `msGeo.ts` tem 5 linhas de código mas ~227 KB de dados SVG inlined (paths de municípios).
+
+### Código-fonte — Domínio (`src/domain/`)
+
+| Arquivo | Propósito | Linhas | Última mudança |
+|---|---|---|---|
+| `src/domain/cloudSync.ts` | Sincronização Firebase Realtime DB | 228 | 06/11/2026 |
+| `src/domain/productMotor.ts` | Processa planilhas de produtos + sortimento | 207 | 06/11/2026 |
+| `src/domain/clientMotor.ts` | Processa planilhas de clientes | 160 | 01/11/2026 |
+| `src/domain/historyMotor.ts` | Processa histórico de vendas | 158 | 01/11/2026 |
+| `src/domain/movementMotor.ts` | Processa movimentações de estoque | 119 | 01/11/2026 |
+| `src/domain/syncEngine.ts` | Coordenação de sync | 93 | 01/11/2026 |
+| `src/domain/receiptMotor.ts` | Processa notas fiscais | 85 | 01/11/2026 |
+| `src/domain/competenciaEngine.ts` | Motor de competência por período | 85 | 01/11/2026 |
+| `src/domain/persistence.ts` | Persistência IndexedDB | 82 | 01/11/2026 |
+| `src/domain/productGrouping.ts` | Agrupamento de produtos | 72 | 01/11/2026 |
+| `src/domain/fileDetector.ts` | Detecção de tipo de arquivo pelo cabeçalho | 67 | 01/11/2026 |
+| `src/domain/audit.ts` | Tipos e utilidades de auditoria | 37 | 01/11/2026 |
+| `src/domain/types.ts` | Tipos compartilhados do domínio | 20 | 01/11/2026 |
+
+**Totais:** 12 componentes TSX (8928 linhas) · 13 módulos de domínio (1413 linhas) ·
+1 CSS (765 linhas) · 3 utilitários TS (33 linhas) · Total src: ~11139 linhas.
+
+---
+
+## 20. Regra permanente — Inventário de arquivos
+
+**Vigência:** a partir de 16/11/2026. Aplica-se a qualquer bot ou pessoa.
+
+1. **Arquivo novo** → inventário (§19) atualizado no mesmo commit ou PR.
+2. **Arquivo removido** → entrada removida do inventário no mesmo commit ou PR.
+3. **Arquivo renomeado** → caminho atualizado no inventário.
+4. **Mudança significativa de propósito** → descrição atualizada.
+5. **Contagem de linhas** → atualizada quando a variação for ≥ 20% em relação ao registrado.
+6. **Formato de cada entrada:** caminho relativo, propósito em uma frase, linhas, data da última
+   mudança significativa.
+7. **Agrupamento:** Documentação, Tarefas/Revisão, Configuração/Build, Componentes (`src/`),
+   Domínio (`src/domain/`).
+8. **Vale para qualquer bot.** Nenhum modelo de IA está isento.
+9. **PR bloqueada se inventário desatualizado.** Revisor deve rejeitar PR que adicione, remova
+   ou renomeie arquivo sem atualizar o inventário.
+10. **Revisores verificam inventário.** Checklist de revisão inclui: "Inventário do HANDOFF.md
+    está atualizado?".
+
+---
+
+## 21. Como atualizar este documento
 
 Este documento é atualizado pelo bot que concluir uma entrega significativa:
 
@@ -408,6 +520,7 @@ Este documento é atualizado pelo bot que concluir uma entrega significativa:
 2. Mova pendências concluídas para a seção 14 (decisões confirmadas) ou remova se irrelevante.
 3. Adicione novas pendências à seção 17.
 4. Atualize a seção 18 com a última entrega.
-5. Marque claramente: "Confirmado no código", "Confirmado na configuração", "Definido por regra", "Ainda não comprovado" ou "Depende de decisão do Luis".
-6. Não adicione informação aspiracional como se fosse fato. Se algo é planejado mas não implementado, diga explicitamente.
-7. Commit no mesmo branch da entrega, com mensagem: `docs: atualizar HANDOFF.md — <o que mudou>`.
+5. Atualize o inventário (§19) conforme a regra permanente (§20).
+6. Marque claramente: "Confirmado no código", "Confirmado na configuração", "Definido por regra", "Ainda não comprovado" ou "Depende de decisão do Luis".
+7. Não adicione informação aspiracional como se fosse fato. Se algo é planejado mas não implementado, diga explicitamente.
+8. Commit no mesmo branch da entrega, com mensagem: `docs: atualizar HANDOFF.md — <o que mudou>`.

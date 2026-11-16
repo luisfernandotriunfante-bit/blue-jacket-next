@@ -52,7 +52,8 @@ reduzido.
 3. Envie a branch e abra pull request.
 4. Não faça merge quando estiver como executor ou revisor.
 5. Informe arquivos, testes, evidências, decisões, riscos e pendências.
-6. Atualize `HANDOFF.md` quando houver mudança significativa de estado ou direção.
+6. Atualize `HANDOFF.md` quando houver mudança significativa de estado ou direção. Inclua o
+   inventário de arquivos (§19–§20 do HANDOFF) sempre que criar, remover ou renomear arquivos.
 
 ## Contingência
 
