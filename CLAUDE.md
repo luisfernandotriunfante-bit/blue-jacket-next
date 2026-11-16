@@ -1,47 +1,73 @@
-# Instruções para o Claude neste repositório
+# Instruções para Claude — Red Jacket
 
-Leia `PROTOCOLO.md` antes de qualquer alteração. Ele manda.
+Leia `HANDOFF.md` e `PROTOCOLO.md` antes de qualquer alteração. O protocolo define o processo;
+este arquivo define apenas os papéis mais comuns do Claude.
 
-## Seu papel
-Gerente (recebe os pedidos do Luis, divide o trabalho, confere e publica) e dono da lógica
-(`src/domain/**`, cálculos, dados, integrações, estado, hooks, rotas, estrutura de pastas e toda
-programação de back-end).
+## Papéis mais comuns
 
-Você também é o responsável pela **publicação final**: só você faz merge na `main` (exceto no modo
-substituição).
+Quando designado como Backend/Lógica:
+- cuide de `src/domain/**`, processamento, persistência, sincronização, integrações, estado e cálculos;
+- não altere aparência, `src/styles.css` ou `PADRAO-VISUAL.md` fora do contrato;
+- implemente e teste entradas, saídas, erros e casos-limite;
+- entregue o diff para revisão independente do Backend Review.
 
-## Antes de qualquer pedido novo
-Abra `revisao/pendente.md`. Se houver entradas, revise primeiro (seção 6 do protocolo).
+Quando designado como Lead:
+- classifique P/M/G;
+- transforme o pacote do Architect em tarefas;
+- defina branch, arquivos reservados, contratos, responsáveis, revisores, dependências e ordem;
+- integre as partes e resolva divergências;
+- não dispense revisão de tarefa P sem justificativa registrada.
 
-## Regras que mais importam
-- Nunca faça commit direto na `main`: ela publica o site. Trabalhe em `claude/<assunto>`.
-- Só lógica: faça sozinho. Qualquer coisa visual (cor, botão, CSS, layout): é do GPT. Não mexa em
-  `src/styles.css` nem em aparência, salvo correção de erro evidente, avisando o GPT.
-- Tarefa mista: defina o contrato (seção 7 do protocolo, campos adicionais) antes de começar.
-  Inclua: dados, ações, arquivos de cada lado, estados visuais (loading, empty, error, disabled) e
-  critérios de aceite. Nenhuma tarefa mista começa pela UI antes do contrato. Nenhuma lógica nova é
-  considerada pronta sem seus estados visuais planejados.
-- Publicar na `main` só depois da revisão cruzada (seção 5 do protocolo). O Luis não revisa.
+Quando designado como Frontend Review:
+- abra o diff inteiro;
+- confira contrato, responsividade, tema claro/escuro, teclado, foco, contraste, rótulos e estados;
+- registre evidências e problemas concretos;
+- não aprove automaticamente apenas porque o build passou.
 
-## Revisão cruzada obrigatória
-- Seu código → GPT revisa antes do merge. Sem aprovação explícita do GPT, não faça merge.
-- Código do GPT → você revisa antes do merge. Verifique também: contraste, foco de teclado, labels
-  de acessibilidade, estados de botões.
-- Pequenas correções (erro evidente, 1-2 linhas): pode corrigir direto, mas notifique a outra IA.
+Quando designado como Publisher:
+- verifique todos os gates do `PROTOCOLO.md`;
+- confirme branch, commit, revisão e plano de reversão;
+- faça merge na `main`;
+- acompanhe o GitHub Pages e abra a URL publicada;
+- registre o resultado e devolva falhas ao Lead.
 
-## Como acionar o GPT
-- No Cowork/app do Claude: ferramenta `perguntar_ao_gpt` (ponte da pasta `C:\nemo`).
-- No Claude Code sem a ponte: abra o pull request do ramo e comente `@codex <pedido no formato da
-  seção 7>`; o Codex assume a tarefa na nuvem.
-- O pedido sempre cita o ramo e os arquivos reservados.
+## Antes de começar
 
-## Ponte (C:\nemo)
-- `C:\nemo` é exclusivamente para comunicação. Nenhum arquivo do projeto vai para lá.
-- O repositório nunca é clonado para o computador do Luis. Todo trabalho acontece no GitHub.
+Confirme:
+- papel assumido;
+- tamanho P/M/G;
+- branch e arquivos reservados;
+- objetivo, contrato e aceite;
+- revisor;
+- testes e evidências exigidas.
 
-## Padrão visual
-Alterações visuais que criem padrões reutilizáveis devem atualizar `PADRAO-VISUAL.md` na mesma
-entrega. O GPT é responsável por essa atualização.
+O Architect vem antes do Lead em mudanças que exigem concepção, contratos ou decisão estrutural.
+Tarefas pequenas e localizadas podem seguir diretamente ao executor quando o Lead registrar o fluxo
+reduzido.
 
-## Comandos
-- `npm ci` · `npm run build` (TypeScript + Vite; é a conferência obrigatória) · `npm run dev`
+## Entrega
+
+1. Rode `npm ci && npm run build`.
+2. Execute os gates aplicáveis.
+3. Envie a branch e abra pull request.
+4. Não faça merge quando estiver como executor ou revisor.
+5. Informe arquivos, testes, evidências, decisões, riscos e pendências.
+6. Atualize `HANDOFF.md` quando houver mudança significativa de estado ou direção.
+
+## Contingência
+
+Claude pode acumular outro papel quando um agente estiver indisponível, mas deve declarar o acúmulo.
+A própria revisão não conta como revisão cruzada. Riscos críticos ou mudança de objetivo voltam ao
+Luis.
+
+## Fontes oficiais
+
+- Estado e contexto: `HANDOFF.md`.
+- Processo: `PROTOCOLO.md`.
+- Aparência: `PADRAO-VISUAL.md`.
+- Tarefas: `tarefas/*.md`.
+- Código e evidências permanentes: GitHub.
+
+OpenBot substituiu a ponte local como orquestrador escolhido, mas seu fluxo multiagente ainda precisa
+ser comprovado de ponta a ponta. Referências a `C:\nemo`, `perguntar_ao_gpt` e
+`resultado_do_gpt` estão descontinuadas neste projeto.
