@@ -295,7 +295,7 @@ Para qualquer IA que comece a trabalhar neste repositório:
 | 5 | `PADRAO-VISUAL.md` | Design system | **Ativo** |
 | 6 | `tarefas/*.md` | Tarefas ativas | **Ativo** |
 | 7 | `revisao/pendente.md` | Trabalho pendente de revisão | **Ativo** (vazio) |
-| 8 | `README.md` | Descrição do projeto | **Desatualizado, precisa reescrita** |
+| 8 | `README.md` | Descrição do projeto | **Ativo — reescrito em 16/11/2026 (P-06)** |
 
 ### Auditoria dos documentos
 
@@ -306,7 +306,7 @@ Para qualquer IA que comece a trabalhar neste repositório:
 | `AGENTS.md` | Instruções específicas para GPT/Codex | Complementa o protocolo; não pode contradizê-lo |
 | `CLAUDE.md` | Instruções específicas para Claude | Complementa o protocolo; não pode contradizê-lo |
 | `PADRAO-VISUAL.md` | Design system e validação visual | Fonte oficial da aparência; mantido pelo frontend |
-| `README.md` | Apresentação pública e início rápido | Manter, mas reescrever para refletir o produto atual |
+| `README.md` | Apresentação pública e início rápido | Reescrito em 16/11/2026 para refletir o produto atual; atualizar quando telas, scripts, fontes de dados ou deploy mudarem |
 | `tarefas/*.md` | Especificações de trabalhos concretos | Histórico/execução; cada arquivo deve declarar status |
 | `revisao/pendente.md` | Exceções aguardando revisão | Manter enquanto houver modo de contingência; hoje vazio |
 | `revisao/revisado.md` | Histórico das exceções revisadas | Manter como registro; hoje vazio |
@@ -365,8 +365,9 @@ Não há duplicação exata na documentação oficial. Há sobreposição necess
 
 ### Médio
 5. **Validação prática do protocolo v8 pendente.** O texto está atualizado, mas o fluxo multiagente completo no OpenBot ainda precisa ser comprovado de ponta a ponta.
-6. **README.md desatualizado.** Descreve apenas o "primeiro ciclo" — o sistema tem 10+ abas
-   e funcionalidades não documentadas.
+6. **README.md desatualizado — resolvido (P-06).** O README foi reescrito em 16/11/2026 para
+   descrever as telas, fontes de dados, arquitetura, scripts e publicação reais. Deve ser mantido
+   em dia quando esses pontos mudarem.
 7. **Todas as dependências em `dependencies`.** Dev tools (TypeScript, Vite, @types) deveriam
    estar em `devDependencies`.
 
@@ -385,7 +386,7 @@ Não há duplicação exata na documentação oficial. Há sobreposição necess
 | P-03 | Verificar proteção técnica e revisões obrigatórias da `main` | **Alta** | Publisher | Aguardando |
 | P-04 | PR #142 fechada sem merge | **Concluída** | GPT | Concluída em 16/11/2026 |
 | P-05 | Atualizar PROTOCOLO.md para v8 | **Concluída** | GPT + revisão Claude | Concluída em 16/11/2026 — PR #144 |
-| P-06 | Atualizar README.md | **Média** | Bot | Aguardando |
+| P-06 | Atualizar README.md | **Concluída** | Bot (Lead) | Concluída em 16/11/2026 — aguardando merge do PR |
 | P-07 | Executar padronização visual | **Média** | Agente frontend | Especificada, aguardando |
 | P-08 | Adicionar ESLint + testes básicos | **Média** | Bot | Aguardando |
 | P-09 | Histórico de sortimento por cliente | **Média** | Bot backend | Aguardando planilha do Luis |
@@ -399,6 +400,10 @@ Não há duplicação exata na documentação oficial. Há sobreposição necess
 - PR #136: Correção do mapeamento faixa→canal no sortimento.
 - PR #137: Quantidade em caixas (Cx) nas notas recebidas.
 - Ambos mergeados e deployed com sucesso.
+
+### Entrega documental pendente de merge (16/11/2026)
+- README.md reescrito (P-06): telas, fontes de dados, arquitetura, scripts, Firebase opcional,
+  publicação e limitações. Somente documentação; nenhum código, configuração ou dado alterado.
 
 ### Próxima ação recomendada
 1. **Imediato:** revisar Firebase e histórico Git (P-01 e P-02).
@@ -421,7 +426,7 @@ Atualizado em 16/11/2026. Cada entrada informa: caminho relativo, propósito, li
 | `CLAUDE.md` | Instruções para Claude por papel | 74 | 16/11/2026 |
 | `AGENTS.md` | Instruções para GPT/Codex por papel | 60 | 16/11/2026 |
 | `PADRAO-VISUAL.md` | Design system e tokens visuais | 136 | 14/11/2026 |
-| `README.md` | Apresentação pública (desatualizado) | 16 | 01/11/2026 |
+| `README.md` | Apresentação pública, arquitetura e início rápido do Red Jacket | 139 | 16/11/2026 |
 
 ### Tarefas e revisão
 
