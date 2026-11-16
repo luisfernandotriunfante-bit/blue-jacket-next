@@ -19,7 +19,7 @@ const fmtNum = (n: number) => n.toLocaleString('pt-BR')
 const WINDOW = 10
 const LINE_COLOR: Partial<Record<CommercialLine, string>> = {
   'Creme Dental': 'var(--blue)', 'Esc + Enx + Fio': '#10b981',
-  'Sabonetes': '#f59e0b', 'Hair': '#a78bfa', 'Limpeza': '#64748b',
+  'Sabonetes': 'var(--amber)', 'Hair': '#a78bfa', 'Limpeza': '#64748b',
 }
 const MOV_LABEL: Partial<Record<string, string>> = {
   venda_faturada: 'Faturado', a_faturar: 'A faturar', devolucao: 'Devolução',
@@ -103,7 +103,7 @@ function TwoSegmentDonut({ label, segA, segALabel, segAVal, segB, segBLabel, seg
         <div className="so-hero-info-row">
           <span className="so-hero-info-dot" style={{ background: 'var(--red)' }} />
           <span className="so-hero-info-key">{segBLabel}</span>
-          <span className="so-hero-info-val" style={{ color: 'var(--red)' }}>{segBVal}</span>
+          <span className="so-hero-info-val" style={{ color: 'var(--red-text)' }}>{segBVal}</span>
         </div>
         {net !== undefined && (
           <div className="so-hero-info-row">
@@ -327,7 +327,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
         </div>
 
         {/* ── KPIs secundários ─────────────────────────────── */}
-        <div className="stock-kpis" style={{ marginBottom: 16 }}>
+        <div className="stock-kpis e5-space-16">
           {kpis.ticket != null && <KpiCard label="Ticket médio" value={kpiCurrency(kpis.ticket)} sub={`${fmtNum(kpis.pedidos)} pedidos`} />}
           <KpiCard label="Devoluções" value={kpiCurrency(Math.abs(kpis.dev))} accent={kpis.dev !== 0 ? 'red' : undefined} />
           {kpis.bon > 0 && <KpiCard label="Bonificações" value={kpiCurrency(kpis.bon)} />}
@@ -370,7 +370,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
                       <span className="so-leg-item"><span className="so-leg-line so-leg-dash" style={{ background: 'var(--red)' }} />A Faturar</span>
                     </div>
                   </div>
-                  <div style={{ overflowX: 'auto' }}>
+                  <div className="e5-scroll">
                     <svg viewBox={`0 0 ${W} ${H_FIN + PAD.t + PAD.b}`} width="100%"
                       style={{ display: 'block', minWidth: Math.max(260, n * 38) }}>
                       <defs>
@@ -424,7 +424,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
                       <span className="so-leg-item"><span className="so-leg-line" style={{ background: 'var(--blue)' }} />Pos. faturada</span>
                     </div>
                   </div>
-                  <div style={{ overflowX: 'auto' }}>
+                  <div className="e5-scroll">
                     <svg viewBox={`0 0 ${W} ${H_POS + PAD.t + PAD.b}`} width="100%"
                       style={{ display: 'block', minWidth: Math.max(260, n * 38) }}>
                       <defs>
@@ -479,7 +479,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
                   </button>
                 </div>
                 <div className="so-table-wrap">
-                  <table className="so-daily-table">
+                  <table className="so-daily-table data-table">
                     {!compact && (
                       <thead>
                         <tr>
@@ -496,6 +496,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
                       {[...windowDays].reverse().map(d => (
                         <tr key={d.date}
                           className={`so-dt-row${selectedDay === d.date ? ' so-dt-selected' : ''}`}
+                          role="button" tabIndex={0} aria-expanded={selectedDay === d.date} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedDay(selectedDay === d.date ? null : d.date) } }}
                           onClick={() => setSelectedDay(selectedDay === d.date ? null : d.date)}>
                           <td className="so-dt-date">{fmtDay(d.date)}</td>
                           <td className={`n-right so-dt-sellout${d.sellOut < 0 ? ' neg' : ''}`}>
@@ -538,7 +539,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
                   <button type="button" className="so-day-detail-close" onClick={() => setSelectedDay(null)}>✕ fechar</button>
                 </div>
                 <div className="so-day-detail-wrap">
-                  <table className="so-day-detail-table">
+                  <table className="so-day-detail-table data-table">
                     <thead>
                       <tr>
                         <th>TIPO</th><th>CLIENTE</th><th>PRODUTO</th>
@@ -565,7 +566,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
 
         {/* ── Linhas comerciais — leaderboard ─────────────── */}
         {lineKpis.length > 0 && (
-          <div className="notas-section so-lines-section" style={{ marginBottom: 24 }}>
+          <div className="notas-section so-lines-section e5-space-24">
             <div className="notas-section-head">
               <span className="notas-section-title">Linhas comerciais · {monthLabel}</span>
             </div>

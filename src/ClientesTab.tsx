@@ -163,7 +163,7 @@ export function ClientesTab({ movementBase, clientBase, monthLabel, activeComp }
 
   return (
     <section className="content">
-      <div className="stock-kpis" style={{ marginBottom: 20 }}>
+      <div className="stock-kpis e5-space-20">
         <KpiCard label="Positivados" value={String(positivados.length)} />
         <KpiCard label="Faturado total" value={kpiCurrency(totalFat)} />
       </div>
@@ -178,7 +178,7 @@ export function ClientesTab({ movementBase, clientBase, monthLabel, activeComp }
         />
       </div>
 
-      <div className="pf-filters-row" style={{ marginBottom: 8 }} onClick={() => setOpenFilter(null)}>
+      <div className="pf-filters-row e5-space-8" onClick={() => setOpenFilter(null)}>
         {availableRanges.length > 0 && (
           <FilterDrop label="Faixa" options={availableRanges} selected={filterRange} onSelect={v => { setFilterRange(v); setExpandedCustomer(null) }} open={openFilter === 'range'} onToggle={() => setOpenFilter(openFilter === 'range' ? null : 'range')} />
         )}
@@ -201,13 +201,13 @@ export function ClientesTab({ movementBase, clientBase, monthLabel, activeComp }
         )}
       </div>
 
-      <div className="notas-section" style={{ marginBottom: 24 }}>
+      <div className="notas-section e5-space-24">
         <div className="notas-section-head">
           <span className="notas-section-title">Positivados · {monthLabel}</span>
-          <small style={{ color: 'var(--muted)', fontSize: 11 }}>clique numa linha para ver histórico</small>
+          <small className="e5-muted-small">clique numa linha para ver histórico</small>
         </div>
         <div>
-          <table className="gr-table">
+          <table className="gr-table data-table">
             <thead>
               <tr>
                 <th>#</th>
@@ -231,6 +231,7 @@ export function ClientesTab({ movementBase, clientBase, monthLabel, activeComp }
                   <tr
                     key={p.code}
                     className={`gr-row cl-expandable-row${isExpanded ? ' cl-row-expanded' : ''}`}
+                    role="button" tabIndex={0} aria-expanded={isExpanded} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCustomer(p.code) } }}
                     onClick={() => toggleCustomer(p.code)}
                   >
                     <td className="gr-rank">#{i + 1}</td>
@@ -259,7 +260,7 @@ export function ClientesTab({ movementBase, clientBase, monthLabel, activeComp }
                             <span style={{ color: 'var(--muted)', fontSize: 11 }}>{history.length} movimentações</span>
                           </div>
                           <div>
-                            <table className="so-day-detail-table">
+                            <table className="so-day-detail-table data-table">
                               <thead>
                                 <tr>
                                   <th>Data</th>
@@ -335,7 +336,7 @@ function FilterDrop({ label, options, selected, onSelect, single, open, onToggle
           ) : (
             <>
               {selected.length > 0 && (
-                <label style={{ color: 'var(--red)', fontWeight: 600 }}><input type="checkbox" checked={false} onChange={() => onSelect([])} /> Limpar</label>
+                <label style={{ color: 'var(--red-text)', fontWeight: 600 }}><input type="checkbox" checked={false} onChange={() => onSelect([])} /> Limpar</label>
               )}
               {vis.map(o => (
                 <label key={o}><input type="checkbox" checked={selected.includes(o)} onChange={() => {

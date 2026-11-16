@@ -74,7 +74,7 @@ function TwoSegmentDonut({ label, segA, segALabel, segAVal, segB, segBLabel, seg
         <div className="so-hero-info-row">
           <span className="so-hero-info-dot" style={{ background: 'var(--red)' }} />
           <span className="so-hero-info-key">{segBLabel}</span>
-          <span className="so-hero-info-val" style={{ color: 'var(--red)' }}>{segBVal}</span>
+          <span className="so-hero-info-val" style={{ color: 'var(--red-text)' }}>{segBVal}</span>
         </div>
         {net !== undefined && (
           <div className="so-hero-info-row">
@@ -283,7 +283,7 @@ export function GerencialTab({ movementBase, monthLabel, activeComp }: {
   return (
     <section className="content">
       {/* KPIs: donut filial + pódio */}
-      <div className="so-hero-grid" style={{ marginBottom: 24 }}>
+      <div className="so-hero-grid e5-space-24">
         <TwoSegmentDonut
           label="META DA FILIAL"
           segA={filialFat} segALabel="Faturado" segAVal={kpiCurrency(filialFat)}
@@ -313,15 +313,15 @@ export function GerencialTab({ movementBase, monthLabel, activeComp }: {
 
       {/* ── Ranking geral ──────────────────────────────── */}
       {(view === 'ranking' || !hasRcas) && (
-        <div className="notas-section" style={{ marginBottom: 24 }}>
+        <div className="notas-section e5-space-24">
           <div className="notas-section-head">
             <span className="notas-section-title">Ranking · {monthLabel}</span>
             {!allSellers.some(s => s.achievement !== null) && (
-              <small style={{ color: 'var(--muted)', fontSize: 11 }}>sem metas — ordenado por faturado</small>
+              <small className="e5-muted-small">sem metas — ordenado por faturado</small>
             )}
           </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="gr-table">
+          <div className="e5-scroll">
+            <table className="gr-table data-table">
               <thead>
                 <tr>
                   <th>#</th>
@@ -380,7 +380,7 @@ export function GerencialTab({ movementBase, monthLabel, activeComp }: {
             const isExpanded = expandedTeam === team.supervisor
             return (
               <div key={team.supervisor} className="gr-team-card">
-                <div className="gr-team-head" onClick={() => setExpandedTeam(isExpanded ? null : team.supervisor)}>
+                <div className="gr-team-head" role="button" tabIndex={0} aria-expanded={isExpanded} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedTeam(isExpanded ? null : team.supervisor) } }} onClick={() => setExpandedTeam(isExpanded ? null : team.supervisor)}>
                   <div className="gr-team-info">
                     <div className="gr-team-name">{team.supervisor}</div>
                     <div className="gr-team-sup">{team.members.length} vendedor{team.members.length !== 1 ? 'es' : ''} · {team.activeCount} ativo{team.activeCount !== 1 ? 's' : ''}</div>
@@ -395,7 +395,7 @@ export function GerencialTab({ movementBase, monthLabel, activeComp }: {
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ color: 'var(--blue)', fontWeight: 800, fontFamily: 'Space Grotesk, sans-serif', fontSize: 14 }}>{kpiCurrency(team.totalFat)}</div>
                       {team.teamAchievement !== null && (
-                        <div style={{ fontSize: 11, color: team.teamAchievement >= 100 ? 'var(--blue)' : team.teamAchievement >= 70 ? '#f59e0b' : 'var(--red)', fontWeight: 700 }}>
+                        <div style={{ fontSize: 11, color: team.teamAchievement >= 100 ? 'var(--blue)' : team.teamAchievement >= 70 ? 'var(--amber)' : 'var(--red)', fontWeight: 700 }}>
                           {fmtPct(team.teamAchievement)}
                         </div>
                       )}
@@ -406,7 +406,7 @@ export function GerencialTab({ movementBase, monthLabel, activeComp }: {
 
                 {isExpanded && (
                   <div className="gr-team-body">
-                    <div style={{ overflowX: 'auto' }}>
+                    <div className="e5-scroll">
                       <table className="gr-table gr-table-sm">
                         <thead>
                           <tr>
@@ -444,7 +444,7 @@ export function GerencialTab({ movementBase, monthLabel, activeComp }: {
                                       className="gr-progress-bar"
                                       style={{
                                         width: `${Math.min(100, s.achievement).toFixed(1)}%`,
-                                        background: s.achievement >= 100 ? 'var(--blue)' : s.achievement >= 70 ? '#f59e0b' : 'var(--red)',
+                                        background: s.achievement >= 100 ? 'var(--blue)' : s.achievement >= 70 ? 'var(--amber)' : 'var(--red)',
                                       }}
                                     />
                                   </div>

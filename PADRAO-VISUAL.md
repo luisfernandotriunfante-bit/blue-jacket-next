@@ -149,3 +149,7 @@ A sidebar compacta também expande com foco do teclado; entre 721 e 1024px perma
 ### Diálogos (E4)
 
 Os diálogos têm título associado, foco inicial, retorno ao controle de origem e Escape para fechar. O foco permanece no diálogo. Sua largura e altura respeitam a tela; em telas pequenas o conteúdo rola e os campos empilham.
+
+### Texto vermelho e tabelas comerciais (E5)
+
+`--red-text` usa `#f43f46` no tema escuro (4,68:1 sobre `#1a1a1a`) e `#d4131b` no claro; `--red` permanece para fundos e marca. Linhas expansíveis aceitam Enter e Espaço. Tabelas mantêm todas as colunas em contêiner rolável.
