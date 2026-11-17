@@ -790,7 +790,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
 
       {!hasSelection && clientBase.length === 0 && (
         <div className="visual-u-91" >
-          <p>Nenhum cliente carregado.</p>
+          <p className="empty">Nenhum cliente carregado.</p>
           <p className="visual-u-92" >Carregue os arquivos de clientes e sortimento para começar a análise.</p>
         </div>
       )}

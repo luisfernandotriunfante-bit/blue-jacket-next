@@ -867,7 +867,8 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
 
         {/* Map */}
         <main className="crt-card crt-mapcard">
-          <svg ref={svgRef} viewBox={`0 0 ${MS_W} ${MS_H}`} className="crt-svg" role="group" aria-label="Mapa de Mato Grosso do Sul">
+          <div className="crt-map-scroll" tabIndex={0} role="region" aria-label="Mapa de Mato Grosso do Sul">
+            <svg ref={svgRef} viewBox={`0 0 ${MS_W} ${MS_H}`} className="crt-svg" role="group" aria-label="Mapa de Mato Grosso do Sul">
             {cityKeys.map(ck => {
               const geo = msGeo[ck]
               const color = cityColors[ck]
@@ -896,7 +897,8 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
                 {msGeo[ck].n}
               </text>
             ))}
-          </svg>
+            </svg>
+          </div>
           <div ref={tipRef} className="crt-tip" />
           <div className="crt-legend">
             <span>{legendLabel}</span>

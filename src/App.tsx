@@ -535,7 +535,7 @@ export function App() {
       )}
       <div className="sidebar-bottom">
         {isFirebaseConfigured() && (
-          <button type="button" className="cloud-status" title={getSyncDetail()} onClick={() => alert(getSyncDetail())}>
+          <button type="button" className="cloud-status" aria-live="polite" title={getSyncDetail()} onClick={() => alert(getSyncDetail())}>
             <span className={`cloud-dot cloud-dot-${cloudStatus}`} />
             <span className="nav-label">{cloudStatus === 'synced' ? 'Sincronizado' : cloudStatus === 'syncing' ? 'Sincronizando…' : cloudStatus === 'error' ? 'Erro' : 'Offline'}</span>
           </button>
@@ -622,7 +622,7 @@ export function App() {
         <button type="button" className={`stock-nav-btn${tab === 'rcas' ? ' on' : ''}`} aria-current={tab === 'rcas' ? 'page' : undefined} onClick={event => { event.currentTarget.scrollIntoView({ inline: 'nearest', block: 'nearest' }); setTab('rcas'); setActiveNotice(null) }}>Vendedores</button>
         <button type="button" className={`stock-nav-btn${tab === 'dados' ? ' on' : ''}`} aria-current={tab === 'dados' ? 'page' : undefined} onClick={event => { event.currentTarget.scrollIntoView({ inline: 'nearest', block: 'nearest' }); setTab('dados'); setActiveNotice(null) }}>Dados</button>
       </header>
-      {tab === 'uploads' ? <section className="content" aria-busy={processingAll}>
+      {tab === 'uploads' ? <section className="content" role="status" aria-busy={processingAll}>
         <h2>ARQUIVOS DIÁRIOS</h2>
         <div className="quick-upload" role="button" tabIndex={0} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); dailyInput.current?.click() } }} onClick={() => dailyInput.current?.click()} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); void distributeFiles(Array.from(event.dataTransfer.files)) }}><strong>Solte todos os arquivos aqui</strong><span>ou escolha os arquivos</span><input ref={dailyInput} aria-label="Adicionar arquivos diários" type="file" multiple onChange={event => { if (event.target.files) void distributeFiles(Array.from(event.target.files)); event.target.value = '' }} /></div>
         {(Object.values(productSlots).some(f => f && rawFiles[f.id]) || Object.values(clientSlots).some(f => f && rawFiles[f.id]) || (historySlots.sales ?? []).some(f => rawFiles[f.id]) || Object.values(movementSlots).flat().some(f => rawFiles[f.id]) || Object.values(receiptSlots).flat().some(f => rawFiles[f.id])) ? <button className="process-button process-all" type="button" disabled={processingAll || productProcessing || clientProcessing || historyProcessing || movementProcessing || receiptProcessing} onClick={() => void processAll()}>{processingAll ? 'Processando todos os motores…' : 'Processar todos os motores'}</button> : null}
@@ -1054,7 +1054,7 @@ function SyncSection() {
           </label>
         </div>
         {status ? (
-          <p className="config-help" style={{ marginTop: 10, fontWeight: 600, color: status.startsWith('Erro') || status.startsWith('Arquivo') ? 'var(--red-text)' : 'var(--green-text)' }}>
+          <p className="config-help" role={status.startsWith('Erro') || status.startsWith('Arquivo') ? 'alert' : 'status'} style={{ marginTop: 10, fontWeight: 600, color: status.startsWith('Erro') || status.startsWith('Arquivo') ? 'var(--red-text)' : 'var(--green-text)' }}>
             {status}
           </p>
         ) : null}

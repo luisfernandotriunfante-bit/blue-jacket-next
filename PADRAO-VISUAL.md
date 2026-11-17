@@ -117,7 +117,7 @@ Hoje existem 15 classes de botão com raio de 5 a 8px e paddings diferentes (`.a
 - Trilha/grade: `--border`. Série principal: `--text`. Realizado: `--blue`. Pendente: `--red` tracejado.
 - Texto de eixo: 9px, `--muted`, `Space Grotesk`.
 - Cores das linhas comerciais (fixas, vêm do dado): Creme Dental `--blue`, Esc + Enx + Fio `--green`,
-  Sabonetes `--amber`, Hair `--purple`, Limpeza `#64748b`.
+  Sabonetes `--amber`, Hair `#a78bfa`, Limpeza `#64748b`.
 
 ## 6. Responsividade e acessibilidade
 
@@ -197,10 +197,12 @@ Estados existentes e classes:
 | Estado | Classe | Telas |
 |---|---|---|
 | Sem dados | `.so-empty` | Sell Out, Gerencial, Clientes, Pirâmide |
-| Sem dados | `.sort-empty`, `.stock-treemap-empty`, `.empty` | Sortimento, Estoque, Administração |
+| Sem dados | `.empty`, `.stock-treemap-empty`, `.arrivals-bucket-empty` | Sortimento, Estoque, Administração |
 | Sem vendedor ou resultado | `.rca-empty` | Administração / Vendedores |
 | Processando | `.process-button:disabled`, `aria-busy` | Administração / Uploads |
 | Erro | `.rca-errors`, mensagens existentes | Administração / Vendedores e Uploads |
 | Desabilitado | `:disabled` nos controles existentes | Telas com ações indisponíveis |
 
-Os vazios compartilham cor, alinhamento e quebra; a marcação compacta de ausência em baldes permanece `—`, sem caixa de mensagem. Texto de linha comercial usa `--text`; cores de dado ficam em marcadores e barras. A tabela de clientes tem contêiner rolável por teclado. Raios compostos das extremidades de filtros foram normalizados; 50% continua reservado a círculos e 3px a barras de gráfico.
+Os vazios compartilham cor, alinhamento e quebra; a marcação compacta de ausência em baldes usa a mesma cor e alinhamento, preservando `—`. Texto de linha comercial usa `--text`; cores de dado ficam em marcadores e barras. A tabela de clientes tem contêiner rolável por teclado. Raios compostos das extremidades de filtros foram normalizados; 50% continua reservado a círculos e 3px a barras de gráfico.
+
+Estados: Uploads usa `aria-busy` e `role=status`; retorno de Dados usa `status` ou `alert`; nuvem usa `aria-live=polite`. Controles desabilitados compartilham opacidade e cursor. Badges Faturado e dias usam `--blue-text` (`#1d4ed8` claro; `#60a5fa` escuro); textos sobre azul ativo são brancos sólidos. `.table-scroll` e `.so-table-wrap` são regiões roláveis e focáveis. Critério de raios: nenhum fora dos cinco tokens, exceto 50% para círculos e 3px para barras (sete valores). Cinco hex de dados e literais rgba legados permanecem registrados como dívida baixa.

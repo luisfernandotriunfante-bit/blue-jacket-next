@@ -713,7 +713,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                       </div>
                     </div>
                   )) : (
-                    <p className="arrivals-important-hint">
+                    <p className="arrivals-important-hint empty">
                       {nfsComPrevisao.hasTaggedProducts
                         ? `Nenhum produto marcado identificado nas ${nfsComPrevisao.totalWithPreview} NF${nfsComPrevisao.totalWithPreview !== 1 ? 's' : ''} com previsão. Verifique se o campo Cód. fabricante está preenchido nos produtos marcados.`
                         : 'Nenhum produto marcado como PEX ou lançamento. Marque produtos na aba Itens Foco para acompanhar aqui.'}

@@ -278,7 +278,7 @@ Resumo:
 - Todo CSS mora em `src/styles.css`. Inline só para valores dinâmicos.
 
 A tarefa de padronização visual (`tarefas/2026-11-14-padronizacao-visual.md`) lista 14
-correções priorizadas. Status: PR #147 em andamento; revisão e validação final pendentes.
+correções priorizadas. Status: P-07 entregue na PR #147; merge e revisão do delta pendentes.
 
 ---
 
@@ -387,7 +387,7 @@ Não há duplicação exata na documentação oficial. Há sobreposição necess
 | P-04 | PR #142 fechada sem merge | **Concluída** | GPT | Concluída em 16/11/2026 |
 | P-05 | Atualizar PROTOCOLO.md para v8 | **Concluída** | GPT + revisão Claude | Concluída em 16/11/2026 — PR #144 |
 | P-06 | Atualizar README.md | **Concluída** | Bot (Lead) | Entregue na PR #146 (16/11/2026) |
-| P-07 | Executar padronização visual | **Média** | Agente frontend | PR #147 em andamento; revisão e validação final pendentes |
+| P-07 | Executar padronização visual | **Média** | Agente frontend | P-07 entregue na PR #147; merge e revisão do delta pendentes |
 | P-08 | Adicionar ESLint + testes básicos | **Média** | Bot | Aguardando |
 | P-09 | Histórico de sortimento por cliente | **Média** | Bot backend | Aguardando planilha do Luis |
 | P-10 | Mover devDependencies no package.json | **Baixa** | Bot | Aguardando |
@@ -405,14 +405,14 @@ Não há duplicação exata na documentação oficial. Há sobreposição necess
 - README.md reescrito (P-06, PR #146): telas, fontes de dados, arquitetura, scripts, Firebase opcional,
   publicação e limitações. Somente documentação; nenhum código, configuração ou dado alterado.
 
-### Padronização visual - PR #147 (em andamento)
+### Padronização visual - entregue na PR #147
 - Tokens, componentes CSS, navegação, diálogos e telas foram trabalhados na branch visual. Build passa; revisão independente e validação completa com dados fictícios permanecem pendentes.
 - Motores, persistência e Firebase estão fora do escopo.
 
 ### Próxima ação recomendada
 1. **Imediato:** revisar Firebase e histórico Git (P-01 e P-02).
 2. **Em seguida:** verificar a proteção técnica da `main` e executar o primeiro piloto multiagente no OpenBot.
-3. **Em andamento:** concluir validação e revisão da padronização visual (P-07).
+3. **Entregue na PR #147:** padronização visual (P-07), pendente de revisão do delta e merge.
 
 ---
 
