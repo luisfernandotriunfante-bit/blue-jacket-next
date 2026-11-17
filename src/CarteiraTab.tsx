@@ -567,7 +567,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
             <div className="crt-meta"><span><b>{sl.length}</b> vendedor{sl.length > 1 ? 'es' : ''} na cidade</span></div>
             {sl.map(s => (
               <button key={s.code} type="button" onClick={() => { setSelectedSeller(s.code); setSelectedCity(null); setExpandedClient(null) }} className="crt-city-seller">
-                <div style={{ fontWeight: 600 }}>{s.name}</div>
+                <div className="visual-u-43" >{s.name}</div>
                 <div className="crt-sub">Cód. {s.code} · {s.cities[selectedCity]?.clients ?? 0} clientes</div>
               </button>
             ))}
@@ -588,7 +588,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
           <p className="crt-note">Cidades com mais vendedores no mesmo roteiro:</p>
           <div className="crt-rows">
             {topCities.map(({ ck, n }) => (
-              <div key={ck} className="crt-row" onClick={() => { setSelectedCity(ck) }} style={{ cursor: 'pointer' }}>
+              <div key={ck} className="crt-row crt-row-clickable" role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedCity(ck) } }} onClick={() => { setSelectedCity(ck) }}>
                 <span>{msGeo[ck].n}</span>
                 <span>{n} vendedor{n > 1 ? 'es' : ''}</span>
                 <div className="crt-bar"><i style={{ width: `${n / topCities[0].n * 100}%` }} /></div>
@@ -623,7 +623,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
           <div className="crt-meta">
             <span><b>{clients.length}</b> {mode === 'nao' ? 'clientes sem roteiro' : 'clientes sem cadastro'}</span>
             {comp && comp.assigned > 0 && (
-              <span style={{ color: comp.assigned === comp.total ? GREEN_DONE : 'var(--red)' }}>
+              <span style={{ color: comp.assigned === comp.total ? 'var(--green-text)' : 'var(--red-text)' }}>
                 <b>{comp.assigned}/{comp.total}</b> atribuídos
               </span>
             )}
@@ -704,8 +704,8 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
         {totalAssigned.assigned > 0 && (
           <>
             <div className="crt-meta">
-              <span style={{ color: GREEN_DONE }}><b>{totalAssigned.assigned}/{totalAssigned.total}</b> atribuídos</span>
-              <span style={{ color: GREEN_DONE }}><b>{completeCities}/{sorted.length}</b> cidades completas</span>
+              <span className="text-green"><b>{totalAssigned.assigned}/{totalAssigned.total}</b> atribuídos</span>
+              <span className="text-green"><b>{completeCities}/{sorted.length}</b> cidades completas</span>
             </div>
             <div className="crt-progress">
               <div className="crt-progress-bar" style={{ width: `${totalAssigned.assigned / totalAssigned.total * 100}%`, background: totalAssigned.assigned === totalAssigned.total ? GREEN_DONE : 'var(--red)' }} />
@@ -733,10 +733,10 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
             return (
               <button key={ck} type="button" className="crt-rowbtn" onClick={() => setSelectedCity(selectedCity === ck ? null : ck)}>
                 <div className="crt-row">
-                  <span style={done ? { color: GREEN_DONE } : undefined}>{done ? '✓ ' : ''}{msGeo[ck]?.n ?? ck}</span>
+                  <span className={done ? 'text-green' : undefined}>{done ? '✓ ' : ''}{msGeo[ck]?.n ?? ck}</span>
                   <span>{data[ck].length} cli</span>
                   {comp && comp.assigned > 0 && !done && (
-                    <span className="crt-sub" style={{ color: 'var(--red)' }}>{comp.assigned}/{comp.total} atribuídos</span>
+                    <span className="crt-sub visual-u-44" >{comp.assigned}/{comp.total} atribuídos</span>
                   )}
                   {!comp?.assigned && (
                     <span className="crt-sub">{(() => {
@@ -780,7 +780,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
           </div>
         )}
       </div>
-      <div className="pf-filters-row" style={{ padding: '0 16px' }} onClick={() => setOpenFilter(null)}>
+      <div className="pf-filters-row visual-u-45"  onClick={() => setOpenFilter(null)}>
         {availableRanges.length > 0 && (
           <FilterDrop label="Faixa" options={availableRanges} selected={filterRange} onSelect={setFilterRange} open={openFilter === 'range'} onToggle={() => setOpenFilter(openFilter === 'range' ? null : 'range')} />
         )}
@@ -841,7 +841,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
                         aria-pressed={selectedSeller === s.code}
                         onClick={() => { setSelectedSeller(s.code); setSelectedCity(null); setExpandedClient(null) }}
                       >
-                        <span>{s.name} <small style={{ opacity: .6 }}>({s.code})</small></span>
+                        <span>{s.name} <small className="visual-u-46" >({s.code})</small></span>
                         <small>{s.totalClients}</small>
                       </button>
                     </div>
@@ -867,7 +867,8 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
 
         {/* Map */}
         <main className="crt-card crt-mapcard">
-          <svg ref={svgRef} viewBox={`0 0 ${MS_W} ${MS_H}`} className="crt-svg" role="img" aria-label="Mapa de Mato Grosso do Sul">
+          <div className="crt-map-scroll" tabIndex={0} role="region" aria-label="Mapa de Mato Grosso do Sul">
+            <svg ref={svgRef} viewBox={`0 0 ${MS_W} ${MS_H}`} className="crt-svg" role="group" aria-label="Mapa de Mato Grosso do Sul">
             {cityKeys.map(ck => {
               const geo = msGeo[ck]
               const color = cityColors[ck]
@@ -880,6 +881,8 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
                   className={`crt-m${color ? ' on' : ''}${isSelected ? ' pick' : ''}`}
                   onMouseMove={e => showTip(e, ck)}
                   onMouseLeave={hideTip}
+                  role={color ? "button" : undefined} tabIndex={color ? 0 : undefined} aria-label={color ? geo.n : undefined}
+                  onKeyDown={e => { if (color && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); clickCity(ck) } }}
                   onClick={() => { if (color) clickCity(ck) }}
                 />
               )
@@ -894,15 +897,16 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
                 {msGeo[ck].n}
               </text>
             ))}
-          </svg>
+            </svg>
+          </div>
           <div ref={tipRef} className="crt-tip" />
           <div className="crt-legend">
             <span>{legendLabel}</span>
             {RAMP.map((r, i) => (
               <span key={i}><i className="crt-sw" style={{ background: r }} />{i === 0 ? '1' : i === 4 ? `${maxLegend}+` : ''}</span>
             ))}
-            <span><i className="crt-sw" style={{ background: 'var(--surface-raised)' }} />nenhum</span>
-            {mode !== 'rot' && <span><i className="crt-sw" style={{ background: GREEN_DONE, borderRadius: 2 }} />completo</span>}
+            <span><i className="crt-sw visual-u-47"  />nenhum</span>
+            {mode !== 'rot' && <span><i className="crt-sw crt-sw-complete" />completo</span>}
           </div>
         </main>
 
@@ -912,7 +916,6 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
         </aside>
       </div>
 
-      <style>{CRT_STYLES}</style>
     </div>
   )
 }
@@ -951,7 +954,7 @@ function FilterDrop({ label, options, selected, onSelect, single, open, onToggle
           ) : (
             <>
               {selected.length > 0 && (
-                <label style={{ color: 'var(--red)', fontWeight: 600 }}><input type="checkbox" checked={false} onChange={() => onSelect([])} /> Limpar</label>
+                <label className="visual-u-36" ><input type="checkbox" checked={false} onChange={() => onSelect([])} /> Limpar</label>
               )}
               {vis.map(o => (
                 <label key={o}><input type="checkbox" checked={selected.includes(o)} onChange={() => {
@@ -967,550 +970,3 @@ function FilterDrop({ label, options, selected, onSelect, single, open, onToggle
   )
 }
 
-const CRT_MONO = 'ui-monospace, SFMono-Regular, monospace'
-
-const CRT_STYLES = `
-.crt-wrap {
-  --r0: #5c2222;
-  --r1: #8b2828;
-  --r2: #c03030;
-  --r3: #ed1c24;
-  --r4: #ff7070;
-  --r-soft: rgba(237, 28, 36, 0.15);
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-  gap: 14px;
-  padding: 14px 0;
-}
-.theme-light .crt-wrap {
-  --r0: #fde8e8;
-  --r1: #f5a5a5;
-  --r2: #e05050;
-  --r3: #d4131b;
-  --r4: #8a0d12;
-  --r-soft: rgba(212, 19, 27, 0.12);
-}
-@media (prefers-color-scheme: light) {
-  :root:not(.theme-dark) .crt-wrap {
-    --r0: #fde8e8;
-    --r1: #f5a5a5;
-    --r2: #e05050;
-    --r3: #d4131b;
-    --r4: #8a0d12;
-    --r-soft: rgba(212, 19, 27, 0.12);
-  }
-}
-.crt-modes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 0 16px;
-}
-.crt-mode {
-  all: unset;
-  box-sizing: border-box;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: baseline;
-  gap: 10px;
-  padding: 9px 14px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--text);
-  font: 500 14px system-ui, sans-serif;
-}
-.crt-mode small {
-  font: 400 11px ${CRT_MONO};
-  color: var(--muted);
-}
-.crt-mode:hover { border-color: var(--red); }
-.crt-mode[aria-pressed="true"] {
-  background: var(--red);
-  border-color: var(--red);
-  color: #fff;
-}
-.crt-mode[aria-pressed="true"] small { color: rgba(255,255,255,.8); }
-.crt-grid {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 270px minmax(0,1fr) 340px;
-  gap: 16px;
-  align-items: start;
-  padding: 0 16px;
-  overflow: hidden;
-}
-.crt-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  min-width: 0;
-}
-.crt-rail {
-  display: flex;
-  flex-direction: column;
-  max-height: calc(100vh - 220px);
-  overflow: hidden;
-}
-.crt-q {
-  margin: 10px;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--background);
-  color: var(--text);
-  font: inherit;
-}
-.crt-q:focus { outline: 2px solid var(--red); outline-offset: 2px; }
-.crt-all {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  margin: 0 10px 6px;
-  width: calc(100% - 20px);
-  text-align: left;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: none;
-  color: var(--text);
-  font: inherit;
-  font-weight: 500;
-  padding: 7px 8px;
-  cursor: pointer;
-}
-.crt-all small { font: 400 11px ${CRT_MONO}; opacity: .8; white-space: nowrap; align-self: center; }
-.crt-all:hover { background: var(--background); }
-.crt-all[aria-pressed="true"] { background: var(--red); color: #fff; }
-.crt-list { overflow: auto; padding: 0 6px 10px; flex: 1; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
-.crt-list::-webkit-scrollbar { width: 6px; }
-.crt-list::-webkit-scrollbar-track { background: transparent; }
-.crt-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-.crt-list::-webkit-scrollbar-thumb:hover { background: var(--muted); }
-.crt-sup {
-  font: 500 11px ${CRT_MONO};
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  color: var(--muted);
-  padding: 12px 8px 4px;
-}
-.crt-seller, .crt-cty {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
-  text-align: left;
-  border: 0;
-  background: none;
-  color: var(--text);
-  font: inherit;
-  padding: 7px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.crt-seller:hover, .crt-cty:hover { background: var(--background); }
-.crt-seller[aria-pressed="true"], .crt-cty[aria-pressed="true"] { background: var(--red); color: #fff; }
-.crt-seller small, .crt-cty small {
-  font: 400 11px ${CRT_MONO};
-  opacity: .8;
-  white-space: nowrap;
-  align-self: center;
-}
-.crt-mapcard { padding: 8px; position: relative; }
-.crt-svg { display: block; width: 100%; height: auto; max-height: calc(100vh - 280px); }
-.crt-m { stroke: var(--border); stroke-width: .8; transition: fill .15s; }
-.crt-m.on { cursor: pointer; }
-.crt-m.pick { stroke: var(--text); stroke-width: 2.6; }
-.crt-m:hover { stroke: var(--text); stroke-width: 1.6; }
-.crt-lbl {
-  font: 500 14px system-ui, sans-serif;
-  fill: var(--text);
-  paint-order: stroke;
-  stroke: var(--surface);
-  stroke-width: 4px;
-  pointer-events: none;
-  text-anchor: middle;
-}
-.crt-tip {
-  position: absolute;
-  pointer-events: none;
-  background: var(--text);
-  color: var(--background);
-  padding: 6px 9px;
-  border-radius: 4px;
-  font-size: 12px;
-  max-width: 260px;
-  display: none;
-  z-index: 10;
-  line-height: 1.5;
-}
-.crt-tip b { font-weight: 600; }
-.crt-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-  align-items: center;
-  padding: 6px 8px 2px;
-  font-size: 12px;
-  color: var(--muted);
-}
-.crt-sw {
-  display: inline-block;
-  width: 14px;
-  height: 10px;
-  margin-right: 3px;
-  vertical-align: -1px;
-}
-.crt-side-panel {
-  padding: 14px;
-  max-height: calc(100vh - 220px);
-  overflow: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
-}
-.crt-side-panel::-webkit-scrollbar { width: 6px; }
-.crt-side-panel::-webkit-scrollbar-track { background: transparent; }
-.crt-side-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-.crt-side-panel::-webkit-scrollbar-thumb:hover { background: var(--muted); }
-.crt-side {
-  display: grid;
-  gap: 12px;
-  align-content: start;
-}
-.crt-side-h2 { font: 700 18px/1.15 system-ui, sans-serif; margin: 0; color: var(--text); }
-.crt-h3 {
-  font: 500 11px ${CRT_MONO};
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  color: var(--muted);
-  margin: 4px 0 0;
-}
-.crt-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  color: var(--muted);
-  font-size: 12px;
-}
-.crt-meta b { font: 500 15px ${CRT_MONO}; color: var(--text); }
-.crt-note { font-size: 12px; color: var(--muted); margin: 0; }
-.crt-warn {
-  font-size: 12px;
-  background: rgba(237, 28, 36, 0.1);
-  color: var(--red);
-  padding: 7px 9px;
-  border-radius: 4px;
-  margin: 0;
-}
-.crt-rows { display: grid; gap: 0; }
-.crt-row {
-  display: grid;
-  grid-template-columns: minmax(0,1fr) auto;
-  gap: 2px 8px;
-  font-size: 13px;
-  padding: 6px 0;
-  border-top: 1px solid var(--border);
-}
-.crt-row span:last-of-type {
-  font: 400 12px ${CRT_MONO};
-  text-align: right;
-  white-space: nowrap;
-}
-.crt-sub {
-  grid-column: 1 / -1;
-  font-size: 11px;
-  color: var(--muted);
-}
-.crt-bar {
-  grid-column: 1 / -1;
-  height: 4px;
-  background: var(--r-soft);
-  border-radius: 2px;
-}
-.crt-bar i { display: block; height: 100%; background: var(--red); border-radius: 2px; }
-.crt-tb {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-}
-.crt-tb th {
-  font: 500 10px ${CRT_MONO};
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  color: var(--muted);
-  text-align: right;
-  padding: 4px 4px;
-  border-bottom: 1px solid var(--border);
-}
-.crt-tb th:first-child, .crt-tb td:first-child { text-align: left; }
-.crt-tb td {
-  padding: 5px 4px;
-  border-bottom: 1px solid var(--border);
-  text-align: right;
-  font-family: ${CRT_MONO};
-  color: var(--text);
-}
-.crt-tb td:first-child { font-family: system-ui, sans-serif; }
-.crt-tb-total td { font-weight: 600; }
-.crt-det { border-top: 1px solid var(--border); }
-.crt-det summary {
-  display: grid;
-  grid-template-columns: minmax(0,1fr) auto;
-  gap: 2px 8px;
-  font-size: 13px;
-  padding: 7px 0;
-  cursor: pointer;
-  list-style: none;
-}
-.crt-det summary::-webkit-details-marker { display: none; }
-.crt-det summary > span:first-child::before {
-  content: '+';
-  display: inline-block;
-  width: 14px;
-  font: 500 13px ${CRT_MONO};
-  color: var(--red);
-}
-.crt-det[open] summary > span:first-child::before { content: '\\2212'; }
-.crt-det summary span:last-child {
-  font: 400 12px ${CRT_MONO};
-  text-align: right;
-  white-space: nowrap;
-}
-.crt-cli {
-  margin: 2px 0 8px;
-  padding: 0;
-  list-style: none;
-  max-height: 340px;
-  overflow: auto;
-  border-left: 2px solid var(--r-soft);
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
-}
-.crt-cli::-webkit-scrollbar { width: 6px; }
-.crt-cli::-webkit-scrollbar-track { background: transparent; }
-.crt-cli::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-.crt-cli::-webkit-scrollbar-thumb:hover { background: var(--muted); }
-.crt-cli li {
-  padding: 4px 8px;
-  font-size: 12px;
-  display: grid;
-  grid-template-columns: minmax(0,1fr) auto;
-  gap: 0 8px;
-}
-.crt-cli li small { color: var(--muted); font: 400 11px ${CRT_MONO}; }
-.crt-v { font: 400 11px ${CRT_MONO}; color: var(--muted); text-align: right; white-space: nowrap; }
-.crt-detail-body {
-  padding: 4px 0 8px 8px;
-  font-size: 12px;
-  border-left: 2px solid var(--border);
-}
-.crt-detail-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 3px 14px;
-  margin-bottom: 8px;
-}
-.crt-city-seller {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--text);
-  cursor: pointer;
-  font: inherit;
-}
-.crt-city-seller:hover { background: var(--background); }
-.crt-vend {
-  display: grid;
-  grid-template-columns: minmax(0,1fr) auto;
-  gap: 0 8px;
-  padding: 6px 0;
-  border-top: 1px solid var(--border);
-  font-size: 13px;
-}
-.crt-vend small { grid-column: 1/-1; color: var(--muted); font-size: 11px; }
-.crt-vend span:last-child { font: 400 12px ${CRT_MONO}; white-space: nowrap; }
-.crt-rowbtn {
-  all: unset;
-  box-sizing: border-box;
-  cursor: pointer;
-  width: 100%;
-}
-.crt-rowbtn:hover { background: var(--background); }
-.crt-pex-filter {
-  display: flex;
-  gap: 4px;
-  margin-left: 8px;
-  align-items: center;
-}
-.crt-pex-btn {
-  all: unset;
-  box-sizing: border-box;
-  cursor: pointer;
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  font: 400 12px system-ui, sans-serif;
-  color: var(--muted);
-  background: var(--surface);
-}
-.crt-pex-btn:hover { border-color: var(--red); color: var(--text); }
-.crt-pex-btn[aria-pressed="true"] { background: var(--red); color: #fff; border-color: var(--red); }
-.crt-progress {
-  height: 4px;
-  background: var(--border);
-  border-radius: 2px;
-  overflow: hidden;
-}
-.crt-progress-bar {
-  height: 100%;
-  border-radius: 2px;
-  transition: width .3s;
-}
-.crt-assign-row {
-  display: grid;
-  grid-template-columns: minmax(0,1fr) auto;
-  gap: 4px 8px;
-  align-items: center;
-  padding: 6px 0;
-  border-top: 1px solid var(--border);
-}
-.crt-assign-info {
-  min-width: 0;
-  font-size: 13px;
-}
-.crt-assign-info small {
-  display: block;
-  font: 400 11px ${CRT_MONO};
-  color: var(--muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.crt-assigned { color: #22c55e; }
-.crt-select {
-  min-width: 130px;
-  max-width: 160px;
-  padding: 5px 6px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--background);
-  color: var(--text);
-  font: 400 11px ${CRT_MONO};
-  cursor: pointer;
-}
-.crt-select:focus { outline: 2px solid var(--red); outline-offset: 1px; }
-.crt-report-btn {
-  all: unset;
-  box-sizing: border-box;
-  cursor: pointer;
-  padding: 8px 14px;
-  border: 1px solid #22c55e;
-  border-radius: 6px;
-  background: rgba(34, 197, 94, 0.1);
-  color: #22c55e;
-  font: 500 13px system-ui, sans-serif;
-  text-align: center;
-}
-.crt-report-btn:hover { background: rgba(34, 197, 94, 0.2); }
-.crt-clear-filters {
-  all: unset;
-  box-sizing: border-box;
-  cursor: pointer;
-  padding: 5px 10px;
-  border: 1px solid var(--red);
-  border-radius: 4px;
-  font: 400 12px system-ui, sans-serif;
-  color: var(--red);
-  background: none;
-}
-.crt-clear-filters:hover { background: rgba(237, 28, 36, 0.08); }
-.pf-filters-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: flex-start;
-}
-.pf-filter-drop { position: relative; }
-.pf-filter-btn {
-  all: unset;
-  box-sizing: border-box;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 10px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  font: 400 12px system-ui, sans-serif;
-  color: var(--muted);
-  background: var(--surface);
-  white-space: nowrap;
-}
-.pf-filter-btn:hover { border-color: var(--red); color: var(--text); }
-.pf-filter-btn.has-value { border-color: var(--red); color: var(--red); font-weight: 600; }
-.pf-filter-btn.open { border-color: var(--red); }
-.pf-filter-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 16px;
-  height: 16px;
-  border-radius: 8px;
-  background: var(--red);
-  color: #fff;
-  font: 600 10px ${CRT_MONO};
-  padding: 0 4px;
-}
-.pf-arrow { font-size: 8px; opacity: .5; }
-.pf-filter-panel {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  z-index: 20;
-  min-width: 160px;
-  max-height: 260px;
-  overflow: auto;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  box-shadow: 0 6px 20px rgba(0,0,0,.25);
-  padding: 6px 0;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
-}
-.pf-filter-panel::-webkit-scrollbar { width: 6px; }
-.pf-filter-panel::-webkit-scrollbar-track { background: transparent; }
-.pf-filter-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-.pf-filter-panel label {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  padding: 5px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.pf-filter-panel label:hover { background: var(--background); }
-.pf-panel-search {
-  width: calc(100% - 16px);
-  margin: 4px 8px 6px;
-  padding: 5px 8px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--background);
-  color: var(--text);
-  font: inherit;
-  font-size: 12px;
-}
-@media (max-width: 1000px) {
-  .crt-grid { grid-template-columns: 1fr !important; }
-  .crt-rail { max-height: 300px; }
-  .crt-side-panel { max-height: none; }
-}
-@media (prefers-reduced-motion: reduce) { .crt-m { transition: none; } }
-`

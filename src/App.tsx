@@ -148,6 +148,20 @@ export function App() {
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [rawFiles, setRawFiles] = useState<Record<string, File>>({})
   const [activeNotice, setActiveNotice] = useState<AuditItem | null>(null)
+  const noticeDialogRef = useRef<HTMLElement>(null)
+  const noticeOpen = activeNotice !== null
+  useEffect(() => {
+    if (!noticeOpen) return
+    const previous = document.activeElement as HTMLElement | null
+    const dialog = noticeDialogRef.current
+    dialog?.querySelector<HTMLElement>('button')?.focus()
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); setActiveNotice(null) }
+      if (event.key === 'Tab' && dialog?.isConnected) { event.preventDefault(); dialog.querySelector<HTMLElement>('button')?.focus() }
+    }
+    document.addEventListener('keydown', keydown)
+    return () => { document.removeEventListener('keydown', keydown); previous?.focus() }
+  }, [noticeOpen])
   const [clientAudit, setClientAudit] = useState<AuditItem[]>([])
   const [clientBase, setClientBase] = useState<CanonicalClient[]>([])
   const [clientSlots, setClientSlots] = useState<Partial<Record<(typeof clientSources)[number]['id'], UploadedFile>>>({})
@@ -490,23 +504,23 @@ export function App() {
   return <div className={`app theme-${theme}`}>
     <aside className="sidebar">
       <div className="brand"><span className="brand-short">RJ</span><span className="brand-full">RED JACKET</span></div>
-      <button className={`nav-item${section === 'sellout' ? ' active' : ''}`} type="button" onClick={() => setSection('sellout')}>
+      <button className={`nav-item${section === 'sellout' ? ' active' : ''}`} type="button" aria-label="Sell out" title="Sell out" aria-current={section === 'sellout' ? 'page' : undefined} onClick={() => setSection('sellout')}>
         <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" /></svg>
         <span className="nav-label">Sell out</span>
       </button>
-      <button className={`nav-item${section === 'estoque' ? ' active' : ''}`} type="button" onClick={() => setSection('estoque')}>
+      <button className={`nav-item${section === 'estoque' ? ' active' : ''}`} type="button" aria-label="Estoque" title="Estoque" aria-current={section === 'estoque' ? 'page' : undefined} onClick={() => setSection('estoque')}>
         <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z" /><path fillRule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
         <span className="nav-label">Estoque</span>
       </button>
-      <button className={`nav-item${section === 'clientes' ? ' active' : ''}`} type="button" onClick={() => setSection('clientes')}>
+      <button className={`nav-item${section === 'clientes' ? ' active' : ''}`} type="button" aria-label="Clientes" title="Clientes" aria-current={section === 'clientes' ? 'page' : undefined} onClick={() => setSection('clientes')}>
         <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" /></svg>
         <span className="nav-label">Clientes</span>
       </button>
-      <button className={`nav-item${section === 'campanhas' ? ' active' : ''}`} type="button" onClick={() => setSection('campanhas')}>
+      <button className={`nav-item${section === 'campanhas' ? ' active' : ''}`} type="button" aria-label="Campanhas" title="Campanhas" aria-current={section === 'campanhas' ? 'page' : undefined} onClick={() => setSection('campanhas')}>
         <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z" /></svg>
         <span className="nav-label">Campanhas</span>
       </button>
-      <button className={`nav-item${section === 'administracao' ? ' active' : ''}`} type="button" onClick={() => setSection('administracao')}>
+      <button className={`nav-item${section === 'administracao' ? ' active' : ''}`} type="button" aria-label="Administração" title="Administração" aria-current={section === 'administracao' ? 'page' : undefined} onClick={() => setSection('administracao')}>
         <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" /></svg>
         <span className="nav-label">Administração</span>
       </button>
@@ -521,39 +535,39 @@ export function App() {
       )}
       <div className="sidebar-bottom">
         {isFirebaseConfigured() && (
-          <div className="cloud-status" title={getSyncDetail()} onClick={() => alert(getSyncDetail())} style={{ cursor: 'pointer' }}>
+          <button type="button" className="cloud-status" aria-live="polite" title={getSyncDetail()} onClick={() => alert(getSyncDetail())}>
             <span className={`cloud-dot cloud-dot-${cloudStatus}`} />
             <span className="nav-label">{cloudStatus === 'synced' ? 'Sincronizado' : cloudStatus === 'syncing' ? 'Sincronizando…' : cloudStatus === 'error' ? 'Erro' : 'Offline'}</span>
-          </div>
+          </button>
         )}
-        <button className="theme-toggle" type="button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+        <button className="theme-toggle" type="button" aria-label={theme === 'dark' ? 'Tema claro' : 'Tema escuro'} title={theme === 'dark' ? 'Tema claro' : 'Tema escuro'} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
           <svg className="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" /></svg>
           <span className="nav-label">{theme === 'dark' ? 'Tema claro' : 'Tema escuro'}</span>
         </button>
       </div>
     </aside>
     <nav className="bottom-nav" aria-label="Navegação principal">
-      <button className={`bn-item${section === 'sellout' ? ' active' : ''}`} type="button" onClick={() => setSection('sellout')}>
+      <button className={`bn-item${section === 'sellout' ? ' active' : ''}`} type="button" aria-label="Sell out" title="Sell out" aria-current={section === 'sellout' ? 'page' : undefined} onClick={() => setSection('sellout')}>
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" /></svg>
         <span>Sell out</span>
       </button>
-      <button className={`bn-item${section === 'estoque' ? ' active' : ''}`} type="button" onClick={() => setSection('estoque')}>
+      <button className={`bn-item${section === 'estoque' ? ' active' : ''}`} type="button" aria-label="Estoque" title="Estoque" aria-current={section === 'estoque' ? 'page' : undefined} onClick={() => setSection('estoque')}>
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z" /><path fillRule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
         <span>Estoque</span>
       </button>
-      <button className={`bn-item${section === 'clientes' ? ' active' : ''}`} type="button" onClick={() => setSection('clientes')}>
+      <button className={`bn-item${section === 'clientes' ? ' active' : ''}`} type="button" aria-label="Clientes" title="Clientes" aria-current={section === 'clientes' ? 'page' : undefined} onClick={() => setSection('clientes')}>
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" /></svg>
         <span>Clientes</span>
       </button>
-      <button className={`bn-item${section === 'campanhas' ? ' active' : ''}`} type="button" onClick={() => setSection('campanhas')}>
+      <button className={`bn-item${section === 'campanhas' ? ' active' : ''}`} type="button" aria-label="Campanhas" title="Campanhas" aria-current={section === 'campanhas' ? 'page' : undefined} onClick={() => setSection('campanhas')}>
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z" /></svg>
         <span>Camp.</span>
       </button>
-      <button className={`bn-item${section === 'administracao' ? ' active' : ''}`} type="button" onClick={() => setSection('administracao')}>
+      <button className={`bn-item${section === 'administracao' ? ' active' : ''}`} type="button" aria-label="Administração" title="Administração" aria-current={section === 'administracao' ? 'page' : undefined} onClick={() => setSection('administracao')}>
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" /></svg>
         <span>Admin</span>
       </button>
-      <button className="bn-item bn-theme" type="button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+      <button className="bn-item bn-theme" type="button" aria-label={theme === 'dark' ? 'Tema claro' : 'Tema escuro'} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" /></svg>
         <span>{theme === 'dark' ? 'Claro' : 'Escuro'}</span>
       </button>
@@ -565,15 +579,15 @@ export function App() {
           <button type="button" className="comp-close-btn" onClick={() => setViewingComp(null)}>Voltar ao vivo</button>
         </div>
       )}
+      <div className="page-head"><h1>{({ sellout: 'Sell out', estoque: 'Estoque', clientes: 'Clientes', campanhas: 'Campanhas', administracao: 'Administra\u00e7\u00e3o' } as const)[section]}</h1></div>
       {section === 'sellout' ? (<>
-        <header className="topbar" aria-label="Sell out" style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'stretch', borderBottom: '1px solid var(--border)' }}>
-          <div />
-          <div style={{ display: 'flex' }}>
-            <button type="button" className={`stock-nav-btn${selloutTab === 'dashboard' ? ' on' : ''}`} onClick={() => setSelloutTab('dashboard')}>Dashboard</button>
-            <button type="button" className={`stock-nav-btn${selloutTab === 'gerencial' ? ' on' : ''}`} onClick={() => setSelloutTab('gerencial')}>Gerencial</button>
-            <button type="button" className={`stock-nav-btn${selloutTab === 'clientes' ? ' on' : ''}`} onClick={() => setSelloutTab('clientes')}>Clientes</button>
+        <header className="topbar section-topbar" aria-label="Sell out">
+          <div className="section-tabs">
+            <button type="button" className={`stock-nav-btn${selloutTab === 'dashboard' ? ' on' : ''}`} aria-current={selloutTab === 'dashboard' ? 'page' : undefined} onClick={() => setSelloutTab('dashboard')}>Dashboard</button>
+            <button type="button" className={`stock-nav-btn${selloutTab === 'gerencial' ? ' on' : ''}`} aria-current={selloutTab === 'gerencial' ? 'page' : undefined} onClick={() => setSelloutTab('gerencial')}>Gerencial</button>
+            <button type="button" className={`stock-nav-btn${selloutTab === 'clientes' ? ' on' : ''}`} aria-current={selloutTab === 'clientes' ? 'page' : undefined} onClick={() => setSelloutTab('clientes')}>Clientes</button>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 16 }}>
+          <div className="section-month">
             <span className="so-month-label">{monthLabel}</span>
           </div>
         </header>
@@ -583,15 +597,14 @@ export function App() {
       </>) : section === 'estoque' ? <>
         <StockTab productBase={effectiveProducts} receiptBase={effectiveReceipts} movementBase={effectiveMovements} productIndicators={snap ? null : productIndicators} activeComp={displayComp} />
       </> : section === 'clientes' ? (<>
-        <header className="topbar" style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'stretch', borderBottom: '1px solid var(--border)' }}>
-          <div />
-          <div style={{ display: 'flex' }}>
-            <button type="button" className={`stock-nav-btn${clientesTab === 'carteira' ? ' on' : ''}`} onClick={() => setClientesTab('carteira')}>Carteira</button>
-            <button type="button" className={`stock-nav-btn${clientesTab === 'cadastro' ? ' on' : ''}`} onClick={() => setClientesTab('cadastro')}>Cadastro</button>
-            <button type="button" className={`stock-nav-btn${clientesTab === 'piramide' ? ' on' : ''}`} onClick={() => setClientesTab('piramide')}>Pirâmide</button>
-            <button type="button" className={`stock-nav-btn${clientesTab === 'sortimento' ? ' on' : ''}`} onClick={() => setClientesTab('sortimento')}>Sortimento</button>
+        <header className="topbar section-topbar" aria-label="Clientes">
+          <div className="section-tabs">
+            <button type="button" className={`stock-nav-btn${clientesTab === 'carteira' ? ' on' : ''}`} aria-current={clientesTab === 'carteira' ? 'page' : undefined} onClick={() => setClientesTab('carteira')}>Carteira</button>
+            <button type="button" className={`stock-nav-btn${clientesTab === 'cadastro' ? ' on' : ''}`} aria-current={clientesTab === 'cadastro' ? 'page' : undefined} onClick={() => setClientesTab('cadastro')}>Cadastro</button>
+            <button type="button" className={`stock-nav-btn${clientesTab === 'piramide' ? ' on' : ''}`} aria-current={clientesTab === 'piramide' ? 'page' : undefined} onClick={() => setClientesTab('piramide')}>Pirâmide</button>
+            <button type="button" className={`stock-nav-btn${clientesTab === 'sortimento' ? ' on' : ''}`} aria-current={clientesTab === 'sortimento' ? 'page' : undefined} onClick={() => setClientesTab('sortimento')}>Sortimento</button>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 16 }}>
+          <div className="section-month">
             <span className="so-month-label">{monthLabel}</span>
           </div>
         </header>
@@ -603,20 +616,20 @@ export function App() {
         <CampaignTab />
       </> : <>
       <header className="topbar stock-topbar" aria-label="Administração">
-        <button type="button" className={`stock-nav-btn${tab === 'uploads' ? ' on' : ''}`} onClick={() => { setTab('uploads'); setActiveNotice(null) }}>Uploads</button>
-        <button type="button" className={`stock-nav-btn${tab === 'auditoria' ? ' on' : ''}`} onClick={() => { setTab('auditoria'); setActiveNotice(null) }}>Auditoria</button>
-        <button type="button" className={`stock-nav-btn${tab === 'config' ? ' on' : ''}`} onClick={() => { setTab('config'); setActiveNotice(null) }}>Configurações</button>
-        <button type="button" className={`stock-nav-btn${tab === 'rcas' ? ' on' : ''}`} onClick={() => { setTab('rcas'); setActiveNotice(null) }}>Vendedores</button>
-        <button type="button" className={`stock-nav-btn${tab === 'dados' ? ' on' : ''}`} onClick={() => { setTab('dados'); setActiveNotice(null) }}>Dados</button>
+        <button type="button" className={`stock-nav-btn${tab === 'uploads' ? ' on' : ''}`} aria-current={tab === 'uploads' ? 'page' : undefined} onClick={event => { event.currentTarget.scrollIntoView({ inline: 'nearest', block: 'nearest' }); setTab('uploads'); setActiveNotice(null) }}>Uploads</button>
+        <button type="button" className={`stock-nav-btn${tab === 'auditoria' ? ' on' : ''}`} aria-current={tab === 'auditoria' ? 'page' : undefined} onClick={event => { event.currentTarget.scrollIntoView({ inline: 'nearest', block: 'nearest' }); setTab('auditoria'); setActiveNotice(null) }}>Auditoria</button>
+        <button type="button" className={`stock-nav-btn${tab === 'config' ? ' on' : ''}`} aria-current={tab === 'config' ? 'page' : undefined} onClick={event => { event.currentTarget.scrollIntoView({ inline: 'nearest', block: 'nearest' }); setTab('config'); setActiveNotice(null) }}>Configurações</button>
+        <button type="button" className={`stock-nav-btn${tab === 'rcas' ? ' on' : ''}`} aria-current={tab === 'rcas' ? 'page' : undefined} onClick={event => { event.currentTarget.scrollIntoView({ inline: 'nearest', block: 'nearest' }); setTab('rcas'); setActiveNotice(null) }}>Vendedores</button>
+        <button type="button" className={`stock-nav-btn${tab === 'dados' ? ' on' : ''}`} aria-current={tab === 'dados' ? 'page' : undefined} onClick={event => { event.currentTarget.scrollIntoView({ inline: 'nearest', block: 'nearest' }); setTab('dados'); setActiveNotice(null) }}>Dados</button>
       </header>
-      {tab === 'uploads' ? <section className="content">
+      {tab === 'uploads' ? <section className="content" role="status" aria-busy={processingAll}>
         <h2>ARQUIVOS DIÁRIOS</h2>
-        <div className="quick-upload" role="button" tabIndex={0} onClick={() => dailyInput.current?.click()} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); void distributeFiles(Array.from(event.dataTransfer.files)) }}><strong>Solte todos os arquivos aqui</strong><span>ou escolha os arquivos</span><input ref={dailyInput} aria-label="Adicionar arquivos diários" type="file" multiple onChange={event => { if (event.target.files) void distributeFiles(Array.from(event.target.files)); event.target.value = '' }} /></div>
-        {(Object.values(productSlots).some(f => f && rawFiles[f.id]) || Object.values(clientSlots).some(f => f && rawFiles[f.id]) || (historySlots.sales ?? []).some(f => rawFiles[f.id]) || Object.values(movementSlots).flat().some(f => rawFiles[f.id]) || Object.values(receiptSlots).flat().some(f => rawFiles[f.id])) ? <button className="process-button" type="button" disabled={processingAll || productProcessing || clientProcessing || historyProcessing || movementProcessing || receiptProcessing} onClick={() => void processAll()} style={{marginBottom: '16px'}}>{processingAll ? 'Processando todos os motores…' : 'Processar todos os motores'}</button> : null}
+        <div className="quick-upload" role="button" tabIndex={0} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); dailyInput.current?.click() } }} onClick={() => dailyInput.current?.click()} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); void distributeFiles(Array.from(event.dataTransfer.files)) }}><strong>Solte todos os arquivos aqui</strong><span>ou escolha os arquivos</span><input ref={dailyInput} aria-label="Adicionar arquivos diários" type="file" multiple onChange={event => { if (event.target.files) void distributeFiles(Array.from(event.target.files)); event.target.value = '' }} /></div>
+        {(Object.values(productSlots).some(f => f && rawFiles[f.id]) || Object.values(clientSlots).some(f => f && rawFiles[f.id]) || (historySlots.sales ?? []).some(f => rawFiles[f.id]) || Object.values(movementSlots).flat().some(f => rawFiles[f.id]) || Object.values(receiptSlots).flat().some(f => rawFiles[f.id])) ? <button className="process-button process-all" type="button" disabled={processingAll || productProcessing || clientProcessing || historyProcessing || movementProcessing || receiptProcessing} onClick={() => void processAll()}>{processingAll ? 'Processando todos os motores…' : 'Processar todos os motores'}</button> : null}
         <FileList files={filesIn('diario')} onRemove={removeFile} />
         <h2 className="section-title">MOTORES</h2>
-        <div className="motor-grid">{motors.map(motor => <article className="motor-card" key={motor.id}><h3>{motor.name}</h3>{motor.id === 'produtos' ? <><div className="client-source-list">{productSources.map(source => { const uploaded = productSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded ? <small style={{display:'flex',gap:'6px',alignItems:'center'}}>{uploaded.name} <span style={{opacity:0.5,fontSize:10}}>{uploaded.receivedAt}</span> <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeProductSlotFile(source.id, uploaded.id)}>Remover</button></small> : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => productSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={productProcessing || !Object.values(productSlots).some(file => file && rawFiles[file.id])} onClick={processProducts}>{productProcessing ? 'Conferindo arquivos' : 'Criar base de produtos'}</button>{productIndicators ? <div className="indicators"><span>{productIndicators.total.toLocaleString('pt-BR')} produtos</span><span>{productIndicators.inTransit.toLocaleString('pt-BR')} em trânsito</span><button type="button" onClick={downloadProductBase}>Baixar JSON</button><button type="button" onClick={downloadProductExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'clientes' ? <><div className="client-source-list">{clientSources.map(source => { const uploaded = clientSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded ? <small style={{display:'flex',gap:'6px',alignItems:'center'}}>{uploaded.name} <span style={{opacity:0.5,fontSize:10}}>{uploaded.receivedAt}</span> <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeClientSlotFile(source.id, uploaded.id)}>Remover</button></small> : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => clientSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={clientProcessing || !Object.values(clientSlots).some(file => file && rawFiles[file.id])} onClick={processClients}>{clientProcessing ? 'Conferindo arquivos' : 'Criar base de clientes'}</button>{clientIndicators ? <div className="indicators"><span>{clientIndicators.totalClients.toLocaleString('pt-BR')} clientes</span><span>{clientIndicators.complete.toLocaleString('pt-BR')} completos</span><span>{clientIndicators.internal.toLocaleString('pt-BR')} interno</span><span>{clientIndicators.route.toLocaleString('pt-BR')} roteiro</span><span>{clientIndicators.portfolio.toLocaleString('pt-BR')} carteira</span><span>{clientIndicators.premises.toLocaleString('pt-BR')} pirâmide</span><button type="button" onClick={downloadClientBase}>Baixar JSON</button><button type="button" onClick={downloadClientExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'historico' ? <><div className="client-source-list">{historySources.map(source => { const uploaded = historySlots[source.id] ?? []; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file => <small key={file.id} style={{display:'flex',gap:'6px',alignItems:'center'}}>{file.name} <span style={{opacity:0.5,fontSize:10}}>{file.receivedAt}</span> <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeHistoryFile(file.id)}>Remover</button></small>) : <small>{source.id === 'catalog' ? 'Opcional' : 'Ainda não enviado'}</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".txt" multiple={source.id !== 'catalog'} onChange={event => historySourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={historyProcessing || !(historySlots.sales ?? []).some(f => rawFiles[f.id])} onClick={processHistory}>{historyProcessing ? 'Conferindo arquivos' : 'Criar base histórica'}</button>{historyIndicators ? <div className="indicators"><span>{historyIndicators.competencies.toLocaleString('pt-BR')} competências</span><span>{historyIndicators.salesLines.toLocaleString('pt-BR')} vendas</span><button type="button" onClick={downloadHistoryBase}>Baixar JSON</button><button type="button" onClick={downloadHistoryExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'movimentacoes' ? <><div className="client-source-list">{movementSources.map(source => { const uploaded = movementSlots[source.id] ?? []; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file => <small key={file.id} style={{display:'flex',gap:'6px',alignItems:'center'}}>{file.name} <span style={{opacity:0.5,fontSize:10}}>{file.receivedAt}</span> <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeMovementFile(file.id)}>Remover</button></small>) : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" multiple onChange={event => movementSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={movementProcessing || !Object.values(movementSlots).flat().some(file => rawFiles[file.id])} onClick={processMovements}>{movementProcessing ? 'Conferindo arquivos' : 'Criar base de movimentações'}</button>{movementIndicators ? <div className="indicators"><span>{movementIndicators.sales.toLocaleString('pt-BR')} vendas faturadas</span><span>{movementIndicators.pendingRetyping.toLocaleString('pt-BR')} para redigitar</span><button type="button" onClick={downloadMovementBase}>Baixar JSON</button><button type="button" onClick={downloadMovementExcel}>Baixar Excel</button></div> : null}</> : <><button type="button" className="add-button" onClick={() => motorInputs.current[motor.id]?.click()}>Adicionar arquivos</button><input ref={element => { motorInputs.current[motor.id] = element }} aria-label={`Adicionar arquivos de ${motor.name}`} type="file" multiple onChange={event => fileChange(motor.id, event)} /><FileList files={filesIn(motor.id)} onRemove={removeFile} compact /></>}</article>)}</div>
-        <article className="motor-card"><h3>Chegada de notas</h3><div className="client-source-list">{receiptSources.map(source => { const uploaded=receiptSlots[source.id]??[]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file=><small key={file.id} style={{display:'flex',gap:'6px',alignItems:'center'}}>{file.name} <span style={{opacity:0.5,fontSize:10}}>{file.receivedAt}</span> <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeReceiptFile(file.id)}>Remover</button></small>) : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input type="file" multiple accept={source.id==='legacy'?'.txt':'.xls,.xlsx'} onChange={event=>receiptSourceChange(source.id,event)} /></label></div>})}</div><button className="process-button" type="button" disabled={receiptProcessing||!Object.values(receiptSlots).flat().some(file=>rawFiles[file.id])} onClick={processReceipts}>{receiptProcessing?'Conferindo arquivos':'Criar base de chegada'}</button>{receiptIndicators?<div className="indicators"><span>{receiptIndicators.received.toLocaleString('pt-BR')} recebimentos</span><span>{receiptIndicators.inTransit.toLocaleString('pt-BR')} em trânsito</span><button type="button" onClick={downloadReceiptBase}>Baixar JSON</button><button type="button" onClick={downloadReceiptExcel}>Baixar Excel</button></div>:null}</article>
+        <div className="motor-grid">{motors.map(motor => <article className="motor-card" key={motor.id}><h3>{motor.name}</h3>{motor.id === 'produtos' ? <><div className="client-source-list">{productSources.map(source => { const uploaded = productSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded ? <small className="visual-u-1" >{uploaded.name} <span className="visual-u-2" >{uploaded.receivedAt}</span> <button type="button" className="visual-u-3"  onClick={()=>removeProductSlotFile(source.id, uploaded.id)}>Remover</button></small> : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => productSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={productProcessing || !Object.values(productSlots).some(file => file && rawFiles[file.id])} onClick={processProducts}>{productProcessing ? 'Conferindo arquivos' : 'Criar base de produtos'}</button>{productIndicators ? <div className="indicators"><span>{productIndicators.total.toLocaleString('pt-BR')} produtos</span><span>{productIndicators.inTransit.toLocaleString('pt-BR')} em trânsito</span><button type="button" onClick={downloadProductBase}>Baixar JSON</button><button type="button" onClick={downloadProductExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'clientes' ? <><div className="client-source-list">{clientSources.map(source => { const uploaded = clientSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded ? <small className="visual-u-1" >{uploaded.name} <span className="visual-u-2" >{uploaded.receivedAt}</span> <button type="button" className="visual-u-3"  onClick={()=>removeClientSlotFile(source.id, uploaded.id)}>Remover</button></small> : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => clientSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={clientProcessing || !Object.values(clientSlots).some(file => file && rawFiles[file.id])} onClick={processClients}>{clientProcessing ? 'Conferindo arquivos' : 'Criar base de clientes'}</button>{clientIndicators ? <div className="indicators"><span>{clientIndicators.totalClients.toLocaleString('pt-BR')} clientes</span><span>{clientIndicators.complete.toLocaleString('pt-BR')} completos</span><span>{clientIndicators.internal.toLocaleString('pt-BR')} interno</span><span>{clientIndicators.route.toLocaleString('pt-BR')} roteiro</span><span>{clientIndicators.portfolio.toLocaleString('pt-BR')} carteira</span><span>{clientIndicators.premises.toLocaleString('pt-BR')} pirâmide</span><button type="button" onClick={downloadClientBase}>Baixar JSON</button><button type="button" onClick={downloadClientExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'historico' ? <><div className="client-source-list">{historySources.map(source => { const uploaded = historySlots[source.id] ?? []; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file => <small key={file.id} className="visual-u-1" >{file.name} <span className="visual-u-2" >{file.receivedAt}</span> <button type="button" className="visual-u-3"  onClick={()=>removeHistoryFile(file.id)}>Remover</button></small>) : <small>{source.id === 'catalog' ? 'Opcional' : 'Ainda não enviado'}</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".txt" multiple={source.id !== 'catalog'} onChange={event => historySourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={historyProcessing || !(historySlots.sales ?? []).some(f => rawFiles[f.id])} onClick={processHistory}>{historyProcessing ? 'Conferindo arquivos' : 'Criar base histórica'}</button>{historyIndicators ? <div className="indicators"><span>{historyIndicators.competencies.toLocaleString('pt-BR')} competências</span><span>{historyIndicators.salesLines.toLocaleString('pt-BR')} vendas</span><button type="button" onClick={downloadHistoryBase}>Baixar JSON</button><button type="button" onClick={downloadHistoryExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'movimentacoes' ? <><div className="client-source-list">{movementSources.map(source => { const uploaded = movementSlots[source.id] ?? []; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file => <small key={file.id} className="visual-u-1" >{file.name} <span className="visual-u-2" >{file.receivedAt}</span> <button type="button" className="visual-u-3"  onClick={()=>removeMovementFile(file.id)}>Remover</button></small>) : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" multiple onChange={event => movementSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={movementProcessing || !Object.values(movementSlots).flat().some(file => rawFiles[file.id])} onClick={processMovements}>{movementProcessing ? 'Conferindo arquivos' : 'Criar base de movimentações'}</button>{movementIndicators ? <div className="indicators"><span>{movementIndicators.sales.toLocaleString('pt-BR')} vendas faturadas</span><span>{movementIndicators.pendingRetyping.toLocaleString('pt-BR')} para redigitar</span><button type="button" onClick={downloadMovementBase}>Baixar JSON</button><button type="button" onClick={downloadMovementExcel}>Baixar Excel</button></div> : null}</> : <><button type="button" className="add-button" onClick={() => motorInputs.current[motor.id]?.click()}>Adicionar arquivos</button><input ref={element => { motorInputs.current[motor.id] = element }} aria-label={`Adicionar arquivos de ${motor.name}`} type="file" multiple onChange={event => fileChange(motor.id, event)} /><FileList files={filesIn(motor.id)} onRemove={removeFile} compact /></>}</article>)}</div>
+        <article className="motor-card"><h3>Chegada de notas</h3><div className="client-source-list">{receiptSources.map(source => { const uploaded=receiptSlots[source.id]??[]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file=><small key={file.id} className="visual-u-1" >{file.name} <span className="visual-u-2" >{file.receivedAt}</span> <button type="button" className="visual-u-3"  onClick={()=>removeReceiptFile(file.id)}>Remover</button></small>) : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input type="file" multiple accept={source.id==='legacy'?'.txt':'.xls,.xlsx'} onChange={event=>receiptSourceChange(source.id,event)} /></label></div>})}</div><button className="process-button" type="button" disabled={receiptProcessing||!Object.values(receiptSlots).flat().some(file=>rawFiles[file.id])} onClick={processReceipts}>{receiptProcessing?'Conferindo arquivos':'Criar base de chegada'}</button>{receiptIndicators?<div className="indicators"><span>{receiptIndicators.received.toLocaleString('pt-BR')} recebimentos</span><span>{receiptIndicators.inTransit.toLocaleString('pt-BR')} em trânsito</span><button type="button" onClick={downloadReceiptBase}>Baixar JSON</button><button type="button" onClick={downloadReceiptExcel}>Baixar Excel</button></div>:null}</article>
       </section> : tab === 'auditoria' ? <section className="content">
         <div className="audit-heading"><h2>AUDITORIA</h2><button className="secondary-button" type="button" onClick={downloadAiJson}>Gerar resumo para IA</button></div>
         <div className="notice-list">{audit.map(item => <button className={`notice ${item.level}`} key={item.id} type="button" onClick={() => setActiveNotice(item)}><span>{item.title}</span><small>{item.instruction}</small></button>)}</div>
@@ -646,22 +659,22 @@ export function App() {
           }
           return <article className="motor-card" key={motor.name}>
             <h3>{motor.name}</h3>
-            <div style={{fontSize: '13px', lineHeight: '1.6'}}>
+            <div className="visual-u-4" >
               <div><strong>Registros na base:</strong> {motor.base.length.toLocaleString('pt-BR')}</div>
               <div><strong>Indicadores:</strong> {motor.indicators ? 'Sim' : 'Não processado'}</div>
               {motor.base.length > 0 && <>
-                <div style={{marginTop: '8px'}}><strong>Preenchimento dos campos:</strong></div>
-                {Object.entries(fieldCounts).map(([field, count]) => <div key={field} style={{paddingLeft: '12px'}}>
+                <div className="visual-u-5" ><strong>Preenchimento dos campos:</strong></div>
+                {Object.entries(fieldCounts).map(([field, count]) => <div key={field} className="visual-u-6" >
                   {field}: {count.toLocaleString('pt-BR')} / {motor.base.length.toLocaleString('pt-BR')} ({Math.round(count / motor.base.length * 100)}%)
                 </div>)}
               </>}
               {fileList.length > 0 && <>
-                <div style={{marginTop: '8px'}}><strong>Arquivos carregados ({fileList.length}):</strong></div>
-                {fileList.map((f, i) => <div key={i} style={{paddingLeft: '12px', fontSize: '12px'}}>
+                <div className="visual-u-5" ><strong>Arquivos carregados ({fileList.length}):</strong></div>
+                {fileList.map((f, i) => <div key={i} className="visual-u-7" >
                   {f.name} — {(f.size / 1024).toFixed(0)}KB — {f.receivedAt}
                 </div>)}
               </>}
-              {fileList.length === 0 && <div style={{marginTop: '4px', color: 'var(--red)'}}><strong>Nenhum arquivo nos slots</strong></div>}
+              {fileList.length === 0 && <div className="visual-u-8" ><strong>Nenhum arquivo nos slots</strong></div>}
             </div>
           </article>
         })}
@@ -670,7 +683,7 @@ export function App() {
       </section>}
       </>}
     </main>
-    {tab === 'auditoria' && activeNotice ? <div className="modal-backdrop" onMouseDown={() => setActiveNotice(null)}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="notice-title" onMouseDown={event => event.stopPropagation()}><button className="close" aria-label="Fechar" type="button" onClick={() => setActiveNotice(null)}>×</button><h2 id="notice-title">{activeNotice.title}</h2><p>{activeNotice.detail}</p><strong>{activeNotice.instruction}</strong></section></div> : null}
+    {tab === 'auditoria' && activeNotice ? <div className="modal-backdrop" onMouseDown={() => setActiveNotice(null)}><section ref={noticeDialogRef} className="modal" role="dialog" aria-modal="true" aria-labelledby="notice-title" onMouseDown={event => event.stopPropagation()}><button className="close" aria-label="Fechar" type="button" onClick={() => setActiveNotice(null)}>×</button><h2 id="notice-title">{activeNotice.title}</h2><p>{activeNotice.detail}</p><strong>{activeNotice.instruction}</strong></section></div> : null}
   </div>
 }
 
@@ -767,28 +780,28 @@ function ConfigTab({ activeComp, onChangeComp, onFecha }: { activeComp: string; 
         </p>
         <div className="config-input-row">
           <input
-            className="config-input"
-            style={{ width: 110 }}
+            className="config-input visual-u-9"
+
             type="text"
             placeholder="AAAA-MM"
             value={compInput}
             onChange={e => setCompInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleAbrir()}
           />
-          <button className="process-button" style={{ margin: 0 }} type="button" onClick={handleAbrir}>
+          <button className="process-button visual-u-10"  type="button" onClick={handleAbrir}>
             Abrir competência
           </button>
         </div>
-        <div style={{ marginTop: 12 }}>
+        <div className="visual-u-11" >
           <button
-            className="process-button"
-            style={{ margin: 0, background: 'transparent', border: '1px solid var(--red)', color: 'var(--red)' }}
+            className="process-button visual-u-12"
+
             type="button"
             onClick={onFecha}
           >
             Fechar competência atual ({fmtCompetencia(activeComp)})
           </button>
-          <p className="config-help" style={{ marginTop: 6 }}>
+          <p className="config-help visual-u-13" >
             Salva uma fotografia de todos os dados e torna esta competência somente leitura.
           </p>
         </div>
@@ -812,7 +825,7 @@ function ConfigTab({ activeComp, onChangeComp, onFecha }: { activeComp: string; 
             onKeyDown={e => e.key === 'Enter' && saveMarkup()}
           />
           <span className="config-unit">%</span>
-          <button className="process-button" style={{ margin: 0 }} type="button" onClick={saveMarkup}>
+          <button className="process-button visual-u-10"  type="button" onClick={saveMarkup}>
             {savedMarkup ? 'Salvo ✓' : 'Salvar'}
           </button>
         </div>
@@ -825,10 +838,10 @@ function ConfigTab({ activeComp, onChangeComp, onFecha }: { activeComp: string; 
           O cálculo usa a taxa de reposição histórica das notas de entrada como proxy de consumo diário.
         </p>
         <div className="config-input-row">
-          <span className="config-unit" style={{ marginRight: 2 }}>Crítico &lt;</span>
+          <span className="config-unit visual-u-14" >Crítico &lt;</span>
           <input
-            className="config-input"
-            style={{ width: 64 }}
+            className="config-input visual-u-15"
+
             type="number" min={1} max={365}
             placeholder="30"
             value={covLow}
@@ -837,8 +850,8 @@ function ConfigTab({ activeComp, onChangeComp, onFecha }: { activeComp: string; 
           />
           <span className="config-unit">d · Excesso &gt;</span>
           <input
-            className="config-input"
-            style={{ width: 64 }}
+            className="config-input visual-u-15"
+
             type="number" min={1} max={730}
             placeholder="90"
             value={covHigh}
@@ -846,7 +859,7 @@ function ConfigTab({ activeComp, onChangeComp, onFecha }: { activeComp: string; 
             onKeyDown={e => e.key === 'Enter' && saveCovDays()}
           />
           <span className="config-unit">d</span>
-          <button className="process-button" style={{ margin: 0 }} type="button" onClick={saveCovDays}>
+          <button className="process-button visual-u-10"  type="button" onClick={saveCovDays}>
             {savedCov ? 'Salvo ✓' : 'Salvar'}
           </button>
         </div>
@@ -868,7 +881,7 @@ function ConfigTab({ activeComp, onChangeComp, onFecha }: { activeComp: string; 
             onChange={e => { setSelloutMetaInput(e.target.value); setSavedSelloutMeta(false) }}
             onKeyDown={e => e.key === 'Enter' && saveSelloutMeta()}
           />
-          <button className="process-button" style={{ margin: 0 }} type="button" onClick={saveSelloutMeta}>
+          <button className="process-button visual-u-10"  type="button" onClick={saveSelloutMeta}>
             {savedSelloutMeta ? 'Salvo ✓' : 'Salvar'}
           </button>
         </div>
@@ -889,7 +902,7 @@ function ConfigTab({ activeComp, onChangeComp, onFecha }: { activeComp: string; 
             onChange={e => { setPositivMetaInput(e.target.value); setSavedPositivMeta(false) }}
             onKeyDown={e => e.key === 'Enter' && savePositivMeta()}
           />
-          <button className="process-button" style={{ margin: 0 }} type="button" onClick={savePositivMeta}>
+          <button className="process-button visual-u-10"  type="button" onClick={savePositivMeta}>
             {savedPositivMeta ? 'Salvo ✓' : 'Salvar'}
           </button>
         </div>
@@ -994,22 +1007,22 @@ function SyncSection() {
             Todos os dados são sincronizados automaticamente com a nuvem.
             Qualquer dispositivo que abrir o sistema verá a versão mais recente.
           </p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '8px 0' }}>
+          <div className="visual-u-16" >
             <span className={`cloud-dot cloud-dot-${syncStatus}`} />
-            <span style={{ fontSize: 13 }}>
+            <span className="visual-u-17" >
               {syncStatus === 'synced' ? 'Sincronizado' : syncStatus === 'syncing' ? 'Sincronizando…' : syncStatus === 'error' ? 'Erro' : 'Offline'}
             </span>
           </div>
           {syncDetail && (
-            <p className="config-help" style={{ fontSize: 12, fontFamily: 'monospace', wordBreak: 'break-all' }}>
+            <p className="config-help visual-u-18" >
               {syncDetail}
             </p>
           )}
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
-            <button className="process-button" style={{ margin: 0 }} type="button" disabled={pushing} onClick={handleForceSync}>
+          <div className="visual-u-19" >
+            <button className="process-button visual-u-10"  type="button" disabled={pushing} onClick={handleForceSync}>
               {pushing ? 'Enviando…' : 'Forçar envio'}
             </button>
-            <button className="process-button" style={{ margin: 0 }} type="button" disabled={pulling} onClick={handleForcePull}>
+            <button className="process-button visual-u-10"  type="button" disabled={pulling} onClick={handleForcePull}>
               {pulling ? 'Puxando…' : 'Forçar pull'}
             </button>
           </div>
@@ -1020,7 +1033,7 @@ function SyncSection() {
           <p className="config-help">
             Para que os dados fiquem sincronizados automaticamente entre todos os dispositivos,
             é preciso configurar o Firebase. Crie um projeto gratuito em{' '}
-            <a href="https://console.firebase.google.com/" target="_blank" rel="noreferrer" style={{ color: 'var(--blue)' }}>console.firebase.google.com</a>,
+            <a href="https://console.firebase.google.com/" target="_blank" rel="noreferrer" className="visual-u-20" >console.firebase.google.com</a>,
             ative o <strong>Realtime Database</strong>, e adicione as variáveis de ambiente no deploy (VITE_FB_API_KEY, VITE_FB_DATABASE_URL, etc).
           </p>
         </div>
@@ -1031,17 +1044,17 @@ function SyncSection() {
         <p className="config-help">
           Alternativa manual: exporte os dados para um arquivo JSON e envie para outro dispositivo (WhatsApp, e-mail).
         </p>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
-          <button className="process-button" style={{ margin: 0 }} type="button" disabled={exporting} onClick={handleExport}>
+        <div className="visual-u-19" >
+          <button className="process-button visual-u-10"  type="button" disabled={exporting} onClick={handleExport}>
             {exporting ? 'Exportando…' : 'Exportar dados'}
           </button>
           <label className="process-button" style={{ margin: 0, cursor: importing ? 'wait' : 'pointer', opacity: importing ? 0.6 : 1, display: 'inline-flex', alignItems: 'center' }}>
             {importing ? 'Importando…' : 'Importar dados'}
-            <input ref={importRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} disabled={importing} />
+            <input ref={importRef} type="file" accept=".json" className="visual-u-21"  onChange={handleImport} disabled={importing} />
           </label>
         </div>
         {status ? (
-          <p className="config-help" style={{ marginTop: 10, fontWeight: 600, color: status.startsWith('Erro') || status.startsWith('Arquivo') ? 'var(--red)' : 'var(--green, #10b981)' }}>
+          <p className="config-help" role={status.startsWith('Erro') || status.startsWith('Arquivo') ? 'alert' : 'status'} style={{ marginTop: 10, fontWeight: 600, color: status.startsWith('Erro') || status.startsWith('Arquivo') ? 'var(--red-text)' : 'var(--green-text)' }}>
             {status}
           </p>
         ) : null}

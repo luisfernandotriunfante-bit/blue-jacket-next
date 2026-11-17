@@ -19,7 +19,7 @@ const fmtNum = (n: number) => n.toLocaleString('pt-BR')
 const WINDOW = 10
 const LINE_COLOR: Partial<Record<CommercialLine, string>> = {
   'Creme Dental': 'var(--blue)', 'Esc + Enx + Fio': '#10b981',
-  'Sabonetes': '#f59e0b', 'Hair': '#a78bfa', 'Limpeza': '#64748b',
+  'Sabonetes': 'var(--amber)', 'Hair': '#a78bfa', 'Limpeza': '#64748b',
 }
 const MOV_LABEL: Partial<Record<string, string>> = {
   venda_faturada: 'Faturado', a_faturar: 'A faturar', devolucao: 'Devolução',
@@ -59,7 +59,7 @@ function TwoSegmentDonut({ label, segA, segALabel, segAVal, segB, segBLabel, seg
     <div className="so-hero-card so-hero-card-lg">
       <div className="so-hero-label">{label}</div>
       <div className="so-hero-svg-wrap-lg">
-        <svg viewBox="0 0 132 132">
+        <svg viewBox="0 0 132 132" aria-hidden="true">
           {/* trilha (meta) */}
           <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--border)" strokeWidth={13} />
           {hasData && (
@@ -96,20 +96,20 @@ function TwoSegmentDonut({ label, segA, segALabel, segAVal, segB, segBLabel, seg
       {/* legenda de valores */}
       <div className="so-hero-info">
         <div className="so-hero-info-row">
-          <span className="so-hero-info-dot" style={{ background: 'var(--blue)' }} />
+          <span className="so-hero-info-dot visual-u-54"  />
           <span className="so-hero-info-key">{segALabel}</span>
-          <span className="so-hero-info-val" style={{ color: 'var(--blue)' }}>{segAVal}</span>
+          <span className="so-hero-info-val visual-u-20" >{segAVal}</span>
         </div>
         <div className="so-hero-info-row">
-          <span className="so-hero-info-dot" style={{ background: 'var(--red)' }} />
+          <span className="so-hero-info-dot visual-u-55"  />
           <span className="so-hero-info-key">{segBLabel}</span>
-          <span className="so-hero-info-val" style={{ color: 'var(--red)' }}>{segBVal}</span>
+          <span className="so-hero-info-val visual-u-56" >{segBVal}</span>
         </div>
         {net !== undefined && (
           <div className="so-hero-info-row">
-            <span className="so-hero-info-dot" style={{ background: 'transparent', border: '1.5px solid var(--muted)' }} />
+            <span className="so-hero-info-dot visual-u-57"  />
             <span className="so-hero-info-key">líquido</span>
-            <span className="so-hero-info-val" style={{ color: 'var(--text)' }}>{netLabel}</span>
+            <span className="so-hero-info-val visual-u-58" >{netLabel}</span>
           </div>
         )}
         <div className="so-hero-info-divider" />
@@ -327,7 +327,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
         </div>
 
         {/* ── KPIs secundários ─────────────────────────────── */}
-        <div className="stock-kpis" style={{ marginBottom: 16 }}>
+        <div className="stock-kpis e5-space-16">
           {kpis.ticket != null && <KpiCard label="Ticket médio" value={kpiCurrency(kpis.ticket)} sub={`${fmtNum(kpis.pedidos)} pedidos`} />}
           <KpiCard label="Devoluções" value={kpiCurrency(Math.abs(kpis.dev))} accent={kpis.dev !== 0 ? 'red' : undefined} />
           {kpis.bon > 0 && <KpiCard label="Bonificações" value={kpiCurrency(kpis.bon)} />}
@@ -336,7 +336,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
 
         {/* ── Fechamento diário ────────────────────────────── */}
         {allDays.length > 0 && (
-          <div className="notas-section so-detail-section" style={{ maxHeight: 'none', marginBottom: 20 }}>
+          <div className="notas-section so-detail-section visual-u-78" >
             <div className="so-window-bar">
               <div className="so-window-info">
                 <span className="so-window-tag">JANELA SINCRONIZADA · {WINDOW} DIAS</span>
@@ -365,13 +365,13 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
                       <div className="so-chart-title">Sell Out diário</div>
                     </div>
                     <div className="so-chart-legend">
-                      <span className="so-leg-item"><span className="so-leg-line" style={{ background: 'var(--text)' }} />Sell Out</span>
-                      <span className="so-leg-item"><span className="so-leg-line" style={{ background: 'var(--blue)' }} />Faturado</span>
-                      <span className="so-leg-item"><span className="so-leg-line so-leg-dash" style={{ background: 'var(--red)' }} />A Faturar</span>
+                      <span className="so-leg-item"><span className="so-leg-line visual-u-79"  />Sell Out</span>
+                      <span className="so-leg-item"><span className="so-leg-line visual-u-54"  />Faturado</span>
+                      <span className="so-leg-item"><span className="so-leg-line so-leg-dash visual-u-55"  />A Faturar</span>
                     </div>
                   </div>
-                  <div style={{ overflowX: 'auto' }}>
-                    <svg viewBox={`0 0 ${W} ${H_FIN + PAD.t + PAD.b}`} width="100%"
+                  <div className="e5-scroll">
+                    <svg role="img" aria-label="Sell Out diário" viewBox={`0 0 ${W} ${H_FIN + PAD.t + PAD.b}`} width="100%"
                       style={{ display: 'block', minWidth: Math.max(260, n * 38) }}>
                       <defs>
                         <linearGradient id="gso" x1="0" y1="0" x2="0" y2="1">
@@ -420,12 +420,12 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
                       <div className="so-chart-title">Clientes positivados por dia</div>
                     </div>
                     <div className="so-chart-legend">
-                      <span className="so-leg-item"><span className="so-leg-line" style={{ background: 'var(--text)' }} />Pos. total</span>
-                      <span className="so-leg-item"><span className="so-leg-line" style={{ background: 'var(--blue)' }} />Pos. faturada</span>
+                      <span className="so-leg-item"><span className="so-leg-line visual-u-79"  />Pos. total</span>
+                      <span className="so-leg-item"><span className="so-leg-line visual-u-54"  />Pos. faturada</span>
                     </div>
                   </div>
-                  <div style={{ overflowX: 'auto' }}>
-                    <svg viewBox={`0 0 ${W} ${H_POS + PAD.t + PAD.b}`} width="100%"
+                  <div className="e5-scroll">
+                    <svg role="img" aria-label="Clientes positivados por dia" viewBox={`0 0 ${W} ${H_POS + PAD.t + PAD.b}`} width="100%"
                       style={{ display: 'block', minWidth: Math.max(260, n * 38) }}>
                       <defs>
                         <linearGradient id="gpostot" x1="0" y1="0" x2="0" y2="1">
@@ -478,8 +478,8 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
                     {compact ? 'Expandir' : 'Compactar'}
                   </button>
                 </div>
-                <div className="so-table-wrap">
-                  <table className="so-daily-table">
+                <div className="so-table-wrap" tabIndex={0} role="region" aria-label="Planilha diária">
+                  <table className="so-daily-table data-table">
                     {!compact && (
                       <thead>
                         <tr>
@@ -496,6 +496,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
                       {[...windowDays].reverse().map(d => (
                         <tr key={d.date}
                           className={`so-dt-row${selectedDay === d.date ? ' so-dt-selected' : ''}`}
+                          role="button" tabIndex={0} aria-expanded={selectedDay === d.date} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedDay(selectedDay === d.date ? null : d.date) } }}
                           onClick={() => setSelectedDay(selectedDay === d.date ? null : d.date)}>
                           <td className="so-dt-date">{fmtDay(d.date)}</td>
                           <td className={`n-right so-dt-sellout${d.sellOut < 0 ? ' neg' : ''}`}>
@@ -503,7 +504,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
                           </td>
                           {!compact && <>
                             <td className="n-right so-dt-fat" style={{ color: d.fat > 0 ? 'var(--blue)' : 'var(--muted)' }}>{brlFull(d.fat)}</td>
-                            <td className="n-right so-dt-afat" style={{ color: d.afat > 0 ? 'var(--red)' : 'var(--muted)' }}>{brlFull(d.afat)}</td>
+                            <td className="n-right so-dt-afat" style={{ color: d.afat > 0 ? 'var(--red-text)' : 'var(--muted)' }}>{brlFull(d.afat)}</td>
                             <td className={`n-right so-dt-pos${d.posFat > 0 ? ' pos-active' : ''}`}>{d.posFat}</td>
                             <td className={`n-right so-dt-pos${d.posTotal > 0 ? ' pos-total' : ''}`}>{d.posTotal}</td>
                           </>}
@@ -538,7 +539,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
                   <button type="button" className="so-day-detail-close" onClick={() => setSelectedDay(null)}>✕ fechar</button>
                 </div>
                 <div className="so-day-detail-wrap">
-                  <table className="so-day-detail-table">
+                  <table className="so-day-detail-table data-table">
                     <thead>
                       <tr>
                         <th>TIPO</th><th>CLIENTE</th><th>PRODUTO</th>
@@ -565,7 +566,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
 
         {/* ── Linhas comerciais — leaderboard ─────────────── */}
         {lineKpis.length > 0 && (
-          <div className="notas-section so-lines-section" style={{ marginBottom: 24 }}>
+          <div className="notas-section so-lines-section e5-space-24">
             <div className="notas-section-head">
               <span className="notas-section-title">Linhas comerciais · {monthLabel}</span>
             </div>
@@ -578,7 +579,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
                     <span className="so-lb-dot" style={{ background: color }} />
                     <span className="so-lb-name">{row.line}</span>
                     <div className="so-lb-bar-wrap"><div className="so-lb-bar" style={{ width: `${(row.pct * 100).toFixed(1)}%`, background: color }} /></div>
-                    <span className="so-lb-value" style={{ color }}>{kpiCurrency(row.fat)}</span>
+                    <span className="so-lb-value">{kpiCurrency(row.fat)}</span>
                     <span className="so-lb-pct">{(row.pct * 100).toFixed(1)}%</span>
                     <span className="so-lb-pos">{fmtNum(row.pos)} pos.</span>
                     {row.afat > 0 && <span className="so-lb-afat">+{kpiCurrency(row.afat)}</span>}

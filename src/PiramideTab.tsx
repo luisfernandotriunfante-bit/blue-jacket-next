@@ -248,17 +248,16 @@ export function PiramideTab({ clientBase, movementBase, activeComp, pexSet, onPe
   if (pexSet.size === 0) {
     return (
       <section className="content">
-        <div className="so-empty" style={{ padding: '48px 24px' }}>
-          <p style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>Nenhum cliente PEX importado</p>
-          <small style={{ color: 'var(--muted)', display: 'block', marginBottom: 16 }}>Envie o arquivo da Pirâmide ativa no motor de Clientes (aba Administração → Uploads) e processe. Os clientes PEX serão carregados automaticamente.</small>
-          <small style={{ color: 'var(--muted)', display: 'block', marginBottom: 16 }}>Ou importe manualmente os CNPJs abaixo:</small>
+        <div className="so-empty visual-u-66" >
+          <p className="visual-u-67" >Nenhum cliente PEX importado</p>
+          <small className="visual-u-68" >Envie o arquivo da Pirâmide ativa no motor de Clientes (aba Administração → Uploads) e processe. Os clientes PEX serão carregados automaticamente.</small>
+          <small className="visual-u-68" >Ou importe manualmente os CNPJs abaixo:</small>
           <textarea
-            className="cad-upload-textarea"
+            className="cad-upload-textarea pyramid-upload"
             placeholder="Cole aqui os CNPJs (um por linha, separados por vírgula ou ponto-e-vírgula)…"
             value={pexText}
             onChange={e => setPexText(e.target.value)}
             rows={5}
-            style={{ maxWidth: 480, width: '100%', marginBottom: 12 }}
           />
           <button type="button" className="cad-pex-btn" onClick={handlePexUpload}>Importar PEX</button>
         </div>
@@ -279,8 +278,7 @@ export function PiramideTab({ clientBase, movementBase, activeComp, pexSet, onPe
           />
           <button
             type="button"
-            className="pf-select"
-            style={{ minWidth: 'auto', padding: '0 14px', cursor: 'pointer', background: showPexUpload ? 'var(--red)' : undefined, color: showPexUpload ? '#fff' : undefined, border: showPexUpload ? '1px solid var(--red)' : undefined }}
+            className={`pf-select upload-toggle${showPexUpload ? ' is-active' : ''}`} aria-pressed={showPexUpload}
             onClick={() => setShowPexUpload(v => !v)}
           >
             {showPexUpload ? 'Fechar' : 'Importar PEX'}
@@ -296,9 +294,9 @@ export function PiramideTab({ clientBase, movementBase, activeComp, pexSet, onPe
               onChange={e => setPexText(e.target.value)}
               rows={4}
             />
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <div className="visual-u-22" >
               <button type="button" className="cad-pex-btn" onClick={handlePexUpload}>Marcar como PEX</button>
-              <small style={{ color: 'var(--muted)' }}>{pexSet.size} cliente{pexSet.size !== 1 ? 's' : ''} PEX</small>
+              <small className="visual-u-23" >{pexSet.size} cliente{pexSet.size !== 1 ? 's' : ''} PEX</small>
               <button type="button" className="cad-pex-clear" onClick={() => onPexChange(new Set())}>Limpar PEX</button>
             </div>
           </div>
@@ -333,7 +331,7 @@ export function PiramideTab({ clientBase, movementBase, activeComp, pexSet, onPe
             <span className="sc-num">Dias s/ compra</span>
           </div>
           {filtered.length === 0 && (
-            <p className="empty" style={{ padding: '24px 16px', color: 'var(--muted)', textAlign: 'center' }}>Nenhum cliente PEX encontrado.</p>
+            <p className="empty visual-u-25" >Nenhum cliente PEX encontrado.</p>
           )}
           {filtered.map(r => {
             const isSelected = expanded === r.document
@@ -344,16 +342,16 @@ export function PiramideTab({ clientBase, movementBase, activeComp, pexSet, onPe
                 role="button"
                 tabIndex={0}
                 onClick={() => setExpanded(isSelected ? null : r.document)}
-                onKeyDown={e => e.key === 'Enter' && setExpanded(isSelected ? null : r.document)}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(isSelected ? null : r.document) } }}
               >
                 <span className="sc-desc">
                   <span className="p-name">{r.name}</span>
-                  <span className="p-meta" style={{ gap: 6, marginTop: 2 }}>
+                  <span className="p-meta visual-u-26" >
                     <code>{r.code}</code>
-                    <span style={{ color: 'var(--muted)' }}>{r.document}</span>
+                    <span className="visual-u-23" >{r.document}</span>
                     {r.city && <span>{r.city}</span>}
                   </span>
-                  <span className="p-meta" style={{ gap: 5, marginTop: 3 }}>
+                  <span className="p-meta visual-u-27" >
                     <span className="badge-pex">PEX</span>
                     {r.range && <span className="cad-badge-range">Faixa {r.range}</span>}
                     {r.network && <span className="cad-badge-net">{r.network}</span>}
@@ -362,7 +360,7 @@ export function PiramideTab({ clientBase, movementBase, activeComp, pexSet, onPe
                 </span>
                 <span className="sc-num">
                   {r.premiseAvg12m != null && r.premiseAvg12m > 0
-                    ? <strong style={{ color: '#4caf50' }}>{kpiCurrency(r.premiseAvg12m)}</strong>
+                    ? <strong className="text-green">{kpiCurrency(r.premiseAvg12m)}</strong>
                     : <strong className="c-muted">—</strong>}
                 </span>
                 <span className="sc-num">
@@ -373,7 +371,7 @@ export function PiramideTab({ clientBase, movementBase, activeComp, pexSet, onPe
                 <span className="sc-num">
                   {r.daysSincePurchase >= 0
                     ? <span className={`cl-dias-badge ${r.daysSincePurchase <= 30 ? 'cl-dias-ok' : r.daysSincePurchase <= 90 ? 'cl-dias-mid' : 'cl-dias-warn'}`}>{r.daysSincePurchase}d</span>
-                    : <span style={{ color: 'var(--muted)', fontSize: 11, fontWeight: 700 }}>nunca</span>}
+                    : <span className="visual-u-29" >nunca</span>}
                 </span>
               </div>
             )
@@ -384,12 +382,12 @@ export function PiramideTab({ clientBase, movementBase, activeComp, pexSet, onPe
         {selectedRow && (
           <aside className="cad-side-panel">
             <div className="cad-side-header">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div className="visual-u-30" >
                 <div>
                   <h3>{selectedRow.name}</h3>
                   <small>{selectedRow.document} · {selectedRow.code}</small>
                 </div>
-                <button type="button" style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 18, padding: '0 4px', lineHeight: 1 }} onClick={() => setExpanded(null)}>✕</button>
+                <button type="button" aria-label="Fechar" className="detail-close" onClick={() => setExpanded(null)}>✕</button>
               </div>
             </div>
             <div className="cad-side-body">
@@ -443,11 +441,11 @@ export function PiramideTab({ clientBase, movementBase, activeComp, pexSet, onPe
 
               {history.length > 0 && (
                 <div className="cad-history">
-                  <div className="cl-history-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div className="cl-history-head visual-u-31" >
                     <span className="so-chart-tag">Histórico</span>
-                    <span style={{ color: 'var(--muted)', fontSize: 11 }}>{history.length} movimentações</span>
+                    <span className="visual-u-32" >{history.length} movimentações</span>
                   </div>
-                  <div style={{ overflowX: 'auto', maxHeight: 280, overflowY: 'auto' }}>
+                  <div className="visual-u-33" >
                     <table className="so-day-detail-table">
                       <thead>
                         <tr>
@@ -462,10 +460,10 @@ export function PiramideTab({ clientBase, movementBase, activeComp, pexSet, onPe
                       <tbody>
                         {history.map((m, i) => (
                           <tr key={i} className={`so-dm-row so-dm-${m.movementType}`}>
-                            <td style={{ color: 'var(--muted)', fontSize: 11, whiteSpace: 'nowrap' }}>{m.movementDate ? fmtDay(m.movementDate) : '—'}</td>
+                            <td className="visual-u-34" >{m.movementDate ? fmtDay(m.movementDate) : '—'}</td>
                             <td><span className={`so-mov-badge so-mov-${m.movementType}`}>{MOV_LABEL[m.movementType] ?? m.movementType}</span></td>
                             <td className="so-dm-product">{m.description ?? m.productCode ?? '—'}</td>
-                            <td style={{ fontSize: 11, color: 'var(--muted)' }}>{m.seller ?? m.sellerCode ?? '—'}</td>
+                            <td className="visual-u-35" >{m.seller ?? m.sellerCode ?? '—'}</td>
                             <td className="n-right so-dm-qty">{m.quantity != null ? m.quantity.toLocaleString('pt-BR') : '—'}</td>
                             <td className="n-right so-dm-value">{m.value != null ? brlFull(m.value) : '—'}</td>
                           </tr>
@@ -526,7 +524,7 @@ function FilterDrop({ label, options, selected, onSelect, single, open, onToggle
           ) : (
             <>
               {selected.length > 0 && (
-                <label style={{ color: 'var(--red)', fontWeight: 600 }}><input type="checkbox" checked={false} onChange={() => onSelect([])} /> Limpar</label>
+                <label className="visual-u-36" ><input type="checkbox" checked={false} onChange={() => onSelect([])} /> Limpar</label>
               )}
               {vis.map(o => (
                 <label key={o}><input type="checkbox" checked={selected.includes(o)} onChange={() => {

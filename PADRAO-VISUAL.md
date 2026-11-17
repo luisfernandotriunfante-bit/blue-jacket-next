@@ -32,7 +32,7 @@ refinar, desde que registre a mudança aqui.
 | `--blue` | `#3b82f6` | `#2563eb` | realizado/positivo, estado ativo de controle, foco |
 | `--white` | `#e2e8f0` | `#64748b` | destaque neutro |
 
-### 2.2 Cores a criar como token (hoje estão escritas à mão em vários lugares)
+### 2.2 Cores adicionais
 
 | Token novo | Valor | Substitui | Uso |
 |---|---|---|---|
@@ -40,12 +40,12 @@ refinar, desde que registre a mudança aqui.
 | `--green` | `#10b981` | `#10b981`, `#22c55e`, `#4caf50`, `#2e7d32` | concluído / sincronizado |
 | `--purple` | `#a855f7` | `#a855f7`, `#8b5cf6`, `#9e5bee`, `#a78bfa` | categoria extra (PJ, rede, PEX+lançamento) |
 
-`--bg` **não existe** (é usado em 3 regras e cai em transparente): trocar por `--background`.
+`--background` é o token de fundo; `--bg` não é usado.
 
 ### 2.3 Semáforo de desempenho (um só no site inteiro)
 
 Igual ao Sell Out e ao Gerencial: **bom = `--blue`, médio = `--amber`, ruim = `--red`**.
-O Sortimento usa verde/laranja/vermelho do Material (`#4caf50`/`#ff9800`/`#ef5350`): migrar.
+O Sortimento usa a escala azul/âmbar/vermelho.
 
 ### 2.4 Raios
 
@@ -80,7 +80,7 @@ Distância entre blocos de uma aba: 20px. Grade de KPIs: `gap: 12px`.
 |---|---|
 | Aba de navegação ativa | texto `--red` + sublinhado `--red` de 3px (`.stock-nav-btn.on`) |
 | Controle ativo (filtro, alternador, paginação, "Atual") | fundo `--blue`, texto branco, borda `--blue` |
-| Foco em campo | `border-color: var(--blue)`, sem outline |
+| Foco em campo | borda azul e contorno de foco visível de 2px |
 | Hover em linha | `background: var(--surface-raised)` |
 | Linha selecionada | `background: color-mix(in srgb, var(--blue) 8%, transparent)` |
 | Desabilitado | `opacity: .4; cursor: not-allowed` |
@@ -117,7 +117,7 @@ Hoje existem 15 classes de botão com raio de 5 a 8px e paddings diferentes (`.a
 - Trilha/grade: `--border`. Série principal: `--text`. Realizado: `--blue`. Pendente: `--red` tracejado.
 - Texto de eixo: 9px, `--muted`, `Space Grotesk`.
 - Cores das linhas comerciais (fixas, vêm do dado): Creme Dental `--blue`, Esc + Enx + Fio `--green`,
-  Sabonetes `--amber`, Hair `--purple`, Limpeza `#64748b`.
+  Sabonetes `--amber`, Hair `#a78bfa`, Limpeza `#64748b`.
 
 ## 6. Responsividade e acessibilidade
 
@@ -133,3 +133,76 @@ Hoje existem 15 classes de botão com raio de 5 a 8px e paddings diferentes (`.a
 2. Nenhuma cor hexadecimal nova em `.tsx` (exceto as cores de dado da seção 5).
 3. Tela conferida nos temas claro e escuro e em largura de celular.
 4. Nenhuma regra de cálculo, dado ou texto de negócio foi alterada.
+
+### Base de interação (E1)
+
+As escalas de cor, espaço, raio e tipografia estão disponíveis como propriedades CSS globais. `--focus` usa o azul do tema; `--on-accent` é branco e `--overlay` é preto a 60%. Os temas definem `color-scheme`. Controles recebem contorno de foco visível e animações respeitam movimento reduzido; a fonte usa `system-ui` como alternativa.
+
+### Componentes compartilhados (E2)
+
+Classes canônicas sem uso foram removidas. `.data-table` e `.page-head` permanecem em uso; `.add-button`, `.secondary-button` e `.process-button` compartilham altura, peso e raio. As demais classes legadas mantêm suas regras específicas.
+
+### Navegação (E3)
+
+A sidebar compacta também expande com foco do teclado; entre 721 e 1024px permanece compacta com títulos nos controles. As abas rolam horizontalmente e a navegação móvel preserva alvos de pelo menos 40px.
+
+### Diálogos (E4)
+
+Os diálogos têm título associado, foco inicial, retorno ao controle de origem e Escape para fechar. O foco permanece no diálogo. Sua largura e altura respeitam a tela; em telas pequenas o conteúdo rola e os campos empilham.
+
+### Texto vermelho e tabelas comerciais (E5)
+
+`--red-text` usa `#f43f46` no tema escuro (4,68:1 sobre `#1a1a1a`) e `#d4131b` no claro; `--red` permanece para fundos e marca. Linhas expansíveis aceitam Enter e Espaço. Tabelas mantêm todas as colunas em contêiner rolável.
+
+### Estoque (E6)
+
+O cabeçalho e a superfície dos cartões do treemap usam os tokens do tema; os blocos coloridos permanecem calculados pelos dados. Linhas interativas respondem a Enter e Espaço.
+
+### Carteira (E7)
+
+Os estilos da Carteira residem em `styles.css`. O seletor de modo ativo usa azul, e cidades selecionáveis no mapa e na lista aceitam teclado. As rampas do mapa preservam seus valores de dados originais.
+
+### Sortimento e filtros (E8)
+
+O semáforo de sortimento usa azul (bom), âmbar (intermediário) e vermelho (ruim). `--amber-text` usa `#f59e0b` no escuro e `#985500` no claro para leitura em superfícies; o âmbar de preenchimento permanece `--amber`. Controles selecionados usam azul; linhas de seleção respondem ao teclado.
+
+### Contraste e grades (E9)
+
+`--red-fill` é `#c2151c` no tema escuro e `#d4131b` no claro; `--blue-fill` é `#2563eb`. Com branco, as razões calculadas são 6,14:1, 5,37:1 e 5,17:1, respectivamente. São usados nos preenchimentos de ações e controles selecionados. As grades extensas de Cadastro, Pirâmide e Estoque mantêm colunas em rolagem horizontal interna e nomes podem quebrar linhas. Classes `visual-u-*` agrupam estilos estáticos previamente inline e são temporárias enquanto componentes legados forem migrados.
+
+Os tons `--r0` a `--r4` e `--r-soft` mantêm a escala de dados da Carteira em cada tema. `--on-amber` é `#000000`; `--green-text` é `#10b981` no escuro e `#087a57` no claro, para preservar o significado de concluído com leitura adequada.
+
+Aliases legados mantidos nesta entrega: botões `.add-button`, `.secondary-button`, `.process-button`, `.rca-btn`, `.cad-pex-btn`, `.pf-clear-btn`, `.pf-filter-btn`, `.sort-filter-btn`, `.sort-clear-btn`, `.sort-mode-btn`, `.so-compact-btn`, `.so-nav-btn`, `.stock-nav-btn`, `.gr-view-btn`, `.comp-close-btn` e `.rca-opt-btn` compartilham raio; os vazios e painéis antigos compartilham tokens de superfície e texto. As variantes específicas permanecem para preservar seus fluxos.
+`--map-complete` mantém `#22c55e`, cor de dado da Carteira e de sua legenda.
+
+`--blue-text` é `#60a5fa` no escuro e `#1d4ed8` no claro, usado em textos azuis sobre fundos de destaque; `--blue` permanece para séries e elementos de dados.
+
+Exceções e regras finais da validação (E9):
+- Texto vermelho em qualquer superfície usa `--red-text` (inclui a legenda do donut do Estoque, "Remover" e os avisos de vazio de Uploads/Dados). `--red` fica só para fundo, marca e séries de dados.
+- Dicas secundárias usam `--muted` sem `opacity` (a opacidade reduzia o contraste para 2,4–3,6:1).
+- Alvos de toque ≤720px: botões, abas, chips, campos e rótulos de checkbox têm 40px; a caixa do checkbox nativo mede 13px dentro de um rótulo clicável de 40px. Links dentro de parágrafo (ex.: link do console Firebase) são exceção de link em linha.
+- Linhas clicáveis de tabela (`.so-dt-row`) têm altura mínima de 40px em ≤720px.
+- Linhas de ajuste de Configurações (`.config-input-row`) quebram linha para o botão "Salvar" nunca sair da tela; o grid de motores em Uploads usa `minmax(0, 1fr)` para não estourar 4px em 360px.
+- `!important` permanece somente no bloco `prefers-reduced-motion` (precisa vencer animações e transições inline de terceiros). Raios: 5 tokens, `50%` (círculos) e `3px` (barras de gráfico).
+- Texto branco sobre as telhas do treemap de Estoque usa o gradiente escuro da própria telha em ambos os temas.
+- Desabilitado (`:disabled`) fica isento de contraste mínimo, como previsto pelo WCAG.
+
+Textos usam `--amber-text` (`#985500` claro, `#f59e0b` escuro), `--green-text` (`#087a57`, `#10b981`) e `--purple-text` (`#6b21a8`, `#c084fc`). O preenchimento azul ativo usa `#2563eb`.
+
+O título da seção usa `.page-head` e os rótulos existentes da navegação. Abas administrativas indicam rolagem e mantêm a aba selecionada visível.
+
+
+Estados existentes e classes:
+
+| Estado | Classe | Telas |
+|---|---|---|
+| Sem dados | `.so-empty` | Sell Out, Gerencial, Clientes, Pirâmide |
+| Sem dados | `.empty`, `.stock-treemap-empty`, `.arrivals-bucket-empty` | Sortimento, Estoque, Administração |
+| Sem vendedor ou resultado | `.rca-empty` | Administração / Vendedores |
+| Processando | `.process-button:disabled`, `aria-busy` | Administração / Uploads |
+| Erro | `.rca-errors`, mensagens existentes | Administração / Vendedores e Uploads |
+| Desabilitado | `:disabled` nos controles existentes | Telas com ações indisponíveis |
+
+Os vazios compartilham cor, alinhamento e quebra; a marcação compacta de ausência em baldes usa a mesma cor e alinhamento, preservando `—`. Texto de linha comercial usa `--text`; cores de dado ficam em marcadores e barras. A tabela de clientes tem contêiner rolável por teclado. Raios compostos das extremidades de filtros foram normalizados; 50% continua reservado a círculos e 3px a barras de gráfico.
+
+Estados: Uploads usa `aria-busy` e `role=status`; retorno de Dados usa `status` ou `alert`; nuvem usa `aria-live=polite`. Controles desabilitados compartilham opacidade e cursor. Badges Faturado e dias usam `--blue-text` (`#1d4ed8` claro; `#60a5fa` escuro); textos sobre azul ativo são brancos sólidos. `.table-scroll` e `.so-table-wrap` são regiões roláveis e focáveis. Critério de raios: nenhum fora dos cinco tokens, exceto 50% para círculos e 3px para barras (sete valores). Cinco hex de dados e literais rgba legados permanecem registrados como dívida baixa.
