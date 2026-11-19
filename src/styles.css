@@ -638,7 +638,7 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 
 /* Collapsible filter dropdowns */
 .pf-filter-drop { position: relative; display: inline-block; }
-.pf-filter-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 13px; cursor: pointer; transition: border-color .15s, background .15s; white-space: nowrap; }
+.pf-filter-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); font-size: 13px; cursor: pointer; transition: border-color .15s, background .15s; white-space: nowrap; }
 .pf-filter-btn:hover { border-color: var(--muted); }
 .pf-filter-btn.has-value { border-color: var(--blue); color: var(--blue); }
 .pf-filter-btn .pf-arrow { font-size: 10px; opacity: .5; transition: transform .15s; }
@@ -646,14 +646,14 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 .pf-filter-panel { position: absolute; top: calc(100% + 4px); left: 0; z-index: 20; min-width: 200px; max-height: 280px; overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.25); padding: 6px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 .pf-filter-panel label { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 6px; font-size: 13px; color: var(--text); cursor: pointer; transition: background .1s; }
 .pf-filter-panel label:hover { background: var(--surface-raised); }
-.pf-filter-panel label input[type="checkbox"], .pf-filter-panel label input[type="radio"] { accent-color: var(--blue); }
+.pf-filter-panel label input[type="checkbox"] { accent-color: var(--blue); }
 .pf-filter-panel .pf-panel-search { width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-raised); color: var(--text); font-size: 12px; margin-bottom: 4px; outline: none; }
 .pf-filter-panel .pf-panel-search:focus { border-color: var(--blue); }
 .pf-filter-count { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; border-radius: 9px; background: var(--blue); color: #fff; font-size: 10px; font-weight: 700; padding: 0 5px; }
 
 /* Filter bar row */
 .pf-filters-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 0 0 8px; }
-.pf-clear-btn { all: unset; box-sizing: border-box; cursor: pointer; padding: 6px 12px; border: 1px solid var(--red); border-radius: 8px; font-size: 12px; color: var(--red); }
+.pf-clear-btn { all: unset; box-sizing: border-box; cursor: pointer; padding: 6px 12px; border: 1px solid var(--red); border-radius: 999px; font-size: 12px; color: var(--red); }
 .pf-clear-btn:hover { background: rgba(237,28,36,.08); }
 
 /* Cadastro side panel layout */

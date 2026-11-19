@@ -970,7 +970,7 @@ const CRT_STYLES = `
   gap: 10px;
   padding: 9px 14px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 999px;
   background: var(--surface);
   color: var(--text);
   font: 500 14px system-ui, sans-serif;
@@ -1018,12 +1018,12 @@ const CRT_STYLES = `
   width: calc(100% - 20px);
   text-align: left;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 999px;
   background: none;
   color: var(--text);
   font: inherit;
   font-weight: 500;
-  padding: 7px 8px;
+  padding: 7px 12px;
   cursor: pointer;
 }
 .crt-all small { font: 400 11px ${CRT_MONO}; opacity: .8; white-space: nowrap; align-self: center; }
@@ -1051,8 +1051,8 @@ const CRT_STYLES = `
   background: none;
   color: var(--text);
   font: inherit;
-  padding: 7px 8px;
-  border-radius: 4px;
+  padding: 7px 12px;
+  border-radius: 999px;
   cursor: pointer;
 }
 .crt-seller:hover, .crt-cty:hover { background: var(--background); }
@@ -1299,7 +1299,7 @@ const CRT_STYLES = `
   cursor: pointer;
   padding: 6px 10px;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 999px;
   font: 400 12px system-ui, sans-serif;
   color: var(--muted);
   background: var(--surface);

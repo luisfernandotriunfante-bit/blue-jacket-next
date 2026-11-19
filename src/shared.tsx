@@ -58,9 +58,9 @@ export function FilterDrop({ label, options, selected, onSelect, single, open, o
           )}
           {single ? (
             <>
-              <label><input type="radio" name={`fd-${label}`} checked={selected.length === 0} onChange={() => { onSelect([]); onToggle() }} /> Todos</label>
+              <label><input type="checkbox" checked={selected.length === 0} onChange={() => { onSelect([]); onToggle() }} /> Todos</label>
               {vis.map(o => (
-                <label key={o}><input type="radio" name={`fd-${label}`} checked={selected.includes(o)} onChange={() => { onSelect([o]); onToggle() }} /> {o}</label>
+                <label key={o}><input type="checkbox" checked={selected.includes(o)} onChange={() => { onSelect([o]); onToggle() }} /> {o}</label>
               ))}
             </>
           ) : (
