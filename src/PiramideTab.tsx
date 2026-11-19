@@ -362,7 +362,7 @@ export function PiramideTab({ clientBase, movementBase, activeComp, pexSet, onPe
                 </span>
                 <span className="sc-num">
                   {r.premiseAvg12m != null && r.premiseAvg12m > 0
-                    ? <strong style={{ color: '#4caf50' }}>{kpiCurrency(r.premiseAvg12m)}</strong>
+                    ? <strong style={{ color: 'var(--blue)' }}>{kpiCurrency(r.premiseAvg12m)}</strong>
                     : <strong className="c-muted">—</strong>}
                 </span>
                 <span className="sc-num">

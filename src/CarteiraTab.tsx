@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { MiniDonut } from './shared'
 import type { CanonicalMovement } from './domain/movementMotor'
 import type { CanonicalClient } from './domain/clientMotor'
 import { readRcas, type RcaRecord } from './RcaManager'
@@ -31,7 +32,7 @@ function matchCity(rawCity: string): string | null {
 }
 
 const RAMP = ['var(--r0)', 'var(--r1)', 'var(--r2)', 'var(--r3)', 'var(--r4)']
-const GREEN_DONE = '#22c55e'
+const GREEN_DONE = 'var(--blue)'
 function bin(v: number, max: number): number {
   if (max <= 1) return 2
   return Math.min(4, Math.floor((v - 1) / max * 5))
@@ -541,8 +542,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
                   <details key={ck} className="crt-det" open={isOpen} onToggle={e => { if ((e.target as HTMLDetailsElement).open) setExpandedClient(ck); else if (expandedClient === ck) setExpandedClient(null) }}>
                     <summary>
                       <span>{msGeo[ck]?.n ?? ck}</span>
-                      <span>{city.clients} cli · {kpiCurrency(city.fat)}</span>
-                      <div className="crt-bar"><i style={{ width: `${city.clients / maxC * 100}%` }} /></div>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MiniDonut percent={city.clients / maxC * 100} color="var(--red)" size={18} /> {city.clients} cli · {kpiCurrency(city.fat)}</span>
                     </summary>
                     <ul className="crt-cli">
                       {clients.map(c => (
@@ -590,8 +590,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
             {topCities.map(({ ck, n }) => (
               <div key={ck} className="crt-row" onClick={() => { setSelectedCity(ck) }} style={{ cursor: 'pointer' }}>
                 <span>{msGeo[ck].n}</span>
-                <span>{n} vendedor{n > 1 ? 'es' : ''}</span>
-                <div className="crt-bar"><i style={{ width: `${n / topCities[0].n * 100}%` }} /></div>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MiniDonut percent={n / topCities[0].n * 100} color="var(--blue)" size={18} /> {n} vendedor{n > 1 ? 'es' : ''}</span>
               </div>
             ))}
           </div>
@@ -629,8 +628,9 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
             )}
           </div>
           {comp && comp.total > 0 && (
-            <div className="crt-progress">
-              <div className="crt-progress-bar" style={{ width: `${comp.assigned / comp.total * 100}%`, background: comp.assigned === comp.total ? GREEN_DONE : 'var(--red)' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '6px 0' }}>
+              <MiniDonut percent={comp.assigned / comp.total * 100} color={comp.assigned === comp.total ? 'var(--blue)' : 'var(--red)'} size={22} />
+              <span style={{ fontSize: 11, color: 'var(--muted)' }}>{Math.round(comp.assigned / comp.total * 100)}% atribuído</span>
             </div>
           )}
           {cityVendors.length > 0 && (
@@ -707,8 +707,9 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
               <span style={{ color: GREEN_DONE }}><b>{totalAssigned.assigned}/{totalAssigned.total}</b> atribuídos</span>
               <span style={{ color: GREEN_DONE }}><b>{completeCities}/{sorted.length}</b> cidades completas</span>
             </div>
-            <div className="crt-progress">
-              <div className="crt-progress-bar" style={{ width: `${totalAssigned.assigned / totalAssigned.total * 100}%`, background: totalAssigned.assigned === totalAssigned.total ? GREEN_DONE : 'var(--red)' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '6px 0' }}>
+              <MiniDonut percent={totalAssigned.assigned / totalAssigned.total * 100} color={totalAssigned.assigned === totalAssigned.total ? 'var(--blue)' : 'var(--red)'} size={22} />
+              <span style={{ fontSize: 11, color: 'var(--muted)' }}>{Math.round(totalAssigned.assigned / totalAssigned.total * 100)}% concluído</span>
             </div>
           </>
         )}
@@ -1391,7 +1392,7 @@ const CRT_STYLES = `
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.crt-assigned { color: #22c55e; }
+.crt-assigned { color: var(--blue); }
 .crt-select {
   min-width: 130px;
   max-width: 160px;
@@ -1409,14 +1410,14 @@ const CRT_STYLES = `
   box-sizing: border-box;
   cursor: pointer;
   padding: 8px 14px;
-  border: 1px solid #22c55e;
+  border: 1px solid var(--blue);
   border-radius: 6px;
-  background: rgba(34, 197, 94, 0.1);
-  color: #22c55e;
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--blue);
   font: 500 13px system-ui, sans-serif;
   text-align: center;
 }
-.crt-report-btn:hover { background: rgba(34, 197, 94, 0.2); }
+.crt-report-btn:hover { background: rgba(59, 130, 246, 0.2); }
 .crt-clear-filters {
   all: unset;
   box-sizing: border-box;

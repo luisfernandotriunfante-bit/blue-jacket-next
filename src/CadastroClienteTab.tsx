@@ -385,7 +385,7 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
                 </span>
                 <span className="sc-num">
                   {r.crescimento != null
-                    ? <strong style={{ color: r.crescimento >= 0 ? '#4caf50' : '#ef5350', fontSize: 12 }}>{r.crescimento >= 0 ? '▲' : '▼'} {Math.abs(r.crescimento).toFixed(0)}%</strong>
+                    ? <strong style={{ color: r.crescimento >= 0 ? 'var(--blue)' : 'var(--red)', fontSize: 12 }}>{r.crescimento >= 0 ? '▲' : '▼'} {Math.abs(r.crescimento).toFixed(0)}%</strong>
                     : <strong className="c-muted" style={{ fontSize: 11 }}>—</strong>}
                 </span>
                 <span className="sc-num">
@@ -400,7 +400,7 @@ export function CadastroClienteTab({ clientBase, movementBase, activeComp, pexSe
                 </span>
                 <span className="sc-num">
                   {r.premiseAvg12m != null && r.premiseAvg12m > 0
-                    ? <strong style={{ color: '#4caf50' }}>{kpiCurrency(r.premiseAvg12m)}</strong>
+                    ? <strong style={{ color: 'var(--blue)' }}>{kpiCurrency(r.premiseAvg12m)}</strong>
                     : <strong className="c-muted">—</strong>}
                 </span>
                 <span className="sc-num">

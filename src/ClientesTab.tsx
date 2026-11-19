@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { KpiCard } from './shared'
 import type { CanonicalMovement } from './domain/movementMotor'
 import type { CanonicalClient } from './domain/clientMotor'
 
@@ -24,18 +25,6 @@ const MOV_LABEL: Partial<Record<string, string>> = {
   bonificacao: 'Bonificação', corte: 'Corte', entrada: 'Entrada',
 }
 
-/* ── KpiCard ─────────────────────────────────────────── */
-function KpiCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div className="kpi-card">
-      <div className="kpi-card-body">
-        <div className="kpi-label">{label}</div>
-        <div className="kpi-val">{value}</div>
-        {sub && <div className="kpi-ring-row"><span className="kpi-pct">{sub}</span></div>}
-      </div>
-    </div>
-  )
-}
 
 /* ── ClientesTab ─────────────────────────────────────── */
 export function ClientesTab({ movementBase, clientBase, monthLabel, activeComp }: {
@@ -164,8 +153,8 @@ export function ClientesTab({ movementBase, clientBase, monthLabel, activeComp }
   return (
     <section className="content">
       <div className="stock-kpis" style={{ marginBottom: 20 }}>
-        <KpiCard label="Positivados" value={String(positivados.length)} />
-        <KpiCard label="Faturado total" value={kpiCurrency(totalFat)} />
+        <KpiCard label="Positivados" value={String(positivados.length)} accent="blue" sub="Clientes com compra no período" />
+        <KpiCard label="Faturado total" value={kpiCurrency(totalFat)} accent="blue" sub="Volume total faturado" />
       </div>
 
       <div className="cl-toolbar">
