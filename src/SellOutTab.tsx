@@ -552,29 +552,24 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
           </div>
         )}
 
-        {/* ── Linhas comerciais — leaderboard ─────────────── */}
+        {/* ── Linhas comerciais — blocos KPI ─────────────── */}
         {lineKpis.length > 0 && (
-          <div className="notas-section so-lines-section" style={{ marginBottom: 24 }}>
-            <div className="notas-section-head">
-              <span className="notas-section-title">Linhas comerciais · {monthLabel}</span>
-            </div>
-            <div className="so-leaderboard">
-              {lineKpis.map((row, i) => {
-                const color = LINE_COLOR[row.line] ?? '#64748b'
-                return (
-                  <div key={row.line} className="so-lb-row">
-                    <span className="so-lb-rank">#{i + 1}</span>
-                    <span className="so-lb-dot" style={{ background: color }} />
-                    <span className="so-lb-name">{row.line}</span>
-                    <span className="so-lb-donut"><MiniDonut percent={row.pct * 100} color={color} /></span>
-                    <span className="so-lb-value" style={{ color }}>{kpiCurrency(row.fat)}</span>
-                    <span className="so-lb-pct">{(row.pct * 100).toFixed(1)}%</span>
-                    <span className="so-lb-pos">{fmtNum(row.pos)} pos.</span>
-                    {row.afat > 0 && <span className="so-lb-afat">+{kpiCurrency(row.afat)}</span>}
+          <div className="so-lines-grid">
+            {lineKpis.map((row) => {
+              const color = LINE_COLOR[row.line] ?? '#64748b'
+              return (
+                <div key={row.line} className="so-line-card">
+                  <div className="so-line-donut">
+                    <MiniDonut percent={row.pct * 100} color={color} size={56} />
+                    <span className="so-line-pct" style={{ color }}>{(row.pct * 100).toFixed(1)}%</span>
                   </div>
-                )
-              })}
-            </div>
+                  <span className="so-line-name">{row.line}</span>
+                  <span className="so-line-value" style={{ color }}>{kpiCurrency(row.fat)}</span>
+                  <span className="so-line-pos">{fmtNum(row.pos)} pos.</span>
+                  {row.afat > 0 && <span className="so-line-afat">+{kpiCurrency(row.afat)}</span>}
+                </div>
+              )
+            })}
           </div>
         )}
       </section>
