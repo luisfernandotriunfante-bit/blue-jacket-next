@@ -428,22 +428,19 @@ h1 { font-size: 28px; } h2 { font-size: 18px; } h3 { font-size: 16px; }
 .so-mov-corte { background: rgba(255,255,255,.05); color: var(--muted); border: 1px solid var(--border); }
 .so-mov-entrada { background: rgba(255,255,255,.05); color: var(--muted); border: 1px solid var(--border); }
 
-/* ── leaderboard de linhas comerciais ─────────────────── */
-.so-leaderboard { display: flex; flex-direction: column; gap: 0; padding: 8px 0; }
-.so-lb-row { display: grid; grid-template-columns: 26px 12px minmax(80px,1fr) 24px 90px 44px 60px auto; gap: 10px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--border); transition: background 0.12s; }
-.so-lb-row:hover { background: var(--surface-raised); }
-.so-lb-row:last-child { border-bottom: none; }
-.so-lb-rank { font-size: 11px; font-weight: 800; color: var(--muted); font-family: 'Space Grotesk', sans-serif; }
-.so-lb-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-.so-lb-name { font-size: 12px; font-weight: 700; color: var(--text); letter-spacing: .02em; }
-.so-lb-donut { flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-.so-lb-value { font-size: 16px; font-weight: 800; font-family: 'Space Grotesk', sans-serif; text-align: right; }
-.so-lb-pct { font-size: 12px; font-weight: 700; color: var(--muted); font-family: 'Space Grotesk', sans-serif; text-align: right; }
-.so-lb-pos { font-size: 11px; color: var(--muted); text-align: right; }
-.so-lb-afat { font-size: 10px; color: var(--red); font-weight: 700; white-space: nowrap; }
+/* ── blocos KPI de linhas comerciais ─────────────────── */
+.so-lines-grid { display: flex; gap: 14px; margin-bottom: 24px; flex-wrap: wrap; }
+.so-line-card { flex: 1; min-width: 140px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 18px 12px 14px; text-align: center; }
+.so-line-donut { position: relative; display: flex; align-items: center; justify-content: center; }
+.so-line-pct { position: absolute; font-size: 11px; font-weight: 800; font-family: 'Space Grotesk', sans-serif; }
+.so-line-name { font-size: 12px; font-weight: 700; color: var(--text); letter-spacing: .02em; }
+.so-line-value { font-size: 18px; font-weight: 800; font-family: 'Space Grotesk', sans-serif; }
+.so-line-pos { font-size: 11px; color: var(--muted); }
+.so-line-afat { font-size: 10px; color: var(--red); font-weight: 700; }
 @media (max-width: 700px) {
-  .so-lb-row { grid-template-columns: 26px 12px 1fr auto; gap: 8px; }
-  .so-lb-donut, .so-lb-pct, .so-lb-pos, .so-lb-afat { display: none; }
+  .so-lines-grid { gap: 8px; }
+  .so-line-card { min-width: 100px; padding: 12px 8px 10px; }
+  .so-line-value { font-size: 14px; }
 }
 
 /* ── Aba Gerencial ────────────────────────────────────────── */
