@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { KpiCard } from './shared'
 import type { CanonicalClient } from './domain/clientMotor'
 import type { CanonicalProduct } from './domain/productMotor'
 import type { CanonicalMovement } from './domain/movementMotor'
@@ -530,16 +531,16 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
               <div className="donut-svg-wrap">
                 <svg viewBox="0 0 120 120">
                   <circle cx="60" cy="60" r="52" fill="none" stroke="var(--border)" strokeWidth="12" />
-                  <circle cx="60" cy="60" r="52" fill="none" stroke={analysis.assortment >= 0.5 ? '#4caf50' : analysis.assortment >= 0.25 ? '#ff9800' : '#ef5350'} strokeWidth="12" strokeLinecap="round" strokeDasharray={`${analysis.assortment * 326.73} ${326.73 - analysis.assortment * 326.73}`} strokeDashoffset="81.68" transform="rotate(-90 60 60)" />
+                  <circle cx="60" cy="60" r="52" fill="none" stroke={analysis.assortment >= 0.5 ? 'var(--blue)' : analysis.assortment >= 0.25 ? 'var(--white)' : 'var(--red)'} strokeWidth="12" strokeLinecap="round" strokeDasharray={`${analysis.assortment * 326.73} ${326.73 - analysis.assortment * 326.73}`} strokeDashoffset="81.68" transform="rotate(-90 60 60)" />
                 </svg>
                 <div className="donut-center">
-                  <span className="donut-center-val" style={{ color: analysis.assortment >= 0.5 ? '#4caf50' : analysis.assortment >= 0.25 ? '#ff9800' : '#ef5350' }}>{pct(analysis.assortment)}</span>
+                  <span className="donut-center-val" style={{ color: analysis.assortment >= 0.5 ? 'var(--blue)' : analysis.assortment >= 0.25 ? 'var(--white)' : 'var(--red)' }}>{pct(analysis.assortment)}</span>
                   <span className="donut-center-label">Assortment</span>
                 </div>
               </div>
               <div className="donut-legend">
                 <div className="donut-leg-item">
-                  <span className="donut-leg-dot" style={{ background: '#4caf50' }} />
+                  <span className="donut-leg-dot" style={{ background: 'var(--blue)' }} />
                   <span className="donut-leg-label">Comprados</span>
                   <span className="donut-leg-val">{analysis.skusComprados}</span>
                 </div>
@@ -552,41 +553,40 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
             </div>
 
             <div className="stock-kpis" style={{ flex: 1 }}>
-              <div className="kpi-card">
-                <div className="kpi-card-body">
-                  <div className="kpi-label">Mandatório</div>
-                  <div className="kpi-val" style={{ color: analysis.cobMand >= 0.5 ? '#4caf50' : analysis.cobMand >= 0.25 ? '#ff9800' : '#ef5350' }}>{pct(analysis.cobMand)}</div>
-                  <div className="kpi-sub">{analysis.mandComprados} de {analysis.mandDisp}</div>
-                </div>
-              </div>
-              <div className="kpi-card">
-                <div className="kpi-card-body">
-                  <div className="kpi-label">Importante</div>
-                  <div className="kpi-val" style={{ color: analysis.cobImp >= 0.5 ? '#4caf50' : analysis.cobImp >= 0.25 ? '#ff9800' : '#ef5350' }}>{pct(analysis.cobImp)}</div>
-                  <div className="kpi-sub">{analysis.impComprados} de {analysis.impDisp}</div>
-                </div>
-              </div>
-              <div className="kpi-card kpi-blue">
-                <div className="kpi-card-body">
-                  <div className="kpi-label">Valor Sortimento</div>
-                  <div className="kpi-val">{kpiCurrency(analysis.valorTotal)}</div>
-                </div>
-              </div>
-              <div className="kpi-card">
-                <div className="kpi-card-body">
-                  <div className="kpi-label">Fora Sortimento</div>
-                  <div className="kpi-val" style={{ color: '#ff9800' }}>{kpiCurrency(analysis.valorForaSortimento)}</div>
-                  <div className="kpi-sub">{analysis.skusFora} SKUs</div>
-                </div>
-              </div>
+              <KpiCard
+                label="Mandatório"
+                value={pct(analysis.cobMand)}
+                accent={analysis.cobMand >= 0.5 ? 'blue' : analysis.cobMand >= 0.25 ? 'white' : 'red'}
+                percent={analysis.cobMand * 100}
+                sub={`${analysis.mandComprados} de ${analysis.mandDisp} SKUs`}
+              />
+              <KpiCard
+                label="Importante"
+                value={pct(analysis.cobImp)}
+                accent={analysis.cobImp >= 0.5 ? 'blue' : analysis.cobImp >= 0.25 ? 'white' : 'red'}
+                percent={analysis.cobImp * 100}
+                sub={`${analysis.impComprados} de ${analysis.impDisp} SKUs`}
+              />
+              <KpiCard
+                label="Valor Sortimento"
+                value={kpiCurrency(analysis.valorTotal)}
+                accent="blue"
+                sub={`${analysis.skusComprados} SKUs comprados`}
+              />
+              <KpiCard
+                label="Fora Sortimento"
+                value={kpiCurrency(analysis.valorForaSortimento)}
+                accent="white"
+                sub={`${analysis.skusFora} SKUs fora do mix`}
+              />
               {viewMode === 'rede' && (
-                <div className="kpi-card kpi-blue">
-                  <div className="kpi-card-body">
-                    <div className="kpi-label">Lojas com Compra</div>
-                    <div className="kpi-val">{analysis.storesWithPurchase}/{analysis.totalStores}</div>
-                    <div className="kpi-sub">{pct(analysis.totalStores > 0 ? analysis.storesWithPurchase / analysis.totalStores : 0)}</div>
-                  </div>
-                </div>
+                <KpiCard
+                  label="Lojas com Compra"
+                  value={`${analysis.storesWithPurchase}/${analysis.totalStores}`}
+                  accent="blue"
+                  percent={analysis.totalStores > 0 ? (analysis.storesWithPurchase / analysis.totalStores) * 100 : 0}
+                  sub={pct(analysis.totalStores > 0 ? analysis.storesWithPurchase / analysis.totalStores : 0)}
+                />
               )}
             </div>
           </div>
@@ -665,7 +665,7 @@ export function SortimentoTab({ clientBase, productBase, movementBase, activeCom
                   {item.value > 0
                     ? <strong className="c-blue" style={{ fontSize: 12 }}>{kpiCurrency(item.value)}</strong>
                     : item.value < 0
-                    ? <strong style={{ fontSize: 12, color: '#ef5350' }}>{kpiCurrency(item.value)}</strong>
+                    ? <strong style={{ fontSize: 12, color: 'var(--red)' }}>{kpiCurrency(item.value)}</strong>
                     : <span className="c-muted">—</span>}
                 </span>
               </div>

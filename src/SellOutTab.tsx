@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
+import { KpiCard, MiniDonut } from './shared'
 import type { CanonicalMovement } from './domain/movementMotor'
 import type { CanonicalProduct } from './domain/productMotor'
 import { COMMERCIAL_LINES, resolveCommercialLine } from './domain/productGrouping'
@@ -125,18 +126,6 @@ function TwoSegmentDonut({ label, segA, segALabel, segAVal, segB, segBLabel, seg
   )
 }
 
-/* ── KpiCard ─────────────────────────────────────────────── */
-function KpiCard({ label, value, accent, sub }: { label: string; value: string; accent?: 'blue' | 'red' | 'white'; sub?: string }) {
-  return (
-    <div className={`kpi-card${accent ? ` kpi-${accent}` : ''}`}>
-      <div className="kpi-card-body">
-        <div className="kpi-label">{label}</div>
-        <div className="kpi-val">{value}</div>
-        {sub && <div className="kpi-ring-row"><span className="kpi-pct">{sub}</span></div>}
-      </div>
-    </div>
-  )
-}
 
 /* ── SVG path helpers ────────────────────────────────────── */
 function linePath(vals: number[], xFn: (i: number) => number, yFn: (v: number) => number) {
@@ -328,10 +317,10 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
 
         {/* ── KPIs secundários ─────────────────────────────── */}
         <div className="stock-kpis" style={{ marginBottom: 16 }}>
-          {kpis.ticket != null && <KpiCard label="Ticket médio" value={kpiCurrency(kpis.ticket)} sub={`${fmtNum(kpis.pedidos)} pedidos`} />}
-          <KpiCard label="Devoluções" value={kpiCurrency(Math.abs(kpis.dev))} accent={kpis.dev !== 0 ? 'red' : undefined} />
-          {kpis.bon > 0 && <KpiCard label="Bonificações" value={kpiCurrency(kpis.bon)} />}
-          <KpiCard label="Cortes" value={fmtNum(kpis.cortes)} accent={kpis.cortes > 0 ? 'white' : undefined} />
+          {kpis.ticket != null && <KpiCard label="Ticket médio" value={kpiCurrency(kpis.ticket)} sub={`${fmtNum(kpis.pedidos)} pedidos no período`} />}
+          <KpiCard label="Devoluções" value={kpiCurrency(Math.abs(kpis.dev))} accent={kpis.dev !== 0 ? 'red' : undefined} sub={kpis.dev !== 0 ? 'Valor devolvido no período' : 'Nenhuma devolução'} />
+          {kpis.bon > 0 && <KpiCard label="Bonificações" value={kpiCurrency(kpis.bon)} sub="Valor bonificado" />}
+          <KpiCard label="Cortes" value={fmtNum(kpis.cortes)} accent={kpis.cortes > 0 ? 'white' : undefined} sub={kpis.cortes > 0 ? 'Itens cortados do pedido' : 'Nenhum corte'} />
         </div>
 
         {/* ── Fechamento diário ────────────────────────────── */}
@@ -577,7 +566,7 @@ export function SellOutTab({ movementBase, productBase, monthLabel, activeComp }
                     <span className="so-lb-rank">#{i + 1}</span>
                     <span className="so-lb-dot" style={{ background: color }} />
                     <span className="so-lb-name">{row.line}</span>
-                    <div className="so-lb-bar-wrap"><div className="so-lb-bar" style={{ width: `${(row.pct * 100).toFixed(1)}%`, background: color }} /></div>
+                    <span className="so-lb-donut"><MiniDonut percent={row.pct * 100} color={color} /></span>
                     <span className="so-lb-value" style={{ color }}>{kpiCurrency(row.fat)}</span>
                     <span className="so-lb-pct">{(row.pct * 100).toFixed(1)}%</span>
                     <span className="so-lb-pos">{fmtNum(row.pos)} pos.</span>

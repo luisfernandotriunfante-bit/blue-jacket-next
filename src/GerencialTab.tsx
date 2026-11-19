@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
+import { MiniDonut } from './shared'
 import type { CanonicalMovement } from './domain/movementMotor'
 import { readRcas, type RcaRecord } from './RcaManager'
 
@@ -395,7 +396,7 @@ export function GerencialTab({ movementBase, monthLabel, activeComp }: {
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ color: 'var(--blue)', fontWeight: 800, fontFamily: 'Space Grotesk, sans-serif', fontSize: 14 }}>{kpiCurrency(team.totalFat)}</div>
                       {team.teamAchievement !== null && (
-                        <div style={{ fontSize: 11, color: team.teamAchievement >= 100 ? 'var(--blue)' : team.teamAchievement >= 70 ? '#f59e0b' : 'var(--red)', fontWeight: 700 }}>
+                        <div style={{ fontSize: 11, color: team.teamAchievement >= 100 ? 'var(--blue)' : team.teamAchievement >= 70 ? 'var(--white)' : 'var(--red)', fontWeight: 700 }}>
                           {fmtPct(team.teamAchievement)}
                         </div>
                       )}
@@ -439,13 +440,10 @@ export function GerencialTab({ movementBase, monthLabel, activeComp }: {
                               <td className="n-right"><AtingBadge pct={s.achievement} /></td>
                               <td>
                                 {s.achievement !== null && (
-                                  <div className="gr-progress-bar-wrap">
-                                    <div
-                                      className="gr-progress-bar"
-                                      style={{
-                                        width: `${Math.min(100, s.achievement).toFixed(1)}%`,
-                                        background: s.achievement >= 100 ? 'var(--blue)' : s.achievement >= 70 ? '#f59e0b' : 'var(--red)',
-                                      }}
+                                  <div className="gr-donut-cell">
+                                    <MiniDonut
+                                      percent={Math.min(100, s.achievement)}
+                                      color={s.achievement >= 100 ? 'var(--blue)' : s.achievement >= 70 ? 'var(--white)' : 'var(--red)'}
                                     />
                                   </div>
                                 )}
