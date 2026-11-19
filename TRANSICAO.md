@@ -82,8 +82,10 @@ seguir esse padrão.
 ### Cores e temas
 
 - O site funciona em tema **claro e escuro**. Todo componente deve funcionar em ambos.
-- Semáforo de indicadores: **azul** = bom, **âmbar** = médio, **vermelho** = ruim
-- As variáveis de cor estão definidas em `src/styles.css`
+- Cor da marca: **vermelho** (`--red`) — títulos, botões, navegação, destaques
+- Cor informativa: **azul** (`--blue`) — KPIs, badges, links, dados
+- Cores contextuais variam por componente (sortimento usa verde/vermelho para ok/falta, badges ABC usam âmbar/azul/cinza)
+- Variáveis de cor definidas em `src/styles.css` (`:root`, `.theme-dark`, `.theme-light`)
 
 ### Regras de CSS
 
