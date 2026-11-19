@@ -273,21 +273,6 @@ Qualquer pessoa podia ver as chaves.
 3. `deploy.yml` atualizado para usar **GitHub Secrets** no build
 4. Deploy trigger limitado à `main` (removida a branch de trabalho)
 
-**Ação necessária do Luis:**
-Configurar os secrets no GitHub:
-1. Acesse: https://github.com/luisfernandotriunfante-bit/blue-jacket-next/settings/secrets/actions
-2. Clique "New repository secret" para cada um:
-
-| Nome do secret | Valor (copie do seu .env local) |
-|---|---|
-| `VITE_FB_API_KEY` | (seu valor) |
-| `VITE_FB_AUTH_DOMAIN` | (seu valor) |
-| `VITE_FB_DATABASE_URL` | (seu valor) |
-| `VITE_FB_PROJECT_ID` | (seu valor) |
-| `VITE_FB_STORAGE_BUCKET` | (seu valor) |
-| `VITE_FB_MESSAGING_SENDER_ID` | (seu valor) |
-| `VITE_FB_APP_ID` | (seu valor) |
-
 ### Sobre as chaves Firebase
 
 A configuração pública de um app Firebase web (API key, project ID, etc.) **não é equivalente a
@@ -300,37 +285,8 @@ Storage Rules).
 - Separa configuração de código
 - Permite trocar credenciais sem alterar código
 
-### Recomendações adicionais
+### Situação atual
 
-| Prioridade | Ação | Status |
-|---|---|---|
-| **Alta** | Configurar GitHub Secrets (ver acima) | **Luis precisa fazer** |
-| **Alta** | Verificar regras do Firebase Realtime Database | **Luis precisa fazer** |
-| **Média** | Considerar tornar o repositório privado | Decisão do Luis |
-| **Média** | Rotacionar as chaves Firebase (já estiveram expostas) | Decisão do Luis |
-| **Baixa** | Limpar histórico Git (chaves nos commits antigos) | Complexo, pode esperar |
-
----
-
-## 8. Checklist de transição
-
-### Luis precisa fazer (uma vez):
-
-- [ ] Configurar os 7 GitHub Secrets (seção 7)
-- [ ] Testar o deploy após configurar os secrets
-- [ ] Configurar os 3 bots no OpenBot (seção 3)
-- [ ] Verificar regras do Firebase
-
-### Já feito nesta PR:
-
-- [x] `.env` removido do git
-- [x] `.gitignore` atualizado
-- [x] `deploy.yml` usando GitHub Secrets
-- [x] Deploy limitado à `main`
-- [x] Documento de transição criado
-
-### Depois da transição:
-
-- [ ] Primeira tarefa via OpenBot (teste completo do fluxo)
-- [ ] Padronização visual (tarefa para o bot frontend)
-- [ ] Adicionar testes automatizados
+- `.env` removido do git, GitHub Secrets configurados e funcionando
+- Deploy automático via GitHub Pages ativo na `main`
+- Chaves Firebase já estiveram expostas no histórico — considerar rotação
