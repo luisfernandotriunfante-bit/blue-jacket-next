@@ -781,7 +781,7 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
           </div>
         )}
       </div>
-      <div className="pf-filters-row" style={{ padding: '0 16px' }} onClick={() => setOpenFilter(null)}>
+      <div className="pf-filters-row" onClick={() => setOpenFilter(null)}>
         {availableRanges.length > 0 && (
           <FilterDrop label="Faixa" options={availableRanges} selected={filterRange} onSelect={setFilterRange} open={openFilter === 'range'} onToggle={() => setOpenFilter(openFilter === 'range' ? null : 'range')} />
         )}
@@ -808,13 +808,15 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
       <div className="crt-grid">
         {/* Left rail */}
         <aside className="crt-card crt-rail">
-          <input
-            type="search"
-            placeholder={mode === 'rot' ? 'Buscar vendedor…' : 'Buscar cidade…'}
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="crt-q"
-          />
+          <div className="crt-search-wrap">
+            <input
+              type="search"
+              placeholder={mode === 'rot' ? 'Buscar vendedor…' : 'Buscar cidade…'}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pf-input"
+            />
+          </div>
           {mode === 'rot' && (
             <button
               type="button"
@@ -1005,16 +1007,9 @@ const CRT_STYLES = `
   max-height: calc(100vh - 220px);
   overflow: hidden;
 }
-.crt-q {
+.crt-search-wrap {
   margin: 10px;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--background);
-  color: var(--text);
-  font: inherit;
 }
-.crt-q:focus { outline: 2px solid var(--red); outline-offset: 2px; }
 .crt-all {
   display: flex;
   justify-content: space-between;
@@ -1380,84 +1375,6 @@ const CRT_STYLES = `
   background: none;
 }
 .crt-clear-filters:hover { background: rgba(237, 28, 36, 0.08); }
-.pf-filters-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: flex-start;
-}
-.pf-filter-drop { position: relative; }
-.pf-filter-btn {
-  all: unset;
-  box-sizing: border-box;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 10px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  font: 400 12px system-ui, sans-serif;
-  color: var(--muted);
-  background: var(--surface);
-  white-space: nowrap;
-}
-.pf-filter-btn:hover { border-color: var(--red); color: var(--text); }
-.pf-filter-btn.has-value { border-color: var(--red); color: var(--red); font-weight: 600; }
-.pf-filter-btn.open { border-color: var(--red); }
-.pf-filter-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 16px;
-  height: 16px;
-  border-radius: 8px;
-  background: var(--red);
-  color: #fff;
-  font: 600 10px ${CRT_MONO};
-  padding: 0 4px;
-}
-.pf-arrow { font-size: 8px; opacity: .5; }
-.pf-filter-panel {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  z-index: 20;
-  min-width: 160px;
-  max-height: 260px;
-  overflow: auto;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  box-shadow: 0 6px 20px rgba(0,0,0,.25);
-  padding: 6px 0;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
-}
-.pf-filter-panel::-webkit-scrollbar { width: 6px; }
-.pf-filter-panel::-webkit-scrollbar-track { background: transparent; }
-.pf-filter-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-.pf-filter-panel label {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  padding: 5px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.pf-filter-panel label:hover { background: var(--background); }
-.pf-panel-search {
-  width: calc(100% - 16px);
-  margin: 4px 8px 6px;
-  padding: 5px 8px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--background);
-  color: var(--text);
-  font: inherit;
-  font-size: 12px;
-}
 @media (max-width: 1000px) {
   .crt-grid { grid-template-columns: 1fr !important; }
   .crt-rail { max-height: 300px; }

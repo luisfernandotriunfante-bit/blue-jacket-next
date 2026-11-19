@@ -157,17 +157,16 @@ export function ClientesTab({ movementBase, clientBase, monthLabel, activeComp }
         <KpiCard label="Faturado total" value={kpiCurrency(totalFat)} accent="blue" sub="Volume total faturado" />
       </div>
 
-      <div className="cl-toolbar">
-        <input
-          className="stock-search"
-          placeholder="Buscar cliente, código, vendedor…"
-          value={search}
-          onChange={e => { setSearch(e.target.value); setExpandedCustomer(null) }}
-          style={{ flex: 1 }}
-        />
-      </div>
-
-      <div className="pf-filters-row" style={{ marginBottom: 8 }} onClick={() => setOpenFilter(null)}>
+      <div className="stock-toolbar">
+        <div className="pf-bar">
+          <input
+            className="pf-input"
+            placeholder="Buscar cliente, código, vendedor…"
+            value={search}
+            onChange={e => { setSearch(e.target.value); setExpandedCustomer(null) }}
+          />
+        </div>
+        <div className="pf-filters-row" onClick={() => setOpenFilter(null)}>
         {availableRanges.length > 0 && (
           <FilterDrop label="Faixa" options={availableRanges} selected={filterRange} onSelect={v => { setFilterRange(v); setExpandedCustomer(null) }} open={openFilter === 'range'} onToggle={() => setOpenFilter(openFilter === 'range' ? null : 'range')} />
         )}
@@ -188,6 +187,7 @@ export function ClientesTab({ movementBase, clientBase, monthLabel, activeComp }
             Limpar filtros
           </button>
         )}
+        </div>
       </div>
 
       <div className="notas-section" style={{ marginBottom: 24 }}>
