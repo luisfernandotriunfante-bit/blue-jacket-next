@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
-import { MiniDonut } from './shared'
+import { MiniDonut, FilterDrop } from './shared'
 import type { CanonicalMovement } from './domain/movementMotor'
 import type { CanonicalClient } from './domain/clientMotor'
 import { readRcas, type RcaRecord } from './RcaManager'
@@ -918,56 +918,6 @@ export function CarteiraTab({ clientBase, movementBase, activeComp, pexSet }: {
   )
 }
 
-function FilterDrop({ label, options, selected, onSelect, single, open, onToggle }: {
-  label: string
-  options: string[]
-  selected: string[]
-  onSelect: (vals: string[]) => void
-  single?: boolean
-  open: boolean
-  onToggle: () => void
-}) {
-  const [q, setQ] = useState('')
-  const fq = q.toLowerCase()
-  const vis = fq ? options.filter(o => o.toLowerCase().includes(fq)) : options
-  return (
-    <div className="pf-filter-drop" onClick={e => e.stopPropagation()}>
-      <button type="button" className={`pf-filter-btn${selected.length > 0 ? ' has-value' : ''}${open ? ' open' : ''}`} onClick={onToggle}>
-        {label}
-        {selected.length > 0 && <span className="pf-filter-count">{selected.length}</span>}
-        <span className="pf-arrow">▼</span>
-      </button>
-      {open && (
-        <div className="pf-filter-panel" onClick={e => e.stopPropagation()}>
-          {options.length > 8 && (
-            <input className="pf-panel-search" placeholder="Filtrar..." value={q} onChange={e => setQ(e.target.value)} autoFocus />
-          )}
-          {single ? (
-            <>
-              <label><input type="radio" name={`fd-${label}`} checked={selected.length === 0} onChange={() => { onSelect([]); onToggle() }} /> Todos</label>
-              {vis.map(o => (
-                <label key={o}><input type="radio" name={`fd-${label}`} checked={selected.includes(o)} onChange={() => { onSelect([o]); onToggle() }} /> {o}</label>
-              ))}
-            </>
-          ) : (
-            <>
-              {selected.length > 0 && (
-                <label style={{ color: 'var(--red)', fontWeight: 600 }}><input type="checkbox" checked={false} onChange={() => onSelect([])} /> Limpar</label>
-              )}
-              {vis.map(o => (
-                <label key={o}><input type="checkbox" checked={selected.includes(o)} onChange={() => {
-                  const next = selected.includes(o) ? selected.filter(x => x !== o) : [...selected, o]
-                  onSelect(next)
-                }} /> {o}</label>
-              ))}
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
 const CRT_MONO = 'ui-monospace, SFMono-Regular, monospace'
 
 const CRT_STYLES = `
@@ -1236,17 +1186,17 @@ const CRT_STYLES = `
   font-size: 12px;
 }
 .crt-tb th {
-  font: 500 10px ${CRT_MONO};
+  font: 700 11px ${CRT_MONO};
   text-transform: uppercase;
-  letter-spacing: .06em;
+  letter-spacing: .04em;
   color: var(--muted);
   text-align: right;
-  padding: 4px 4px;
+  padding: 6px 8px;
   border-bottom: 1px solid var(--border);
 }
 .crt-tb th:first-child, .crt-tb td:first-child { text-align: left; }
 .crt-tb td {
-  padding: 5px 4px;
+  padding: 6px 8px;
   border-bottom: 1px solid var(--border);
   text-align: right;
   font-family: ${CRT_MONO};

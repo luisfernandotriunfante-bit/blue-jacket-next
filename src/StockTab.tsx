@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { KpiCard } from './shared'
+import { KpiCard, FilterDrop } from './shared'
 import type { CanonicalProduct, ProductIndicators } from './domain/productMotor'
 import type { CanonicalReceipt } from './domain/receiptMotor'
 import { groupReceiptsByInvoice, computeDailyReceiptRate } from './domain/receiptMotor'
@@ -1748,53 +1748,3 @@ function DI({ label, value, hi }: { label: string; value: string; hi?: boolean }
   )
 }
 
-function FilterDrop({ label, options, selected, onSelect, single, open, onToggle }: {
-  label: string
-  options: string[]
-  selected: string[]
-  onSelect: (vals: string[]) => void
-  single?: boolean
-  open: boolean
-  onToggle: () => void
-}) {
-  const [q, setQ] = useState('')
-  const fq = q.toLowerCase()
-  const vis = fq ? options.filter(o => o.toLowerCase().includes(fq)) : options
-
-  return (
-    <div className="pf-filter-drop">
-      <button type="button" className={`pf-filter-btn${selected.length > 0 ? ' has-value' : ''}${open ? ' open' : ''}`} onClick={onToggle}>
-        {label}
-        {selected.length > 0 && <span className="pf-filter-count">{selected.length}</span>}
-        <span className="pf-arrow">▼</span>
-      </button>
-      {open && (
-        <div className="pf-filter-panel" onClick={e => e.stopPropagation()}>
-          {options.length > 8 && (
-            <input className="pf-panel-search" placeholder="Filtrar..." value={q} onChange={e => setQ(e.target.value)} autoFocus />
-          )}
-          {single ? (
-            <>
-              <label><input type="radio" name={`fd-${label}`} checked={selected.length === 0} onChange={() => { onSelect([]); onToggle() }} /> Todos</label>
-              {vis.map(o => (
-                <label key={o}><input type="radio" name={`fd-${label}`} checked={selected.includes(o)} onChange={() => { onSelect([o]); onToggle() }} /> {o}</label>
-              ))}
-            </>
-          ) : (
-            <>
-              {selected.length > 0 && (
-                <label style={{ color: 'var(--red)', fontWeight: 600 }}><input type="checkbox" checked={false} onChange={() => onSelect([])} /> Limpar seleção</label>
-              )}
-              {vis.map(o => (
-                <label key={o}><input type="checkbox" checked={selected.includes(o)} onChange={() => {
-                  const next = selected.includes(o) ? selected.filter(x => x !== o) : [...selected, o]
-                  onSelect(next)
-                }} /> {o}</label>
-              ))}
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
