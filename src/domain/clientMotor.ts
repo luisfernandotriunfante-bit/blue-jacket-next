@@ -105,7 +105,7 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
         if (portfolioHeader >= 0) {
           codigoClienteCol = columnOf(rows[portfolioHeader], 'codigocliente')
           if (codigoClienteCol < 0) {
-            audit.push({ id: `portfolio-missing-codigocliente-${audit.length}`, level: 'action', title: 'Coluna "codigocliente" não encontrada na carteira', instruction: 'Adicione uma coluna com o cabeçalho "codigocliente" na planilha e envie novamente.', detail: 'A carteira foi reconhecida pelas colunas de CNPJ, frequência e representante, mas nenhuma coluna tem o cabeçalho "codigocliente". Nenhum cliente desta aba foi usado.', area: 'clientes' })
+            audit.push({ id: `portfolio-missing-codigocliente-${audit.length}`, level: 'action', title: 'Coluna "codigocliente" não encontrada na carteira', instruction: 'Adicione uma coluna com o cabeçalho "codigocliente" na planilha e envie novamente.', detail: 'A carteira foi reconhecida pelas colunas de CNPJ, frequência e representante, mas nenhuma coluna tem o cabeçalho "codigocliente". Nenhum cliente desta aba foi usado.', aiDetail: 'Pedir ao usuário para adicionar, na planilha da carteira, uma coluna com o cabeçalho normalizado "codigocliente" (minúsculas, sem acento, sem espaço) em qualquer posição; as colunas de CNPJ, frequência e representante já foram localizadas corretamente.', area: 'clientes' })
             continue
           }
         }
@@ -154,7 +154,7 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
     }
   }
 
-  if (!internal.size && !portfolio.size && !route.size && !premises.size) audit.push({ id: 'no-client-source', level: 'action', title: 'Nenhum arquivo de clientes foi reconhecido', instruction: 'Envie o cadastro interno, a carteira, o roteiro geral ou a pirâmide ativa.', detail: 'O sistema não encontrou a estrutura esperada nos arquivos enviados. Nenhum dado foi usado.', area: 'clientes' })
+  if (!internal.size && !portfolio.size && !route.size && !premises.size) audit.push({ id: 'no-client-source', level: 'action', title: 'Nenhum arquivo de clientes foi reconhecido', instruction: 'Envie o cadastro interno, a carteira, o roteiro geral ou a pirâmide ativa.', detail: 'O sistema não encontrou a estrutura esperada nos arquivos enviados. Nenhum dado foi usado.', aiDetail: 'Nenhuma das 4 estruturas de clientes foi reconhecida (cadastro interno: colunas codigo/cpfcnpj/codrca/codsupervisor; carteira: cnpj/frequencia/representante; roteiro: codigocliente/cnpj/recorrencia/diadasemana; pirâmide: semestrepremissa/codcliente/checkpdv). Pedir ao usuário um desses 4 relatórios específicos, no formato original do sistema de origem.', area: 'clientes' })
   const allKeys = new Set([...internal.keys(), ...portfolio.keys(), ...route.keys(), ...premises.keys()])
   const canonicalBase = [...allKeys].map(document => {
     const current: CanonicalClient = { document, sources: [] }
