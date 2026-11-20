@@ -56,20 +56,25 @@ async function readRows(file: File): Promise<SheetCandidate[]> {
   return workbook.SheetNames.map(sheet => ({ sheet, rows: XLSX.utils.sheet_to_json<Row>(workbook.Sheets[sheet], { header: 1, defval: '', raw: false }) }))
 }
 
-function headerAt(rows: Row[], labels: Record<number, string>) {
-  return rows.findIndex(row => Object.entries(labels).every(([index, label]) => norm(at(row, Number(index))) === label))
+// Acha o cabeçalho pela PRESENÇA dos rótulos em qualquer coluna da linha,
+// não por posição fixa. Isso é o que permite reconhecer a planilha mesmo
+// quando as colunas-âncora foram reordenadas na fonte.
+function headerAt(rows: Row[], labels: string[]) {
+  const wanted = labels.map(norm)
+  return rows.findIndex(row => { const cells = row.map(cell => norm(cell)); return wanted.every(label => cells.includes(label)) })
 }
 
 function columnOf(row: Row, label: string): number {
   return row.findIndex(cell => norm(cell) === label)
 }
 
-function nearbyLayoutWarning(rows: Row[], expected: Record<number, string>, title: string): AuditItem | null {
-  const expectedLabels = new Set(Object.values(expected))
+function nearbyLayoutWarning(rows: Row[], expected: string[], title: string): AuditItem | null {
+  const expectedLabels = new Set(expected.map(norm))
   const row = rows.slice(0, 12).find(candidate => candidate.some(cell => expectedLabels.has(norm(cell))))
   if (!row) return null
-  const missing = Object.entries(expected).find(([index, label]) => norm(at(row, Number(index))) !== label)
-  return { id: `layout-${title}-${Math.random()}`, level: 'action', title: 'O formato de um arquivo mudou', instruction: 'Use a versão habitual do relatório e envie novamente.', detail: missing ? `Encontramos um relatório parecido, mas a coluna “${missing[1]}” não está no lugar esperado. Nenhum dado desse arquivo foi usado.` : 'Nenhum dado desse arquivo foi usado.', aiDetail: missing ? `Fonte candidata: ${title}. Contrato de posição fixa violado. Esperado: coluna ${Number(missing[0]) + 1} com cabeçalho normalizado ${missing[1]}. Não processar essa fonte até que o contrato seja atualizado ou o arquivo seja corrigido.` : `Fonte candidata: ${title}. Nenhuma linha foi aceita.`, area: 'clientes' }
+  const cells = row.map(cell => norm(cell))
+  const missing = expected.find(label => !cells.includes(norm(label)))
+  return { id: `layout-${title}-${Math.random()}`, level: 'action', title: 'O formato de um arquivo mudou', instruction: 'Use a versão habitual do relatório e envie novamente.', detail: missing ? `Encontramos um relatório parecido, mas a coluna “${missing}” não foi encontrada em nenhuma posição. Nenhum dado desse arquivo foi usado.` : 'Nenhum dado desse arquivo foi usado.', aiDetail: missing ? `Fonte candidata: ${title}. Coluna "${missing}" ausente do cabeçalho (procurada em qualquer posição). Não processar essa fonte até que o arquivo tenha essa coluna.` : `Fonte candidata: ${title}. Nenhuma linha foi aceita.`, area: 'clientes' }
 }
 
 export async function processClientMotor(files: File[]): Promise<ClientMotorResult> {
@@ -81,20 +86,22 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
   const candidateWorkbooks = await Promise.all(files.map(async file => ({ file, sheets: await readRows(file) })))
 
   for (const { sheets } of candidateWorkbooks) {
-    const hasPyramidSheet = sheets.some(({ rows }) => headerAt(rows, { 0: 'semestrepremissa', 2: 'codcliente', 13: 'checkpdv' }) >= 0)
+    const hasPyramidSheet = sheets.some(({ rows }) => headerAt(rows, ['semestrepremissa', 'codcliente', 'checkpdv']) >= 0)
     for (const { rows } of sheets) {
-      const internalHeader = headerAt(rows, { 0: 'codigo', 5: 'cpfcnpj', 10: 'codrca', 12: 'codsupervisor' })
-      const portfolioHeader = headerAt(rows, { 1: 'cnpj', 12: 'frequencia', 15: 'representante' })
-      const routeHeader = headerAt(rows, { 2: 'codigocliente', 3: 'cnpj', 10: 'recorrencia', 13: 'diadasemana' })
-      const pyramidHeader = headerAt(rows, { 0: 'semestrepremissa', 2: 'codcliente', 13: 'checkpdv' })
+      const internalHeader = headerAt(rows, ['codigo', 'cpfcnpj', 'codrca', 'codsupervisor'])
+      const portfolioHeader = headerAt(rows, ['cnpj', 'frequencia', 'representante'])
+      const routeHeader = headerAt(rows, ['codigocliente', 'cnpj', 'recorrencia', 'diadasemana'])
+      const pyramidHeader = headerAt(rows, ['semestrepremissa', 'codcliente', 'checkpdv'])
       const fallbackPortfolio = rows.findIndex(row => hasDocument(at(row, 1)) && text(at(row, 12)) && text(at(row, 13)) && text(at(row, 15)))
 
       if (internalHeader >= 0) {
+        const header = rows[internalHeader]
+        const codCol = columnOf(header, 'codigo'); const cpfCol = columnOf(header, 'cpfcnpj'); const rcaCol = columnOf(header, 'codrca'); const supervisorCol = columnOf(header, 'codsupervisor')
         let accepted = 0
         for (const row of rows.slice(internalHeader + 1)) {
-          const key = documentKey(at(row, 5)); if (!hasDocument(key)) continue
+          const key = documentKey(at(row, cpfCol)); if (!hasDocument(key)) continue
           if (internal.has(key)) continue
-          internal.set(key, { document: key, winthorCode: text(at(row, 0)), legalName: text(at(row, 1)), tradeName: text(at(row, 2)), city: text(at(row, 6)), rcaCode: rcaKey(at(row, 10)) || undefined, rcaName: text(at(row, 11)), supervisor: text(at(row, 13)), branch: text(at(row, 8)), billingType: text(at(row, 9)), fiscalBlock: text(at(row, 14)), creditDueDate: text(at(row, 17)), sources: ['Cadastro interno'] }); accepted++
+          internal.set(key, { document: key, winthorCode: text(at(row, codCol)), legalName: text(at(row, 1)), tradeName: text(at(row, 2)), city: text(at(row, 6)), rcaCode: rcaKey(at(row, rcaCol)) || undefined, rcaName: text(at(row, rcaCol + 1)), supervisor: text(at(row, supervisorCol + 1)), branch: text(at(row, 8)), billingType: text(at(row, 9)), fiscalBlock: text(at(row, 14)), creditDueDate: text(at(row, 17)), sources: ['Cadastro interno'] }); accepted++
         }
         audit.push({ id: 'internal-ok', level: 'ok', title: 'Cadastro interno reconhecido', instruction: `${accepted.toLocaleString('pt-BR')} clientes prontos para juntar.`, detail: 'Os dados de identificação e referência comercial foram lidos.', area: 'clientes' }); continue
       }
@@ -102,25 +109,29 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
         const start = portfolioHeader >= 0 ? portfolioHeader + 1 : fallbackPortfolio
         if (hasPyramidSheet) { audit.push({ id: `portfolio-ignored-${audit.length}`, level: 'ok', title: 'Aba auxiliar ignorada', instruction: 'Nada precisa ser feito.', detail: 'A carteira dentro da Pirâmide não alterou a base de clientes.', area: 'clientes' }); continue }
         let codigoClienteCol = 0
+        let cnpjCol = 1
         if (portfolioHeader >= 0) {
           codigoClienteCol = columnOf(rows[portfolioHeader], 'codigocliente')
           if (codigoClienteCol < 0) {
             audit.push({ id: `portfolio-missing-codigocliente-${audit.length}`, level: 'action', title: 'Coluna "codigocliente" não encontrada na carteira', instruction: 'Adicione uma coluna com o cabeçalho "codigocliente" na planilha e envie novamente.', detail: 'A carteira foi reconhecida pelas colunas de CNPJ, frequência e representante, mas nenhuma coluna tem o cabeçalho "codigocliente". Nenhum cliente desta aba foi usado.', aiDetail: 'Pedir ao usuário para adicionar, na planilha da carteira, uma coluna com o cabeçalho normalizado "codigocliente" (minúsculas, sem acento, sem espaço) em qualquer posição; as colunas de CNPJ, frequência e representante já foram localizadas corretamente.', area: 'clientes' })
             continue
           }
+          cnpjCol = columnOf(rows[portfolioHeader], 'cnpj')
         }
         let accepted = 0
         for (const row of rows.slice(start)) {
-          const key = documentKey(at(row, 1)); if (!hasDocument(key)) continue
+          const key = documentKey(at(row, cnpjCol)); if (!hasDocument(key)) continue
           if (portfolio.has(key)) continue
           portfolio.set(key, { document: key, winthorCode: text(at(row, codigoClienteCol)), legalName: text(at(row, 2)), tradeName: text(at(row, 3)), city: text(at(row, 5)), district: text(at(row, 6)), address: text(at(row, 7)), latitude: text(at(row, 8)), longitude: text(at(row, 9)), visitFrequency: text(at(row, 12)), visitDay: text(at(row, 13)), daysWithoutPurchase: text(at(row, 14)), representative: text(at(row, 15)), sources: ['Carteira'] }); accepted++
         }
         audit.push({ id: `portfolio-ok-${audit.length}`, level: 'ok', title: 'Carteira de clientes reconhecida', instruction: `${accepted.toLocaleString('pt-BR')} clientes prontos para juntar.`, detail: 'Os dados de endereço, frequência de visita e representante foram lidos.', area: 'clientes' }); continue
       }
       if (routeHeader >= 0) {
+        const header = rows[routeHeader]
+        const cnpjCol = columnOf(header, 'cnpj'); const codigoClienteCol = columnOf(header, 'codigocliente'); const recorrenciaCol = columnOf(header, 'recorrencia'); const diaSemanaCol = columnOf(header, 'diadasemana')
         let accepted = 0
         for (const row of rows.slice(routeHeader + 1)) {
-          const key = documentKey(at(row, 3)); if (!hasDocument(key)) continue
+          const key = documentKey(at(row, cnpjCol)); if (!hasDocument(key)) continue
           const rca = rcaKey(at(row, 0)) || undefined
           const rName = text(at(row, 1))
           if (route.has(key)) {
@@ -132,24 +143,26 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
             }
             continue
           }
-          const entry: Partial<CanonicalClient> = { document: key, winthorCode: text(at(row, 2)), legalName: text(at(row, 4)), tradeName: text(at(row, 5)), city: text(at(row, 6)), district: text(at(row, 7)), address: text(at(row, 8)), visitFrequency: text(at(row, 10)), visitDay: text(at(row, 13)), rcaCode: rca, rcaName: rName, sources: ['Roteiro geral'] }
+          const entry: Partial<CanonicalClient> = { document: key, winthorCode: text(at(row, codigoClienteCol)), legalName: text(at(row, 4)), tradeName: text(at(row, 5)), city: text(at(row, 6)), district: text(at(row, 7)), address: text(at(row, 8)), visitFrequency: text(at(row, recorrenciaCol)), visitDay: text(at(row, diaSemanaCol)), rcaCode: rca, rcaName: rName, sources: ['Roteiro geral'] }
           if (rca) entry.rcaCodes = [{ code: rca, name: rName }]
           route.set(key, entry); accepted++
         }
         audit.push({ id: `route-ok-${audit.length}`, level: 'ok', title: 'Roteiro geral reconhecido', instruction: `${accepted.toLocaleString('pt-BR')} clientes prontos para juntar.`, detail: 'Os dados de roteiro, frequência de visita e RCA foram lidos.', area: 'clientes' }); continue
       }
       if (pyramidHeader >= 0) {
+        const header = rows[pyramidHeader]
+        const codClienteCol = columnOf(header, 'codcliente'); const semestreCol = columnOf(header, 'semestrepremissa')
         let accepted = 0
         for (const row of rows.slice(pyramidHeader + 1)) {
-          const key = documentKey(at(row, 2)); if (!hasDocument(key)) continue
+          const key = documentKey(at(row, codClienteCol)); if (!hasDocument(key)) continue
           if (premises.has(key)) continue
           const rawAvg = String(at(row, 15) ?? '').replace(/[R$\s]/g, '').replace(/,/g, '')
           const average = Number(rawAvg)
-          premises.set(key, { document: key, legalName: text(at(row, 3)), premiseSemester: text(at(row, 0)), channelType: text(at(row, 1)), premiseRange: text(at(row, 4)), premiseState: text(at(row, 5)), city: text(at(row, 6)), premiseCluster: text(at(row, 8)), premiseAverage12Months: Number.isFinite(average) ? average : undefined, premiseProfile: text(at(row, 11)), premiseNetwork: text(at(row, 14)), sources: ['Pirâmide'] }); accepted++
+          premises.set(key, { document: key, legalName: text(at(row, 3)), premiseSemester: text(at(row, semestreCol)), channelType: text(at(row, 1)), premiseRange: text(at(row, 4)), premiseState: text(at(row, 5)), city: text(at(row, 6)), premiseCluster: text(at(row, 8)), premiseAverage12Months: Number.isFinite(average) ? average : undefined, premiseProfile: text(at(row, 11)), premiseNetwork: text(at(row, 14)), sources: ['Pirâmide'] }); accepted++
         }
         audit.push({ id: 'premises-ok', level: 'ok', title: 'Pirâmide ativa reconhecida', instruction: `${accepted.toLocaleString('pt-BR')} clientes prontos para juntar.`, detail: 'Os dados de faixa, ambiente, perfil e rede foram lidos.', area: 'clientes' }); continue
       }
-      const warning = nearbyLayoutWarning(rows, { 0: 'codigo', 5: 'cpfcnpj', 10: 'codrca' }, 'clientes') ?? nearbyLayoutWarning(rows, { 0: 'codigocliente', 1: 'cnpj', 12: 'frequencia', 15: 'representante' }, 'carteira') ?? nearbyLayoutWarning(rows, { 2: 'codigocliente', 3: 'cnpj', 10: 'recorrencia', 13: 'diadasemana' }, 'roteiro') ?? nearbyLayoutWarning(rows, { 0: 'semestrepremissa', 2: 'codcliente', 13: 'checkpdv' }, 'piramide')
+      const warning = nearbyLayoutWarning(rows, ['codigo', 'cpfcnpj', 'codrca'], 'clientes') ?? nearbyLayoutWarning(rows, ['codigocliente', 'cnpj', 'frequencia', 'representante'], 'carteira') ?? nearbyLayoutWarning(rows, ['codigocliente', 'cnpj', 'recorrencia', 'diadasemana'], 'roteiro') ?? nearbyLayoutWarning(rows, ['semestrepremissa', 'codcliente', 'checkpdv'], 'piramide')
       if (warning) audit.push(warning)
     }
   }

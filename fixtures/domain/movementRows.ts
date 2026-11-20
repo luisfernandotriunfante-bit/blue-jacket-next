@@ -14,6 +14,21 @@ export const salesRows = [
   sparseRow({ 2: '06/01/2026', 3: '002', 18: 'FATURADO', 20: 'NORMAL', 24: '0100', 10: '7', 12: '70,00' }, WIDTH),
 ]
 
+// Mesmo relatorio de vendas, com as colunas-ancora (DATA MOVIMENTO, COD.
+// CLIENTE, CODPROD. WINTHOR, STATUS PEDIDO, TIPO VENDA) em posicoes bem
+// diferentes das originais, para provar que a leitura é por rotulo e nao
+// por posicao fixa.
+export const salesHeaderShifted = sparseRow(
+  { 5: 'DATA MOVIMENTO', 6: 'COD. CLIENTE', 8: 'CODPROD. WINTHOR', 2: 'STATUS PEDIDO', 3: 'TIPO VENDA' },
+  WIDTH,
+)
+export const salesRowsShifted = [
+  salesHeaderShifted,
+  sparseRow({ 5: '05/01/2026', 6: '001', 2: 'FATURADO', 3: 'NORMAL', 8: '0100', 10: '3', 12: '30,00' }, WIDTH),
+  sparseRow({ 5: '06/01/2026', 6: '001', 2: 'A FATURAR', 3: 'NORMAL', 8: '0200', 10: '1', 12: '4,80' }, WIDTH),
+  sparseRow({ 5: '06/01/2026', 6: '002', 2: 'FATURADO', 3: 'NORMAL', 8: '0100', 10: '7', 12: '70,00' }, WIDTH),
+]
+
 // Corte de mercadorias sem venda atual correspondente, para testar o
 // indicador de redigitacao pendente.
 export const cutsHeader = sparseRow({ 0: 'CONSULTAR CORTE DE MERCADORIAS' }, WIDTH)
