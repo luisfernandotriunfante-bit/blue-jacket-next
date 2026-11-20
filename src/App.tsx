@@ -175,6 +175,12 @@ export function App() {
   const [movementStateLoaded, setMovementStateLoaded] = useState(false)
   const [receiptAudit,setReceiptAudit]=useState<AuditItem[]>([]); const [receiptBase,setReceiptBase]=useState<CanonicalReceipt[]>([]); const [receiptSlots,setReceiptSlots]=useState<Partial<Record<(typeof receiptSources)[number]['id'],UploadedFile[]>>>({}); const [receiptIndicators,setReceiptIndicators]=useState<ReceiptIndicators|null>(null); const [receiptProcessing,setReceiptProcessing]=useState(false); const [receiptStateLoaded,setReceiptStateLoaded]=useState(false)
   const [processingAll, setProcessingAll] = useState(false)
+  const restoreDoneRef = useRef(false)
+  const clientSlotsRef = useRef(clientSlots); clientSlotsRef.current = clientSlots
+  const productSlotsRef = useRef(productSlots); productSlotsRef.current = productSlots
+  const historySlotsRef = useRef(historySlots); historySlotsRef.current = historySlots
+  const movementSlotsRef = useRef(movementSlots); movementSlotsRef.current = movementSlots
+  const receiptSlotsRef = useRef(receiptSlots); receiptSlotsRef.current = receiptSlots
   const dailyInput = useRef<HTMLInputElement>(null)
   const motorInputs = useRef<Record<string, HTMLInputElement | null>>({})
   const audit = useMemo(() => [...buildAudit(files).filter(item => (item.area !== 'clientes' || clientBase.length === 0) && (item.area !== 'produtos' || productBase.length === 0) && (item.area !== 'historico' || historyBase.length === 0) && (item.area !== 'movimentacoes' || movementBase.length === 0) && (item.area !== 'recebimentos' || receiptBase.length === 0)), ...clientAudit, ...productAudit, ...historyAudit, ...movementAudit, ...receiptAudit], [files, clientAudit, clientBase.length, productAudit, productBase.length, historyAudit, historyBase.length, movementAudit, movementBase.length, receiptAudit, receiptBase.length])
@@ -201,18 +207,18 @@ export function App() {
   useEffect(()=>{if(receiptStateLoaded)void savePersisted<SavedReceiptMotor>('recebimentos',{base:receiptBase,audit:receiptAudit,indicators:receiptIndicators,slots:receiptSlots})},[receiptStateLoaded,receiptBase,receiptAudit,receiptIndicators,receiptSlots])
 
   useEffect(() => {
+    if (restoreDoneRef.current) return
     if (!clientStateLoaded || !productStateLoaded || !historyStateLoaded || !movementStateLoaded || !receiptStateLoaded) return
-    let active = true
+    restoreDoneRef.current = true
     void (async () => {
       const motorsToRestore = ['clientes', 'produtos', 'historico', 'movimentacoes', 'recebimentos'] as const
       const restored = await Promise.all(motorsToRestore.map(async motor => [motor, await restoreMotorFiles(motor)] as const))
-      if (!active) return
       const savedSlots: Record<string, Record<string, UploadedFile[]>> = {
-        clientes: Object.fromEntries(Object.entries(clientSlots).map(([slot, file]) => [slot, file ? [file] : []])),
-        produtos: Object.fromEntries(Object.entries(productSlots).map(([slot, file]) => [slot, file ? [file] : []])),
-        historico: historySlots,
-        movimentacoes: movementSlots,
-        recebimentos: receiptSlots,
+        clientes: Object.fromEntries(Object.entries(clientSlotsRef.current).map(([slot, file]) => [slot, file ? [file] : []])),
+        produtos: Object.fromEntries(Object.entries(productSlotsRef.current).map(([slot, file]) => [slot, file ? [file] : []])),
+        historico: historySlotsRef.current,
+        movimentacoes: movementSlotsRef.current,
+        recebimentos: receiptSlotsRef.current,
       }
       const restoredRaw: Record<string, File> = {}
       for (const [motor, bySlot] of restored) {
@@ -226,8 +232,7 @@ export function App() {
       }
       if (Object.keys(restoredRaw).length) setRawFiles(current => ({ ...current, ...restoredRaw }))
     })()
-    return () => { active = false }
-  }, [clientStateLoaded, productStateLoaded, historyStateLoaded, movementStateLoaded, receiptStateLoaded, clientSlots, productSlots, historySlots, movementSlots, receiptSlots])
+  }, [clientStateLoaded, productStateLoaded, historyStateLoaded, movementStateLoaded, receiptStateLoaded])
 
   const findInSlot = (list: UploadedFile[] | undefined, file: File) => (list ?? []).find(e => e.name === file.name && e.size === file.size)
   async function distributeFiles(incoming: File[]) {
