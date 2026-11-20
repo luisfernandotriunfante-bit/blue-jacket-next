@@ -44,7 +44,7 @@ const toDate = (value: string) => {
 }
 const competenceOf = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 const dateIso = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-const audit = (id: string, title: string, instruction: string, detail: string, level: AuditItem['level'] = 'ok'): AuditItem => ({ id, title, instruction, detail, level, area: 'historico' })
+const audit = (id: string, title: string, instruction: string, detail: string, level: AuditItem['level'] = 'ok', aiDetail?: string): AuditItem => ({ id, title, instruction, detail, level, aiDetail, area: 'historico' })
 
 async function parseLegacyCatalog(file: File): Promise<Map<string, string>> {
   const content = (await file.text()).replace(/\u0000/g, '')
@@ -70,6 +70,7 @@ export async function processHistoryMotor(files: File[], options?: { catalogFile
   let lastDate: string | undefined
   let catalogHits = 0
   let prefixHits = 0
+  const unmatchedCodes = new Set<string>()
 
   const legacyToEan = options?.catalogFile ? await parseLegacyCatalog(options.catalogFile) : new Map<string, string>()
   const eanToWinthor = new Map<string, string>()
@@ -82,7 +83,7 @@ export async function processHistoryMotor(files: File[], options?: { catalogFile
   for (const file of files) {
     const content = (await file.text()).replace(/\u0000/g, '')
     if (!/vendas\s+\d{2}\/[A-Z]{3}\/\d{4}\s+a\s+\d{2}\/[A-Z]{3}\/\d{4}\s+analitico\s+detalhado/i.test(content)) {
-      audits.push(audit(`history-layout-${crypto.randomUUID()}`, 'Um arquivo não foi reconhecido', 'Envie o relatório detalhado de vendas do legado.', 'O arquivo não contém o cabeçalho esperado para vendas detalhadas. Nenhum dado dele foi usado.', 'action'))
+      audits.push(audit(`history-layout-${crypto.randomUUID()}`, 'Um arquivo não foi reconhecido', 'Envie o relatório detalhado de vendas do legado.', 'O arquivo não contém o cabeçalho esperado para vendas detalhadas. Nenhum dado dele foi usado.', 'action', `O arquivo "${file.name}" não contém a linha "VENDAS <data> a <data> ANALITICO DETALHADO" esperada no início do relatório de vendas detalhadas do legado. Pedir ao usuário o relatório de vendas detalhadas gerado pelo sistema legado, sem edições.`))
       continue
     }
     detailedFiles++
@@ -113,6 +114,7 @@ export async function processHistoryMotor(files: File[], options?: { catalogFile
         winthorCode = productCode.slice(3).replace(/^0+(?=\d)/, '') || productCode.slice(3)
         prefixHits++
       }
+      if (!winthorCode) unmatchedCodes.add(legacyToEan.get(productCode) ?? productCode)
 
       competenceSet.add(competence)
       if (!firstDate || dateStr < firstDate) firstDate = dateStr
@@ -139,9 +141,11 @@ export async function processHistoryMotor(files: File[], options?: { catalogFile
   const canonicalBase = base.sort((a, b) => a.date.localeCompare(b.date) || a.customerCode.localeCompare(b.customerCode) || a.productCode.localeCompare(b.productCode))
   const competencies = [...competenceSet].sort()
   if (detailedFiles) audits.push(audit('history-sales-ready', 'Vendas históricas organizadas', `${competencies.length} competência(s) — ${canonicalBase.length.toLocaleString('pt-BR')} linhas individuais.`, `Cada linha de venda foi mantida com data exata, CNPJ do cliente e código do vendedor.`))
-  if (duplicates) audits.push(audit('history-duplicates', 'Linhas repetidas foram ignoradas', 'Confira os arquivos se a repetição não era esperada.', `${duplicates.toLocaleString('pt-BR')} linha(s) idêntica(s) não foram duplicadas.`, 'attention'))
+  if (duplicates) audits.push(audit('history-duplicates', 'Linhas repetidas foram ignoradas', 'Confira os arquivos se a repetição não era esperada.', `${duplicates.toLocaleString('pt-BR')} linha(s) idêntica(s) não foram duplicadas.`, 'attention', `${duplicates.toLocaleString('pt-BR')} linha(s) com o mesmo texto exato apareceram mais de uma vez nos arquivos de vendas do legado enviados — provável reenvio do mesmo arquivo ou sobreposição de período entre dois arquivos. As duplicatas já foram descartadas automaticamente; conferir se os arquivos enviados cobrem períodos diferentes.`))
   if (legacyToEan.size > 0) {
     const unmatched = canonicalBase.length - catalogHits - prefixHits
+    const sample = [...unmatchedCodes].slice(0, 20)
+    const more = unmatchedCodes.size > sample.length ? ` e mais ${(unmatchedCodes.size - sample.length).toLocaleString('pt-BR')} código(s)` : ''
     audits.push(audit(
       'history-catalog-match',
       'De-para Milênio aplicado',
@@ -149,10 +153,13 @@ export async function processHistoryMotor(files: File[], options?: { catalogFile
       unmatched > 0
         ? `${unmatched.toLocaleString('pt-BR')} linha(s) sem código Winthor correspondente.`
         : 'Todas as linhas de venda foram associadas a um código Winthor.',
-      unmatched > 0 ? 'attention' : 'ok'
+      unmatched > 0 ? 'attention' : 'ok',
+      unmatched > 0
+        ? `Código(s) de origem (EAN quando disponível no catálogo Milênio, senão o código do legado) sem produto Winthor correspondente: ${sample.join(', ')}${more}. Conferir esses códigos no catálogo Milênio (relação complementar) ou adicionar o EAN correspondente na base de produtos.`
+        : undefined
     ))
   }
-  audits.push(audit('history-stock-missing', 'Faltam as fotografias mensais de estoque', 'Adicione os relatórios de posição de estoque de cada fechamento quando estiverem disponíveis.', 'Os arquivos recebidos têm vendas, mas não possuem saldos de estoque por mês.', 'attention'))
-  if (!canonicalBase.length) audits.push(audit('history-none', 'Nenhuma venda histórica foi encontrada', 'Envie os relatórios detalhados de vendas do legado.', 'Nenhuma linha de venda foi usada para criar a base.', 'action'))
+  audits.push(audit('history-stock-missing', 'Faltam as fotografias mensais de estoque', 'Adicione os relatórios de posição de estoque de cada fechamento quando estiverem disponíveis.', 'Os arquivos recebidos têm vendas, mas não possuem saldos de estoque por mês.', 'attention', 'O motor de histórico não recebe nem rastreia relatórios de posição de estoque mensal; esse dado não existe na base atual, então não há como listar quais meses faltam. Pedir ao usuário um relatório de fechamento de estoque por mês (um arquivo por mês, com o mês identificável no nome) para que esse controle possa ser implementado.'))
+  if (!canonicalBase.length) audits.push(audit('history-none', 'Nenhuma venda histórica foi encontrada', 'Envie os relatórios detalhados de vendas do legado.', 'Nenhuma linha de venda foi usada para criar a base.', 'action', 'Nenhuma linha bateu com o padrão de vendas detalhadas do legado (data, pedido, produto, quantidade, valor, desconto, cliente, vendedor) em nenhum arquivo enviado. Pedir ao usuário o relatório "Vendas <período> Analítico Detalhado" do sistema legado.'))
   return { canonicalBase, audit: audits, indicators: { records: canonicalBase.length, competencies: competencies.length, salesLines: canonicalBase.length, firstDate, lastDate } }
 }

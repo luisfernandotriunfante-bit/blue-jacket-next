@@ -10,6 +10,7 @@ import { processReceiptMotor, type CanonicalReceipt, type ReceiptIndicators } fr
 import { classifyProduct } from './domain/productGrouping'
 import { loadPersisted, savePersisted, saveChunked, loadChunked, setOnSaveHook } from './domain/persistence'
 import { detectFile } from './domain/fileDetector'
+import { saveSlotFile, removeSlotFile, restoreMotorFiles } from './domain/fileStorage'
 import { StockTab } from './StockTab'
 import { SellOutTab } from './SellOutTab'
 import { GerencialTab } from './GerencialTab'
@@ -43,7 +44,7 @@ const productSources = [
   { id: 'internal', label: 'Cadastro de produtos (286)' }, { id: 'industry', label: 'Lista SAP da indústria' }, { id: 'stock', label: 'Estoque atual (1118)' }, { id: 'price', label: 'Preço de venda (8011)' }, { id: 'subbrands', label: 'Sub-marcas (8013)' }, { id: 'sortiment', label: 'Sortimento (canais por faixa)' },
 ] as const
 const historySources = [
-  { id: 'sales', label: 'Vendas detalhadas do legado (.txt)' }, { id: 'catalog', label: 'Catálogo Milênio — de-para (322)' },
+  { id: 'sales_atual', label: 'Vendas detalhadas do legado — ano atual (.txt)' }, { id: 'sales_anteriores', label: 'Vendas detalhadas do legado — anos anteriores (.txt)' }, { id: 'catalog', label: 'Catálogo Milênio — de-para (322)' },
 ] as const
 const movementSources = [
   { id: 'sales', label: 'Vendas atuais (8022)' }, { id: 'cuts', label: 'Corte de mercadorias (1454)' },
@@ -57,6 +58,16 @@ type SavedMovementMotor = { base: CanonicalMovement[]; audit: AuditItem[]; indic
 type SavedReceiptMotor = { base: CanonicalReceipt[]; audit: AuditItem[]; indicators: ReceiptIndicators | null; slots: Partial<Record<(typeof receiptSources)[number]['id'], UploadedFile[]>> }
 
 function fileSize(size: number) { return size < 1_000_000 ? `${Math.max(1, Math.round(size / 1024))} KB` : `${(size / 1_000_000).toFixed(1)} MB` }
+async function historySalesSlot(file: File): Promise<'sales_atual' | 'sales_anteriores' | null> {
+  const content = (await file.slice(0, 4096).text()).replace(/\u0000/g, '')
+  const period = content.match(/VENDAS\s+\d{2}\/[A-Z]{3}\/(\d{4})\s+a\s+\d{2}\/[A-Z]{3}\/(\d{4})/i)
+  if (!period) return null
+  const year = Number(period[2])
+  const currentYear = new Date().getFullYear()
+  if (year === currentYear) return 'sales_atual'
+  if (year < currentYear) return 'sales_anteriores'
+  return null
+}
 const dedupeList = (files: UploadedFile[] | undefined) => (files ?? []).filter((f, i, arr) => arr.findIndex(e => e.name === f.name && e.size === f.size) === i)
 
 export function App() {
@@ -174,6 +185,12 @@ export function App() {
   const [movementStateLoaded, setMovementStateLoaded] = useState(false)
   const [receiptAudit,setReceiptAudit]=useState<AuditItem[]>([]); const [receiptBase,setReceiptBase]=useState<CanonicalReceipt[]>([]); const [receiptSlots,setReceiptSlots]=useState<Partial<Record<(typeof receiptSources)[number]['id'],UploadedFile[]>>>({}); const [receiptIndicators,setReceiptIndicators]=useState<ReceiptIndicators|null>(null); const [receiptProcessing,setReceiptProcessing]=useState(false); const [receiptStateLoaded,setReceiptStateLoaded]=useState(false)
   const [processingAll, setProcessingAll] = useState(false)
+  const restoreDoneRef = useRef(false)
+  const clientSlotsRef = useRef(clientSlots); clientSlotsRef.current = clientSlots
+  const productSlotsRef = useRef(productSlots); productSlotsRef.current = productSlots
+  const historySlotsRef = useRef(historySlots); historySlotsRef.current = historySlots
+  const movementSlotsRef = useRef(movementSlots); movementSlotsRef.current = movementSlots
+  const receiptSlotsRef = useRef(receiptSlots); receiptSlotsRef.current = receiptSlots
   const dailyInput = useRef<HTMLInputElement>(null)
   const motorInputs = useRef<Record<string, HTMLInputElement | null>>({})
   const audit = useMemo(() => [...buildAudit(files).filter(item => (item.area !== 'clientes' || clientBase.length === 0) && (item.area !== 'produtos' || productBase.length === 0) && (item.area !== 'historico' || historyBase.length === 0) && (item.area !== 'movimentacoes' || movementBase.length === 0) && (item.area !== 'recebimentos' || receiptBase.length === 0)), ...clientAudit, ...productAudit, ...historyAudit, ...movementAudit, ...receiptAudit], [files, clientAudit, clientBase.length, productAudit, productBase.length, historyAudit, historyBase.length, movementAudit, movementBase.length, receiptAudit, receiptBase.length])
@@ -199,6 +216,34 @@ export function App() {
   useEffect(()=>{let active=true;void loadPersisted<SavedReceiptMotor>('recebimentos').then(saved=>{if(!active||!saved)return;setReceiptBase(saved.base);setReceiptAudit(saved.audit);setReceiptIndicators(saved.indicators);setReceiptSlots(Object.fromEntries(Object.entries(saved.slots).map(([k,v])=>[k,dedupeList(v as UploadedFile[])])) as typeof saved.slots)}).finally(()=>{if(active)setReceiptStateLoaded(true)});return()=>{active=false}},[syncKey])
   useEffect(()=>{if(receiptStateLoaded)void savePersisted<SavedReceiptMotor>('recebimentos',{base:receiptBase,audit:receiptAudit,indicators:receiptIndicators,slots:receiptSlots})},[receiptStateLoaded,receiptBase,receiptAudit,receiptIndicators,receiptSlots])
 
+  useEffect(() => {
+    if (restoreDoneRef.current) return
+    if (!clientStateLoaded || !productStateLoaded || !historyStateLoaded || !movementStateLoaded || !receiptStateLoaded) return
+    restoreDoneRef.current = true
+    void (async () => {
+      const motorsToRestore = ['clientes', 'produtos', 'historico', 'movimentacoes', 'recebimentos'] as const
+      const restored = await Promise.all(motorsToRestore.map(async motor => [motor, await restoreMotorFiles(motor)] as const))
+      const savedSlots: Record<string, Record<string, UploadedFile[]>> = {
+        clientes: Object.fromEntries(Object.entries(clientSlotsRef.current).map(([slot, file]) => [slot, file ? [file] : []])),
+        produtos: Object.fromEntries(Object.entries(productSlotsRef.current).map(([slot, file]) => [slot, file ? [file] : []])),
+        historico: historySlotsRef.current,
+        movimentacoes: movementSlotsRef.current,
+        recebimentos: receiptSlotsRef.current,
+      }
+      const restoredRaw: Record<string, File> = {}
+      for (const [motor, bySlot] of restored) {
+        for (const [slot, items] of Object.entries(bySlot)) {
+          const metadata = savedSlots[motor][slot] ?? []
+          for (const item of items) {
+            const match = metadata.find(file => file.name === item.name && file.size === item.file.size && !restoredRaw[file.id])
+            if (match) restoredRaw[match.id] = item.file
+          }
+        }
+      }
+      if (Object.keys(restoredRaw).length) setRawFiles(current => ({ ...current, ...restoredRaw }))
+    })()
+  }, [clientStateLoaded, productStateLoaded, historyStateLoaded, movementStateLoaded, receiptStateLoaded])
+
   const findInSlot = (list: UploadedFile[] | undefined, file: File) => (list ?? []).find(e => e.name === file.name && e.size === file.size)
   async function distributeFiles(incoming: File[]) {
     const detections = await Promise.all(incoming.map(file => detectFile(file).then(detection => ({ file, detection }))))
@@ -223,29 +268,37 @@ export function App() {
         const existing = productSlots[slotId]; if (existing) idsToRemove.push(existing.id)
         const uploaded: UploadedFile = { id, name: file.name, size: file.size, area: 'produtos', receivedAt: now, lastModified: file.lastModified }
         toProducts[slotId] = uploaded; newUploaded.push(uploaded); newRaw[id] = file
+        void saveSlotFile('produtos', slotId, file)
       } else if (motor === 'clientes') {
         const slotId = slot as (typeof clientSources)[number]['id']
         const existing = clientSlots[slotId]; if (existing) idsToRemove.push(existing.id)
         const uploaded: UploadedFile = { id, name: file.name, size: file.size, area: 'clientes', receivedAt: now, lastModified: file.lastModified }
         toClients[slotId] = uploaded; newUploaded.push(uploaded); newRaw[id] = file
+        void saveSlotFile('clientes', slotId, file)
       } else if (motor === 'historico') {
-        const slotId = slot as (typeof historySources)[number]['id']
-        const dupe = findInSlot(historySlots[slotId], file) ?? findInSlot(toHistory[slotId], file)
-        if (dupe) { newRaw[dupe.id] = file; continue } // re-envio: restaura rawFile sem duplicar metadado
+        const slotId = slot === 'sales' ? await historySalesSlot(file) : slot as (typeof historySources)[number]['id']
+        if (!slotId) { newUploaded.push({ id, name: file.name, size: file.size, area: 'diario', receivedAt: now, lastModified: file.lastModified }); newRaw[id] = file; continue }
         const uploaded: UploadedFile = { id, name: file.name, size: file.size, area: 'historico', receivedAt: now, lastModified: file.lastModified }
-        if (!toHistory[slotId]) toHistory[slotId] = []; toHistory[slotId]!.push(uploaded); newUploaded.push(uploaded); newRaw[id] = file
+        const replaced = toHistory[slotId] ?? historySlots[slotId] ?? []
+        idsToRemove.push(...replaced.map(item => item.id))
+        await Promise.all(replaced.map(item => removeSlotFile('historico', slotId, item.name)))
+        for (const item of replaced) { const index = newUploaded.findIndex(candidate => candidate.id === item.id); if (index >= 0) newUploaded.splice(index, 1); delete newRaw[item.id] }
+        toHistory[slotId] = [uploaded]; newUploaded.push(uploaded); newRaw[id] = file
+        await saveSlotFile('historico', slotId, file)
       } else if (motor === 'movimentacoes') {
         const slotId = slot as (typeof movementSources)[number]['id']
         const dupe = findInSlot(movementSlots[slotId], file) ?? findInSlot(toMovements[slotId], file)
         if (dupe) { newRaw[dupe.id] = file; continue }
         const uploaded: UploadedFile = { id, name: file.name, size: file.size, area: 'movimentacoes', receivedAt: now, lastModified: file.lastModified }
         if (!toMovements[slotId]) toMovements[slotId] = []; toMovements[slotId]!.push(uploaded); newUploaded.push(uploaded); newRaw[id] = file
+        void saveSlotFile('movimentacoes', slotId, file)
       } else if (motor === 'recebimentos') {
         const slotId = slot as (typeof receiptSources)[number]['id']
         const dupe = findInSlot(receiptSlots[slotId], file) ?? findInSlot(toReceipts[slotId], file)
         if (dupe) { newRaw[dupe.id] = file; continue }
         const uploaded: UploadedFile = { id, name: file.name, size: file.size, area: 'recebimentos', receivedAt: now, lastModified: file.lastModified }
         if (!toReceipts[slotId]) toReceipts[slotId] = []; toReceipts[slotId]!.push(uploaded); newUploaded.push(uploaded); newRaw[id] = file
+        void saveSlotFile('recebimentos', slotId, file)
       }
     }
     if (!newUploaded.length && !idsToRemove.length && !Object.keys(newRaw).length) return
@@ -253,9 +306,9 @@ export function App() {
     setRawFiles(current => { const next = { ...current }; for (const id of idsToRemove) delete next[id]; return { ...next, ...newRaw } })
     if (Object.keys(toProducts).length) setProductSlots(current => ({ ...current, ...toProducts }))
     if (Object.keys(toClients).length) setClientSlots(current => ({ ...current, ...toClients }))
-    if (Object.keys(toHistory).length) setHistorySlots(current => { const next = { ...current }; for (const [k, v] of Object.entries(toHistory) as [typeof historySources[number]['id'], UploadedFile[]][]) next[k] = v; return next })
-    if (Object.keys(toMovements).length) setMovementSlots(current => { const next = { ...current }; for (const [k, v] of Object.entries(toMovements) as [typeof movementSources[number]['id'], UploadedFile[]][]) next[k] = v; return next })
-    if (Object.keys(toReceipts).length) setReceiptSlots(current => { const next = { ...current }; for (const [k, v] of Object.entries(toReceipts) as [typeof receiptSources[number]['id'], UploadedFile[]][]) next[k] = v; return next })
+    if (Object.keys(toHistory).length) setHistorySlots(current => { const next = { ...current }; for (const [k, v] of Object.entries(toHistory) as [typeof historySources[number]['id'], UploadedFile[]][]) next[k] = [...(current[k] ?? []), ...v]; return next })
+    if (Object.keys(toMovements).length) setMovementSlots(current => { const next = { ...current }; for (const [k, v] of Object.entries(toMovements) as [typeof movementSources[number]['id'], UploadedFile[]][]) next[k] = [...(current[k] ?? []), ...v]; return next })
+    if (Object.keys(toReceipts).length) setReceiptSlots(current => { const next = { ...current }; for (const [k, v] of Object.entries(toReceipts) as [typeof receiptSources[number]['id'], UploadedFile[]][]) next[k] = [...(current[k] ?? []), ...v]; return next })
   }
   function addFiles(area: SourceArea, incoming: FileList | File[]) {
     const next = Array.from(incoming).map(file => ({ id: `${file.name}-${file.size}-${crypto.randomUUID()}`, name: file.name, size: file.size, area, receivedAt: new Date().toLocaleString('pt-BR'), lastModified: file.lastModified }))
@@ -270,55 +323,88 @@ export function App() {
     setFiles(current => [...current.filter(item => item.id !== clientSlots[source]?.id), uploaded])
     setRawFiles(current => ({ ...current, [uploaded.id]: file }))
     setClientSlots(current => ({ ...current, [source]: uploaded }))
+    void saveSlotFile('clientes', source, file)
   }
   function productSourceChange(source: (typeof productSources)[number]['id'], event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]; event.target.value = ''; if (!file) return
     const uploaded: UploadedFile = { id: `${file.name}-${file.size}-${crypto.randomUUID()}`, name: file.name, size: file.size, area: 'produtos', receivedAt: new Date().toLocaleString('pt-BR'), lastModified: file.lastModified }
     setFiles(current => [...current.filter(item => item.id !== productSlots[source]?.id), uploaded]); setRawFiles(current => ({ ...current, [uploaded.id]: file })); setProductSlots(current => ({ ...current, [source]: uploaded }))
+    void saveSlotFile('produtos', source, file)
   }
-  function historySourceChange(source: (typeof historySources)[number]['id'], event: ChangeEvent<HTMLInputElement>) {
+  async function historySourceChange(source: (typeof historySources)[number]['id'], event: ChangeEvent<HTMLInputElement>) {
     const all = Array.from(event.target.files ?? []); event.target.value = ''
     if (!all.length) return
     const incoming = all
-    const uploaded = incoming.map(file => ({ id: `${file.name}-${file.size}-${crypto.randomUUID()}`, name: file.name, size: file.size, area: 'historico' as const, receivedAt: new Date().toLocaleString('pt-BR'), lastModified: file.lastModified }))
-    setFiles(current => [...current, ...uploaded])
-    setRawFiles(current => ({ ...current, ...Object.fromEntries(uploaded.map((item, index) => [item.id, incoming[index]])) }))
-    setHistorySlots(current => ({ ...current, [source]: uploaded }))
+    const groups = new Map<(typeof historySources)[number]['id'], File[]>()
+    for (const file of incoming) {
+      const slot = source === 'catalog' ? source : await historySalesSlot(file)
+      if (slot) groups.set(slot, [file])
+    }
+    if (!groups.size) return
+    const uploadedBySlot = new Map<(typeof historySources)[number]['id'], UploadedFile[]>()
+    const filesById: Record<string, File> = {}
+    for (const [slot, slotFiles] of groups) {
+      const uploaded = slotFiles.map(file => ({ id: `${file.name}-${file.size}-${crypto.randomUUID()}`, name: file.name, size: file.size, area: 'historico' as const, receivedAt: new Date().toLocaleString('pt-BR'), lastModified: file.lastModified }))
+      uploadedBySlot.set(slot, uploaded)
+      uploaded.forEach((item, index) => { filesById[item.id] = slotFiles[index] })
+      await Promise.all((historySlots[slot] ?? []).map(file => removeSlotFile('historico', slot, file.name)))
+      await Promise.all(slotFiles.map(file => saveSlotFile('historico', slot, file)))
+    }
+    const replacedIds = [...groups.keys()].flatMap(slot => (historySlots[slot] ?? []).map(file => file.id))
+    setFiles(current => [...current.filter(file => !replacedIds.includes(file.id)), ...[...uploadedBySlot.values()].flat()])
+    setRawFiles(current => ({ ...Object.fromEntries(Object.entries(current).filter(([id]) => !replacedIds.includes(id))), ...filesById }))
+    setHistorySlots(current => ({ ...current, ...Object.fromEntries(uploadedBySlot) }))
   }
-  function movementSourceChange(source: (typeof movementSources)[number]['id'], event: ChangeEvent<HTMLInputElement>) {
+  async function movementSourceChange(source: (typeof movementSources)[number]['id'], event: ChangeEvent<HTMLInputElement>) {
     const all = Array.from(event.target.files ?? []); event.target.value = ''
     if (!all.length) return
     const incoming = all
+    const previous = movementSlots[source] ?? []
     const uploaded = incoming.map(file => ({ id: `${file.name}-${file.size}-${crypto.randomUUID()}`, name: file.name, size: file.size, area: 'movimentacoes' as const, receivedAt: new Date().toLocaleString('pt-BR'), lastModified: file.lastModified }))
+    await Promise.all(previous.map(file => removeSlotFile('movimentacoes', source, file.name)))
     setFiles(current => [...current, ...uploaded])
     setRawFiles(current => ({ ...current, ...Object.fromEntries(uploaded.map((item, index) => [item.id, incoming[index]])) }))
     setMovementSlots(current => ({ ...current, [source]: uploaded }))
+    await Promise.all(incoming.map(file => saveSlotFile('movimentacoes', source, file)))
   }
-  function receiptSourceChange(source: (typeof receiptSources)[number]['id'], event: ChangeEvent<HTMLInputElement>) { const all=Array.from(event.target.files??[]);event.target.value='';if(!all.length)return;const incoming=all;const uploaded=incoming.map(file=>({id:`${file.name}-${file.size}-${crypto.randomUUID()}`,name:file.name,size:file.size,area:'recebimentos' as const,receivedAt:new Date().toLocaleString('pt-BR'),lastModified:file.lastModified}));setFiles(current=>[...current,...uploaded]);setRawFiles(current=>({...current,...Object.fromEntries(uploaded.map((item,index)=>[item.id,incoming[index]]))}));setReceiptSlots(current=>({...current,[source]:uploaded})) }
+  async function receiptSourceChange(source: (typeof receiptSources)[number]['id'], event: ChangeEvent<HTMLInputElement>) {
+    const all = Array.from(event.target.files ?? []); event.target.value = ''
+    if (!all.length) return
+    const incoming = all
+    const previous = receiptSlots[source] ?? []
+    const uploaded = incoming.map(file => ({ id: `${file.name}-${file.size}-${crypto.randomUUID()}`, name: file.name, size: file.size, area: 'recebimentos' as const, receivedAt: new Date().toLocaleString('pt-BR'), lastModified: file.lastModified }))
+    await Promise.all(previous.map(file => removeSlotFile('recebimentos', source, file.name)))
+    setFiles(current => [...current, ...uploaded])
+    setRawFiles(current => ({ ...current, ...Object.fromEntries(uploaded.map((item, index) => [item.id, incoming[index]])) }))
+    setReceiptSlots(current => ({ ...current, [source]: uploaded }))
+    await Promise.all(incoming.map(file => saveSlotFile('recebimentos', source, file)))
+  }
   function drop(area: SourceArea, event: DragEvent<HTMLDivElement>) { event.preventDefault(); addFiles(area, event.dataTransfer.files) }
   function removeFile(id: string) { setFiles(current => current.filter(file => file.id !== id)); setRawFiles(current => { const next = { ...current }; delete next[id]; return next }) }
-  function removeHistoryFile(id: string) { removeFile(id); setHistorySlots(current => Object.fromEntries(Object.entries(current).map(([source, files]) => [source, files?.filter(file => file.id !== id)]))) }
-  function removeMovementFile(id: string) { removeFile(id); setMovementSlots(current => Object.fromEntries(Object.entries(current).map(([source, files]) => [source, files?.filter(file => file.id !== id)]))) }
-  function removeReceiptFile(id:string){removeFile(id);setReceiptSlots(current=>Object.fromEntries(Object.entries(current).map(([source,files])=>[source,files?.filter(file=>file.id!==id)])))}
-  function removeProductSlotFile(slotId: (typeof productSources)[number]['id'], fileId: string) { removeFile(fileId); setProductSlots(current => { const next = {...current}; delete next[slotId]; return next }) }
-  function removeClientSlotFile(slotId: (typeof clientSources)[number]['id'], fileId: string) { removeFile(fileId); setClientSlots(current => { const next = {...current}; delete next[slotId]; return next }) }
+  function removeHistoryFile(id: string) { const file = (Object.values(historySlots).flat()).find(item => item.id === id); if (file) void removeSlotFile('historico', historySources.find(source => historySlots[source.id]?.some(item => item.id === id))?.id ?? '', file.name); removeFile(id); setHistorySlots(current => Object.fromEntries(Object.entries(current).map(([source, files]) => [source, files?.filter(file => file.id !== id)]))) }
+  function removeMovementFile(id: string) { const file = (Object.values(movementSlots).flat()).find(item => item.id === id); if (file) void removeSlotFile('movimentacoes', movementSources.find(source => movementSlots[source.id]?.some(item => item.id === id))?.id ?? '', file.name); removeFile(id); setMovementSlots(current => Object.fromEntries(Object.entries(current).map(([source, files]) => [source, files?.filter(file => file.id !== id)]))) }
+  function removeReceiptFile(id:string){const file=Object.values(receiptSlots).flat().find(item=>item.id===id);if(file)void removeSlotFile('recebimentos',receiptSources.find(source=>receiptSlots[source.id]?.some(item=>item.id===id))?.id??'',file.name);removeFile(id);setReceiptSlots(current=>Object.fromEntries(Object.entries(current).map(([source,files])=>[source,files?.filter(file=>file.id!==id)])))}
+  function removeProductSlotFile(slotId: (typeof productSources)[number]['id'], fileId: string) { const file = productSlots[slotId]; if (file) void removeSlotFile('produtos', slotId, file.name); removeFile(fileId); setProductSlots(current => { const next = {...current}; delete next[slotId]; return next }) }
+  function removeClientSlotFile(slotId: (typeof clientSources)[number]['id'], fileId: string) { const file = clientSlots[slotId]; if (file) void removeSlotFile('clientes', slotId, file.name); removeFile(fileId); setClientSlots(current => { const next = {...current}; delete next[slotId]; return next }) }
   async function processClients() {
     const selected = Object.values(clientSlots).map(file => file && rawFiles[file.id]).filter((file): file is File => Boolean(file))
     if (!selected.length) return
-    setClientProcessing(true); setClientAudit([])
-    try { const result = await processClientMotor(selected); setClientAudit(result.audit); setClientBase(result.canonicalBase); setClientIndicators(result.indicators); if (result.pyramidDocuments.length > 0) setPexSet(new Set(result.pyramidDocuments)) }
+    const missing = Object.entries(clientSlots).flatMap(([id, file]) => file && !rawFiles[file.id] ? [{ id: `client-missing-${id}`, level: 'action' as const, title: `Reenvie ${clientSources.find(source => source.id === id)?.label ?? 'o relatório'}`, instruction: `O arquivo ${file.name} não está disponível na memória. Reenvie este relatório para incluí-lo na base.`, detail: 'A base será gerada com os arquivos disponíveis.', area: 'clientes' as const }] : [])
+    setClientProcessing(true); setClientAudit(missing)
+    try { const result = await processClientMotor(selected); setClientAudit([...missing, ...result.audit]); setClientBase(result.canonicalBase); setClientIndicators(result.indicators); if (result.pyramidDocuments.length > 0) setPexSet(new Set(result.pyramidDocuments)) }
     catch { setClientAudit([{ id: 'client-read-error', level: 'action', title: 'Não foi possível ler os arquivos', instruction: 'Confira os arquivos e tente novamente.', detail: 'A base de clientes não foi alterada.', area: 'clientes' }]); setClientBase([]); setClientIndicators(null) }
     finally { setClientProcessing(false); forcePush() }
   }
   async function processProducts() {
-    const selected = Object.values(productSlots).map(file => file && rawFiles[file.id]).filter((file): file is File => Boolean(file)); if (!selected.length) return
-    setProductProcessing(true); setProductAudit([])
-    try { const result = await processProductMotor(selected); setProductBase(result.canonicalBase); setProductAudit(result.audit); setProductIndicators(result.indicators) }
+    const missing = Object.entries(productSlots).flatMap(([id, file]) => file && !rawFiles[file.id] ? [{ id: `product-missing-${id}`, level: 'action' as const, title: `Reenvie ${productSources.find(source => source.id === id)?.label ?? 'o relatório'}`, instruction: `O arquivo ${file.name} não está disponível na memória. Reenvie este relatório para incluí-lo na base.`, detail: 'A base será gerada com os arquivos disponíveis.', area: 'produtos' as const }] : [])
+    const selected = Object.values(productSlots).map(file => file && rawFiles[file.id]).filter((file): file is File => Boolean(file)); if (!selected.length) { setProductAudit(missing); return }
+    setProductProcessing(true); setProductAudit(missing)
+    try { const result = await processProductMotor(selected); setProductBase(result.canonicalBase); setProductAudit([...missing, ...result.audit]); setProductIndicators(result.indicators) }
     catch { setProductAudit([{ id: 'product-read-error', level: 'action', title: 'Não foi possível ler os arquivos', instruction: 'Confira os arquivos e tente novamente.', detail: 'A base de produtos não foi alterada.', area: 'produtos' }]); setProductBase([]); setProductIndicators(null) }
     finally { setProductProcessing(false); forcePush() }
   }
   async function processHistory() {
-    const salesFiles = (historySlots.sales ?? []).map(f => rawFiles[f.id]).filter((f): f is File => Boolean(f)); if (!salesFiles.length) return
+    const salesFiles = [...(historySlots.sales_atual ?? []), ...(historySlots.sales_anteriores ?? [])].map(f => rawFiles[f.id]).filter((f): f is File => Boolean(f)); if (!salesFiles.length) return
     const catalogRaw = historySlots.catalog?.[0] ? rawFiles[historySlots.catalog[0].id] : undefined
     setHistoryProcessing(true); setHistoryAudit([])
     try { const result = await processHistoryMotor(salesFiles, { catalogFile: catalogRaw, productBase }); setHistoryBase(result.canonicalBase); setHistoryAudit(result.audit); setHistoryIndicators(result.indicators) }
@@ -338,7 +424,7 @@ export function App() {
     const toRun: Promise<void>[] = []
     if (Object.values(productSlots).some(f => f && rawFiles[f.id])) toRun.push(processProducts())
     if (Object.values(clientSlots).some(f => f && rawFiles[f.id])) toRun.push(processClients())
-    if ((historySlots.sales ?? []).some(f => rawFiles[f.id])) toRun.push(processHistory())
+    if ([...(historySlots.sales_atual ?? []), ...(historySlots.sales_anteriores ?? [])].some(f => rawFiles[f.id])) toRun.push(processHistory())
     if (Object.values(movementSlots).flat().some(f => rawFiles[f.id])) toRun.push(processMovements())
     if (Object.values(receiptSlots).flat().some(f => rawFiles[f.id])) toRun.push(processReceipts())
     await Promise.all(toRun)
@@ -612,10 +698,10 @@ export function App() {
       {tab === 'uploads' ? <section className="content">
         <h2>ARQUIVOS DIÁRIOS</h2>
         <div className="quick-upload" role="button" tabIndex={0} onClick={() => dailyInput.current?.click()} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); void distributeFiles(Array.from(event.dataTransfer.files)) }}><strong>Solte todos os arquivos aqui</strong><span>ou escolha os arquivos</span><input ref={dailyInput} aria-label="Adicionar arquivos diários" type="file" multiple onChange={event => { if (event.target.files) void distributeFiles(Array.from(event.target.files)); event.target.value = '' }} /></div>
-        {(Object.values(productSlots).some(f => f && rawFiles[f.id]) || Object.values(clientSlots).some(f => f && rawFiles[f.id]) || (historySlots.sales ?? []).some(f => rawFiles[f.id]) || Object.values(movementSlots).flat().some(f => rawFiles[f.id]) || Object.values(receiptSlots).flat().some(f => rawFiles[f.id])) ? <button className="process-button" type="button" disabled={processingAll || productProcessing || clientProcessing || historyProcessing || movementProcessing || receiptProcessing} onClick={() => void processAll()} style={{marginBottom: '16px'}}>{processingAll ? 'Processando todos os motores…' : 'Processar todos os motores'}</button> : null}
+        {(Object.values(productSlots).some(f => f && rawFiles[f.id]) || Object.values(clientSlots).some(f => f && rawFiles[f.id]) || ([...(historySlots.sales_atual ?? []), ...(historySlots.sales_anteriores ?? [])]).some(f => rawFiles[f.id]) || Object.values(movementSlots).flat().some(f => rawFiles[f.id]) || Object.values(receiptSlots).flat().some(f => rawFiles[f.id])) ? <button className="process-button" type="button" disabled={processingAll || productProcessing || clientProcessing || historyProcessing || movementProcessing || receiptProcessing} onClick={() => void processAll()} style={{marginBottom: '16px'}}>{processingAll ? 'Processando todos os motores…' : 'Processar todos os motores'}</button> : null}
         <FileList files={filesIn('diario')} onRemove={removeFile} />
         <h2 className="section-title">MOTORES</h2>
-        <div className="motor-grid">{motors.map(motor => <article className="motor-card" key={motor.id}><h3>{motor.name}</h3>{motor.id === 'produtos' ? <><div className="client-source-list">{productSources.map(source => { const uploaded = productSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded ? <small style={{display:'flex',gap:'6px',alignItems:'center'}}>{uploaded.name} <span style={{opacity:0.5,fontSize:10}}>{uploaded.receivedAt}</span> <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeProductSlotFile(source.id, uploaded.id)}>Remover</button></small> : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => productSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={productProcessing || !Object.values(productSlots).some(file => file && rawFiles[file.id])} onClick={processProducts}>{productProcessing ? 'Conferindo arquivos' : 'Criar base de produtos'}</button>{productIndicators ? <div className="indicators"><span>{productIndicators.total.toLocaleString('pt-BR')} produtos</span><span>{productIndicators.inTransit.toLocaleString('pt-BR')} em trânsito</span><button type="button" onClick={downloadProductBase}>Baixar JSON</button><button type="button" onClick={downloadProductExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'clientes' ? <><div className="client-source-list">{clientSources.map(source => { const uploaded = clientSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded ? <small style={{display:'flex',gap:'6px',alignItems:'center'}}>{uploaded.name} <span style={{opacity:0.5,fontSize:10}}>{uploaded.receivedAt}</span> <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeClientSlotFile(source.id, uploaded.id)}>Remover</button></small> : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => clientSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={clientProcessing || !Object.values(clientSlots).some(file => file && rawFiles[file.id])} onClick={processClients}>{clientProcessing ? 'Conferindo arquivos' : 'Criar base de clientes'}</button>{clientIndicators ? <div className="indicators"><span>{clientIndicators.totalClients.toLocaleString('pt-BR')} clientes</span><span>{clientIndicators.complete.toLocaleString('pt-BR')} completos</span><span>{clientIndicators.internal.toLocaleString('pt-BR')} interno</span><span>{clientIndicators.route.toLocaleString('pt-BR')} roteiro</span><span>{clientIndicators.portfolio.toLocaleString('pt-BR')} carteira</span><span>{clientIndicators.premises.toLocaleString('pt-BR')} pirâmide</span><button type="button" onClick={downloadClientBase}>Baixar JSON</button><button type="button" onClick={downloadClientExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'historico' ? <><div className="client-source-list">{historySources.map(source => { const uploaded = historySlots[source.id] ?? []; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file => <small key={file.id} style={{display:'flex',gap:'6px',alignItems:'center'}}>{file.name} <span style={{opacity:0.5,fontSize:10}}>{file.receivedAt}</span> <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeHistoryFile(file.id)}>Remover</button></small>) : <small>{source.id === 'catalog' ? 'Opcional' : 'Ainda não enviado'}</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".txt" multiple={source.id !== 'catalog'} onChange={event => historySourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={historyProcessing || !(historySlots.sales ?? []).some(f => rawFiles[f.id])} onClick={processHistory}>{historyProcessing ? 'Conferindo arquivos' : 'Criar base histórica'}</button>{historyIndicators ? <div className="indicators"><span>{historyIndicators.competencies.toLocaleString('pt-BR')} competências</span><span>{historyIndicators.salesLines.toLocaleString('pt-BR')} vendas</span><button type="button" onClick={downloadHistoryBase}>Baixar JSON</button><button type="button" onClick={downloadHistoryExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'movimentacoes' ? <><div className="client-source-list">{movementSources.map(source => { const uploaded = movementSlots[source.id] ?? []; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file => <small key={file.id} style={{display:'flex',gap:'6px',alignItems:'center'}}>{file.name} <span style={{opacity:0.5,fontSize:10}}>{file.receivedAt}</span> <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeMovementFile(file.id)}>Remover</button></small>) : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" multiple onChange={event => movementSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={movementProcessing || !Object.values(movementSlots).flat().some(file => rawFiles[file.id])} onClick={processMovements}>{movementProcessing ? 'Conferindo arquivos' : 'Criar base de movimentações'}</button>{movementIndicators ? <div className="indicators"><span>{movementIndicators.sales.toLocaleString('pt-BR')} vendas faturadas</span><span>{movementIndicators.pendingRetyping.toLocaleString('pt-BR')} para redigitar</span><button type="button" onClick={downloadMovementBase}>Baixar JSON</button><button type="button" onClick={downloadMovementExcel}>Baixar Excel</button></div> : null}</> : <><button type="button" className="add-button" onClick={() => motorInputs.current[motor.id]?.click()}>Adicionar arquivos</button><input ref={element => { motorInputs.current[motor.id] = element }} aria-label={`Adicionar arquivos de ${motor.name}`} type="file" multiple onChange={event => fileChange(motor.id, event)} /><FileList files={filesIn(motor.id)} onRemove={removeFile} compact /></>}</article>)}</div>
+        <div className="motor-grid">{motors.map(motor => <article className="motor-card" key={motor.id}><h3>{motor.name}</h3>{motor.id === 'produtos' ? <><div className="client-source-list">{productSources.map(source => { const uploaded = productSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded ? <small style={{display:'flex',gap:'6px',alignItems:'center'}}>{uploaded.name} <span style={{opacity:0.5,fontSize:10}}>{uploaded.receivedAt}</span> <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeProductSlotFile(source.id, uploaded.id)}>Remover</button></small> : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => productSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={productProcessing || !Object.values(productSlots).some(file => file && rawFiles[file.id])} onClick={processProducts}>{productProcessing ? 'Conferindo arquivos' : 'Criar base de produtos'}</button>{productIndicators ? <div className="indicators"><span>{productIndicators.total.toLocaleString('pt-BR')} produtos</span><span>{productIndicators.inTransit.toLocaleString('pt-BR')} em trânsito</span><button type="button" onClick={downloadProductBase}>Baixar JSON</button><button type="button" onClick={downloadProductExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'clientes' ? <><div className="client-source-list">{clientSources.map(source => { const uploaded = clientSlots[source.id]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded ? <small style={{display:'flex',gap:'6px',alignItems:'center'}}>{uploaded.name} <span style={{opacity:0.5,fontSize:10}}>{uploaded.receivedAt}</span> <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeClientSlotFile(source.id, uploaded.id)}>Remover</button></small> : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" onChange={event => clientSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={clientProcessing || !Object.values(clientSlots).some(file => file && rawFiles[file.id])} onClick={processClients}>{clientProcessing ? 'Conferindo arquivos' : 'Criar base de clientes'}</button>{clientIndicators ? <div className="indicators"><span>{clientIndicators.totalClients.toLocaleString('pt-BR')} clientes</span><span>{clientIndicators.complete.toLocaleString('pt-BR')} completos</span><span>{clientIndicators.internal.toLocaleString('pt-BR')} interno</span><span>{clientIndicators.route.toLocaleString('pt-BR')} roteiro</span><span>{clientIndicators.portfolio.toLocaleString('pt-BR')} carteira</span><span>{clientIndicators.premises.toLocaleString('pt-BR')} pirâmide</span><button type="button" onClick={downloadClientBase}>Baixar JSON</button><button type="button" onClick={downloadClientExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'historico' ? <><div className="client-source-list">{historySources.map(source => { const uploaded = historySlots[source.id] ?? []; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file => <small key={file.id} style={{display:'flex',gap:'6px',alignItems:'center'}}>{file.name} <span style={{opacity:0.5,fontSize:10}}>{file.receivedAt}</span> <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeHistoryFile(file.id)}>Remover</button></small>) : <small>{source.id === 'catalog' ? 'Opcional' : 'Ainda não enviado'}</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".txt" multiple={source.id !== 'catalog'} onChange={event => historySourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={historyProcessing || !([...(historySlots.sales_atual ?? []), ...(historySlots.sales_anteriores ?? [])]).some(f => rawFiles[f.id])} onClick={processHistory}>{historyProcessing ? 'Conferindo arquivos' : 'Criar base histórica'}</button>{historyIndicators ? <div className="indicators"><span>{historyIndicators.competencies.toLocaleString('pt-BR')} competências</span><span>{historyIndicators.salesLines.toLocaleString('pt-BR')} vendas</span><button type="button" onClick={downloadHistoryBase}>Baixar JSON</button><button type="button" onClick={downloadHistoryExcel}>Baixar Excel</button></div> : null}</> : motor.id === 'movimentacoes' ? <><div className="client-source-list">{movementSources.map(source => { const uploaded = movementSlots[source.id] ?? []; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file => <small key={file.id} style={{display:'flex',gap:'6px',alignItems:'center'}}>{file.name} <span style={{opacity:0.5,fontSize:10}}>{file.receivedAt}</span> <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeMovementFile(file.id)}>Remover</button></small>) : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input aria-label={`Adicionar ${source.label}`} type="file" accept=".xls,.xlsx" multiple onChange={event => movementSourceChange(source.id, event)} /></label></div> })}</div><button className="process-button" type="button" disabled={movementProcessing || !Object.values(movementSlots).flat().some(file => rawFiles[file.id])} onClick={processMovements}>{movementProcessing ? 'Conferindo arquivos' : 'Criar base de movimentações'}</button>{movementIndicators ? <div className="indicators"><span>{movementIndicators.sales.toLocaleString('pt-BR')} vendas faturadas</span><span>{movementIndicators.pendingRetyping.toLocaleString('pt-BR')} para redigitar</span><button type="button" onClick={downloadMovementBase}>Baixar JSON</button><button type="button" onClick={downloadMovementExcel}>Baixar Excel</button></div> : null}</> : <><button type="button" className="add-button" onClick={() => motorInputs.current[motor.id]?.click()}>Adicionar arquivos</button><input ref={element => { motorInputs.current[motor.id] = element }} aria-label={`Adicionar arquivos de ${motor.name}`} type="file" multiple onChange={event => fileChange(motor.id, event)} /><FileList files={filesIn(motor.id)} onRemove={removeFile} compact /></>}</article>)}</div>
         <article className="motor-card"><h3>Chegada de notas</h3><div className="client-source-list">{receiptSources.map(source => { const uploaded=receiptSlots[source.id]??[]; return <div className="client-source" key={source.id}><span><strong>{source.label}</strong>{uploaded.length ? uploaded.map(file=><small key={file.id} style={{display:'flex',gap:'6px',alignItems:'center'}}>{file.name} <span style={{opacity:0.5,fontSize:10}}>{file.receivedAt}</span> <button type="button" style={{border:0,background:'none',color:'var(--red)',fontWeight:700,padding:0,cursor:'pointer'}} onClick={()=>removeReceiptFile(file.id)}>Remover</button></small>) : <small>Ainda não enviado</small>}</span><label className="source-upload">Adicionar arquivo<input type="file" multiple accept={source.id==='legacy'?'.txt':'.xls,.xlsx'} onChange={event=>receiptSourceChange(source.id,event)} /></label></div>})}</div><button className="process-button" type="button" disabled={receiptProcessing||!Object.values(receiptSlots).flat().some(file=>rawFiles[file.id])} onClick={processReceipts}>{receiptProcessing?'Conferindo arquivos':'Criar base de chegada'}</button>{receiptIndicators?<div className="indicators"><span>{receiptIndicators.received.toLocaleString('pt-BR')} recebimentos</span><span>{receiptIndicators.inTransit.toLocaleString('pt-BR')} em trânsito</span><button type="button" onClick={downloadReceiptBase}>Baixar JSON</button><button type="button" onClick={downloadReceiptExcel}>Baixar Excel</button></div>:null}</article>
       </section> : tab === 'auditoria' ? <section className="content">
         <div className="audit-heading"><h2>AUDITORIA</h2><button className="secondary-button" type="button" onClick={downloadAiJson}>Gerar resumo para IA</button></div>

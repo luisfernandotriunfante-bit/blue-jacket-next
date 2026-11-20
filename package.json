@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "tsc -b --pretty false"
+    "lint": "tsc -b --pretty false",
+    "test": "node --experimental-strip-types --import ./tests/domain/helpers/register.mjs --test tests/domain/**/*.test.ts"
   },
   "dependencies": {
     "@types/leaflet": "^1.9.22",

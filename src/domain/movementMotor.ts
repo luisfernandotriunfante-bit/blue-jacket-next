@@ -60,7 +60,7 @@ const cnpj = (value: unknown) => { const result = String(value ?? '').replace(/\
 const number = (value: unknown) => { const raw = String(value ?? '').trim(); const normal = raw.includes(',') && raw.includes('.') ? (raw.lastIndexOf(',') < raw.lastIndexOf('.') ? raw.replace(/,/g, '') : raw.replace(/\./g, '').replace(',', '.')) : raw.replace(',', '.'); const result = Number(normal); return Number.isFinite(result) ? result : undefined }
 const date = (value: unknown) => { const raw = String(value ?? '').trim(); const match = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})/); return match ? `${match[3]}-${match[2]}-${match[1]}` : undefined }
 const rowsFrom = async (file: File) => { const book = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: 'array' }); return book.SheetNames.map(name => XLSX.utils.sheet_to_json<Row>(book.Sheets[name], { header: 1, defval: '', raw: false })) }
-const audit = (id: string, title: string, instruction: string, detail: string, level: AuditItem['level'] = 'ok'): AuditItem => ({ id, title, instruction, detail, level, area: 'movimentacoes' })
+const audit = (id: string, title: string, instruction: string, detail: string, level: AuditItem['level'] = 'ok', aiDetail?: string): AuditItem => ({ id, title, instruction, detail, level, aiDetail, area: 'movimentacoes' })
 
 export async function processMovementMotor(files: File[]): Promise<MovementMotorResult> {
   const rows: Row[][] = []; for (const file of files) rows.push(...await rowsFrom(file))
@@ -71,7 +71,11 @@ export async function processMovementMotor(files: File[]): Promise<MovementMotor
     if (salesHeader) {
       const index = (label: string) => salesHeader.findIndex(value => norm(value) === norm(label))
       const needed = ['DATA MOVIMENTO', 'COD. CLIENTE', 'CODPROD. WINTHOR', 'STATUS PEDIDO', 'TIPO VENDA']
-      if (needed.some(label => index(label) < 0)) { audits.push(audit('move-sales-layout', 'O relatório de vendas mudou', 'Envie o relatório de vendas no formato habitual.', 'As colunas necessárias não foram encontradas nas posições esperadas. Nenhuma venda foi usada.', 'action')); continue }
+      if (needed.some(label => index(label) < 0)) {
+        const missingCols = needed.filter(label => index(label) < 0)
+        audits.push(audit('move-sales-layout', 'O relatório de vendas mudou', 'Envie o relatório de vendas no formato habitual.', 'As colunas necessárias não foram encontradas nas posições esperadas. Nenhuma venda foi usada.', 'action', `Coluna(s) não encontrada(s) no cabeçalho do relatório de vendas atuais: ${missingCols.join(', ')}. Pedir ao usuário o relatório de vendas atuais no formato habitual, com essas colunas presentes.`))
+        continue
+      }
       for (const row of sheet.slice(sheet.indexOf(salesHeader) + 1)) {
         const orderDate = date(row[index('DATA MOVIMENTO')]); const movementDate = date(row[index('DATA EMISSAO NF')]) ?? orderDate; const customerCode = code(row[index('COD. CLIENTE')]); const productCode = code(row[index('CODPROD. WINTHOR')])
         if (!movementDate || !customerCode || !productCode) continue
@@ -107,13 +111,18 @@ export async function processMovementMotor(files: File[]): Promise<MovementMotor
       }
       continue
     }
-    if (sheet.length) audits.push(audit(`move-layout-${crypto.randomUUID()}`, 'Um arquivo não foi reconhecido', 'Confira o relatório e envie novamente.', 'O conteúdo não corresponde a vendas, cortes ou entradas no formato esperado. Nenhum dado foi usado.', 'action'))
+    if (sheet.length) audits.push(audit(`move-layout-${crypto.randomUUID()}`, 'Um arquivo não foi reconhecido', 'Confira o relatório e envie novamente.', 'O conteúdo não corresponde a vendas, cortes ou entradas no formato esperado. Nenhum dado foi usado.', 'action', 'O conteúdo da aba não bateu com nenhum dos 3 formatos reconhecidos (vendas atuais: cabeçalho com DATA MOVIMENTO/COD. CLIENTE/CODPROD. WINTHOR; cortes: título "Consultar corte de mercadorias"; entradas: título "Rel. Entrada de Mercadoria"). Pedir ao usuário para confirmar qual desses relatórios é esse arquivo e reenviar no formato original.'))
   }
-  const pendingRetyping = cuts.filter(cut => cut.needsRetyping).length
+  const retyping = cuts.filter(cut => cut.needsRetyping)
+  const pendingRetyping = retyping.length
   if (salesFound) audits.push(audit('move-sales-ready', 'Vendas atuais organizadas', `${salesFound.toLocaleString('pt-BR')} movimentações foram lidas.`, 'Vendas faturadas, a faturar, devoluções e bonificações foram mantidas separadamente.'))
-  if (cutsFound) audits.push(audit('move-cuts-ready', 'Cortes por cliente organizados', `${pendingRetyping.toLocaleString('pt-BR')} item(ns) precisam de confirmação para redigitação.`, 'O sistema comparou cliente e produto dos cortes com as vendas atuais. Itens sem correspondência ficaram destacados para revisão.', pendingRetyping ? 'attention' : 'ok'))
+  if (cutsFound) {
+    const sample = retyping.slice(0, 10).map(cut => `cliente ${cut.customerCode ?? '?'} / produto ${cut.productCode ?? '?'} (corte de ${cut.movementDate ?? 'data desconhecida'})`)
+    const more = retyping.length > sample.length ? ` e mais ${(retyping.length - sample.length).toLocaleString('pt-BR')} item(ns)` : ''
+    audits.push(audit('move-cuts-ready', 'Cortes por cliente organizados', `${pendingRetyping.toLocaleString('pt-BR')} item(ns) precisam de confirmação para redigitação.`, 'O sistema comparou cliente e produto dos cortes com as vendas atuais. Itens sem correspondência ficaram destacados para revisão.', pendingRetyping ? 'attention' : 'ok', pendingRetyping ? `${pendingRetyping.toLocaleString('pt-BR')} corte(s) não têm uma venda atual correspondente (mesmo cliente e produto) e precisam de redigitação manual. Exemplos: ${sample.join('; ')}${more}.` : undefined))
+  }
   if (entriesFound) audits.push(audit('move-entries-ready', 'Entradas por nota organizadas', `${entriesFound.toLocaleString('pt-BR')} item(ns) de nota foram lidos.`, 'Cada item mantém a nota, fornecedor, data de entrada e custo financeiro atual.'))
-  if (!movements.length) audits.push(audit('move-none', 'Nenhuma movimentação foi encontrada', 'Envie os relatórios de vendas, cortes ou entradas atuais.', 'Nenhum dado foi usado para criar a base de movimentações.', 'action'))
+  if (!movements.length) audits.push(audit('move-none', 'Nenhuma movimentação foi encontrada', 'Envie os relatórios de vendas, cortes ou entradas atuais.', 'Nenhum dado foi usado para criar a base de movimentações.', 'action', 'Nenhum arquivo bateu com vendas atuais, cortes por cliente ou entradas de mercadoria. Pedir ao usuário um desses 3 relatórios específicos no formato original do Winthor.'))
   const indicators = { sales: movements.filter(m => m.movementType === 'venda_faturada').length, toBill: movements.filter(m => m.movementType === 'a_faturar').length, returns: movements.filter(m => m.movementType === 'devolucao').length, bonuses: movements.filter(m => m.movementType === 'bonificacao').length, cuts: cutsFound, pendingRetyping, receiptItems: entriesFound }
   return { canonicalBase: movements.sort((a, b) => (a.movementDate ?? '').localeCompare(b.movementDate ?? '')), audit: audits, indicators }
 }
