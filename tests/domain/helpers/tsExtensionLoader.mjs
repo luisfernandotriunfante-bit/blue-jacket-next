@@ -18,7 +18,7 @@ export async function load(url, context, nextLoad) {
   const result = await nextLoad(url, context)
   if (url.endsWith('/src/firebaseConfig.ts') && result.source !== undefined) {
     const text = typeof result.source === 'string' ? result.source : Buffer.from(result.source).toString('utf8')
-    const source = text.replaceAll('import.meta.env', 'globalThis.__TEST_IMPORT_META_ENV__')
+    const source = text.replaceAll('import.meta.env', '(globalThis.__TEST_IMPORT_META_ENV__ ??= {})')
     return { ...result, source }
   }
   return result
