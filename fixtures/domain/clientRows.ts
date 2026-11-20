@@ -14,3 +14,18 @@ export const portfolioRows = [
   portfolioHeader,
   sparseRow({ 0: '001', 1: '00011122233344', 2: 'Empresa Teste Um LTDA', 5: 'Cidade Teste', 12: 'Semanal', 15: 'Rep Um' }, WIDTH),
 ]
+
+// codigocliente fora da posicao 0, nas demais colunas-ancora (cnpj, frequencia,
+// representante) sem mudanca, para provar que a leitura passou a ser por cabecalho.
+export const portfolioHeaderCodeMoved = sparseRow({ 16: 'CODIGO CLIENTE', 1: 'CNPJ', 12: 'FREQUENCIA', 15: 'REPRESENTANTE' }, WIDTH)
+export const portfolioRowsCodeMoved = [
+  portfolioHeaderCodeMoved,
+  sparseRow({ 16: '001', 1: '00011122233344', 2: 'Empresa Teste Um LTDA', 5: 'Cidade Teste', 12: 'Semanal', 15: 'Rep Um' }, WIDTH),
+]
+
+// cabecalho da carteira sem nenhuma coluna "codigocliente".
+export const portfolioHeaderNoCode = sparseRow({ 1: 'CNPJ', 12: 'FREQUENCIA', 15: 'REPRESENTANTE' }, WIDTH)
+export const portfolioRowsNoCode = [
+  portfolioHeaderNoCode,
+  sparseRow({ 1: '00011122233344', 2: 'Empresa Teste Um LTDA', 5: 'Cidade Teste', 12: 'Semanal', 15: 'Rep Um' }, WIDTH),
+]
