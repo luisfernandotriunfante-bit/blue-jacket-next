@@ -305,15 +305,17 @@ export function App() {
   async function processClients() {
     const selected = Object.values(clientSlots).map(file => file && rawFiles[file.id]).filter((file): file is File => Boolean(file))
     if (!selected.length) return
-    setClientProcessing(true); setClientAudit([])
-    try { const result = await processClientMotor(selected); setClientAudit(result.audit); setClientBase(result.canonicalBase); setClientIndicators(result.indicators); if (result.pyramidDocuments.length > 0) setPexSet(new Set(result.pyramidDocuments)) }
+    const missing = Object.entries(clientSlots).flatMap(([id, file]) => file && !rawFiles[file.id] ? [{ id: `client-missing-${id}`, level: 'action' as const, title: `Reenvie ${clientSources.find(source => source.id === id)?.label ?? 'o relatório'}`, instruction: `O arquivo ${file.name} não está disponível na memória. Reenvie este relatório para incluí-lo na base.`, detail: 'A base será gerada com os arquivos disponíveis.', area: 'clientes' as const }] : [])
+    setClientProcessing(true); setClientAudit(missing)
+    try { const result = await processClientMotor(selected); setClientAudit([...missing, ...result.audit]); setClientBase(result.canonicalBase); setClientIndicators(result.indicators); if (result.pyramidDocuments.length > 0) setPexSet(new Set(result.pyramidDocuments)) }
     catch { setClientAudit([{ id: 'client-read-error', level: 'action', title: 'Não foi possível ler os arquivos', instruction: 'Confira os arquivos e tente novamente.', detail: 'A base de clientes não foi alterada.', area: 'clientes' }]); setClientBase([]); setClientIndicators(null) }
     finally { setClientProcessing(false); forcePush() }
   }
   async function processProducts() {
-    const selected = Object.values(productSlots).map(file => file && rawFiles[file.id]).filter((file): file is File => Boolean(file)); if (!selected.length) return
-    setProductProcessing(true); setProductAudit([])
-    try { const result = await processProductMotor(selected); setProductBase(result.canonicalBase); setProductAudit(result.audit); setProductIndicators(result.indicators) }
+    const missing = Object.entries(productSlots).flatMap(([id, file]) => file && !rawFiles[file.id] ? [{ id: `product-missing-${id}`, level: 'action' as const, title: `Reenvie ${productSources.find(source => source.id === id)?.label ?? 'o relatório'}`, instruction: `O arquivo ${file.name} não está disponível na memória. Reenvie este relatório para incluí-lo na base.`, detail: 'A base será gerada com os arquivos disponíveis.', area: 'produtos' as const }] : [])
+    const selected = Object.values(productSlots).map(file => file && rawFiles[file.id]).filter((file): file is File => Boolean(file)); if (!selected.length) { setProductAudit(missing); return }
+    setProductProcessing(true); setProductAudit(missing)
+    try { const result = await processProductMotor(selected); setProductBase(result.canonicalBase); setProductAudit([...missing, ...result.audit]); setProductIndicators(result.indicators) }
     catch { setProductAudit([{ id: 'product-read-error', level: 'action', title: 'Não foi possível ler os arquivos', instruction: 'Confira os arquivos e tente novamente.', detail: 'A base de produtos não foi alterada.', area: 'produtos' }]); setProductBase([]); setProductIndicators(null) }
     finally { setProductProcessing(false); forcePush() }
   }
