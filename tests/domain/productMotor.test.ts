@@ -22,6 +22,15 @@ test('processProductMotor: estoque atual sobrescreve saldo do cadastro interno',
   assert.equal(product?.status, 'active')
 })
 
+test('processProductMotor: produtos sem regra de agrupamento aparecem listados na auditoria, sem texto generico', async () => {
+  const file = xlsxFile('cadastro-produtos-teste.xlsx', { Produtos: internalRows })
+  const result = await processProductMotor([file])
+  const item = result.audit.find(a => a.id === 'prod-group-review')
+  assert.ok(item, 'produtos de teste nao batem com nenhuma regra de agrupamento, entao devem gerar o item de revisao')
+  assert.match(item!.aiDetail ?? '', /100/)
+  assert.notEqual(item!.aiDetail, 'Não inventar dados. Solicitar o arquivo ou a regra manual correspondente e registrar a decisão na auditoria.')
+})
+
 test('processProductMotor: sem arquivos reconheciveis, base fica vazia e audita a pendencia', async () => {
   const file = xlsxFile('arquivo-vazio.xlsx', { Sheet1: [['nada', 'aqui']] })
   const result = await processProductMotor([file])

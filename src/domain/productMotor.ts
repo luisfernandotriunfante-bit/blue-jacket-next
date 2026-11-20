@@ -91,7 +91,7 @@ const code = (value: unknown) => { const result = String(value ?? '').replace(/\
 const number = (value: unknown) => { const raw = String(value ?? '').replace(/\*/g, '').trim(); const normalized = raw.includes(',') && raw.includes('.') ? (raw.lastIndexOf(',') < raw.lastIndexOf('.') ? raw.replace(/,/g, '') : raw.replace(/\./g, '').replace(',', '.')) : raw.replace(',', '.'); const result = Number(normalized); return Number.isFinite(result) ? result : undefined }
 const rowsFrom = async (file: File): Promise<Sheet[]> => { const book = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: 'array' }); return book.SheetNames.map(name => ({ sheetName: name, rows: XLSX.utils.sheet_to_json<Row>(book.Sheets[name], { header: 1, defval: '', raw: true }) })) }
 const headerAt = (rows: Row[], expected: Record<number, string>) => rows.findIndex(row => Object.entries(expected).every(([index, label]) => norm(row[Number(index)]) === label))
-const audit = (id: string, title: string, instruction: string, detail: string, level: AuditItem['level'] = 'ok'): AuditItem => ({ id, title, instruction, detail, level, area: 'produtos' })
+const audit = (id: string, title: string, instruction: string, detail: string, level: AuditItem['level'] = 'ok', aiDetail?: string): AuditItem => ({ id, title, instruction, detail, level, aiDetail, area: 'produtos' })
 
 export async function processProductMotor(files: File[]): Promise<ProductMotorResult> {
   const results: AuditItem[] = []
@@ -180,9 +180,13 @@ export async function processProductMotor(files: File[]): Promise<ProductMotorRe
       : undefined
     return { ...product, groupCode: grouping.group?.code, groupName: grouping.group?.name, groupFamily: grouping.group?.family, groupStatus: grouping.status, margin, stockCoverage }
   }).sort((a, b) => (a.description ?? '').localeCompare(b.description ?? ''))
-  let differences = 0; for (const [key, value] of check105) if (stock.has(key) && Math.abs((stock.get(key)?.totalStock ?? 0) - value) > .01) differences++
-  if (differences) results.push(audit('prod-stock-diff', 'Há diferenças na conferência de estoque', 'Revise o estoque antes de usar os saldos.', `${differences.toLocaleString('pt-BR')} itens possuem saldo diferente entre os dois relatórios.`, 'attention'))
-  if (!canonicalBase.length) results.push(audit('prod-none', 'Nenhum arquivo de produtos foi reconhecido', 'Envie os arquivos do Motor de Produtos.', 'Nenhum dado foi usado.', 'action'))
+  let differences = 0; const differentCodes: string[] = []; for (const [key, value] of check105) if (stock.has(key) && Math.abs((stock.get(key)?.totalStock ?? 0) - value) > .01) { differences++; differentCodes.push(key) }
+  if (differences) {
+    const sample = differentCodes.slice(0, 20)
+    const more = differentCodes.length > sample.length ? ` e mais ${(differentCodes.length - sample.length).toLocaleString('pt-BR')} código(s)` : ''
+    results.push(audit('prod-stock-diff', 'Há diferenças na conferência de estoque', 'Revise o estoque antes de usar os saldos.', `${differences.toLocaleString('pt-BR')} itens possuem saldo diferente entre os dois relatórios.`, 'attention', `Código(s) de produto com saldo total diferente entre o relatório de estoque atual (1118) e a conferência (105): ${sample.join(', ')}${more}. Revisar fisicamente o estoque desses códigos antes de usar os saldos para decisão.`))
+  }
+  if (!canonicalBase.length) results.push(audit('prod-none', 'Nenhum arquivo de produtos foi reconhecido', 'Envie os arquivos do Motor de Produtos.', 'Nenhum dado foi usado.', 'action', 'Nenhum dos relatórios de produtos foi reconhecido (cadastro interno 286, lista da indústria, estoque atual 1118, preço de venda 8011, sub-marcas 8013, sortimento nacional). Pedir ao usuário um desses relatórios específicos, no formato original.'))
   let stockAtCost = 0, stockAtSalePrice = 0, inTransitTotalValue = 0
   for (const p of canonicalBase) {
     const avail = p.availableStock ?? 0
@@ -200,8 +204,13 @@ export async function processProductMotor(files: File[]): Promise<ProductMotorRe
     stockAtSalePrice: Math.round(stockAtSalePrice * 100) / 100,
     inTransitTotalValue: Math.round(inTransitTotalValue * 100) / 100,
   }
-  const ungrouped = canonicalBase.filter(product => product.groupStatus === 'review').length
-  if (ungrouped) results.push(audit('prod-group-review', 'Alguns produtos precisam de agrupamento', `Revise ${ungrouped.toLocaleString('pt-BR')} produto(s).`, 'Os demais foram agrupados automaticamente conforme suas características.', 'attention'))
+  const ungroupedProducts = canonicalBase.filter(product => product.groupStatus === 'review')
+  const ungrouped = ungroupedProducts.length
+  if (ungrouped) {
+    const sample = ungroupedProducts.slice(0, 20).map(p => p.internalCode ?? p.manufacturerCode ?? p.id)
+    const more = ungroupedProducts.length > sample.length ? ` e mais ${(ungroupedProducts.length - sample.length).toLocaleString('pt-BR')} código(s)` : ''
+    results.push(audit('prod-group-review', 'Alguns produtos precisam de agrupamento', `Revise ${ungrouped.toLocaleString('pt-BR')} produto(s).`, 'Os demais foram agrupados automaticamente conforme suas características.', 'attention', `${ungrouped.toLocaleString('pt-BR')} produto(s) não bateram com nenhuma regra de agrupamento automático, ou bateram com mais de uma. Códigos: ${sample.join(', ')}${more}. Revisar manualmente o grupo comercial desses códigos.`))
+  }
   results.push(audit('prod-base-ready', 'Base de produtos criada', `${indicators.total.toLocaleString('pt-BR')} produtos na base única.`, 'Itens em trânsito não foram incluídos no estoque disponível.'))
   return { canonicalBase, audit: results, indicators }
 }

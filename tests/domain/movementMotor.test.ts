@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { computeAbcMap, processMovementMotor } from '../../src/domain/movementMotor'
 import type { CanonicalMovement } from '../../src/domain/movementMotor'
 import { xlsxFile } from './helpers/files'
-import { salesRows } from '../../fixtures/domain/movementRows'
+import { salesRows, cutsRows } from '../../fixtures/domain/movementRows'
 
 function movement(partial: Partial<CanonicalMovement>): CanonicalMovement {
   return { id: 'x', movementType: 'venda_faturada', sources: [], ...partial }
@@ -36,4 +36,14 @@ test('processMovementMotor: separa vendas faturadas e a faturar pelo status', as
   const result = await processMovementMotor([file])
   assert.equal(result.indicators.sales, 2)
   assert.equal(result.indicators.toBill, 1)
+})
+
+test('processMovementMotor: corte sem venda correspondente lista cliente e produto na auditoria, sem texto generico', async () => {
+  const file = xlsxFile('cortes-teste.xlsx', { Cortes: cutsRows })
+  const result = await processMovementMotor([file])
+  assert.equal(result.indicators.pendingRetyping, 1)
+  const item = result.audit.find(a => a.id === 'move-cuts-ready')
+  assert.ok(item)
+  assert.match(item!.aiDetail ?? '', /cliente 1 \/ produto 100/)
+  assert.notEqual(item!.aiDetail, 'Não inventar dados. Solicitar o arquivo ou a regra manual correspondente e registrar a decisão na auditoria.')
 })
