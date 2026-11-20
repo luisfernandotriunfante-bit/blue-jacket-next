@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { sanitizeStorageName, storagePathFor, saveSlotFile, removeSlotFile, restoreMotorFiles } from '../../src/domain/fileStorage'
+import { sanitizeStorageName, sanitizeDatabaseKey, databasePathFor, saveSlotFile, removeSlotFile, restoreMotorFiles, MAX_RAW_FILE_BYTES } from '../../src/domain/fileStorage'
 import { textFile } from './helpers/files'
 import { createFakeStorageClient } from './helpers/fakeStorageClient'
 import { sampleCadastroContent, sampleCadastroContentV2, sampleCarteiraContent } from '../../fixtures/domain/storageFiles'
@@ -16,8 +16,13 @@ test('sanitizeStorageName: nome vazio ou só com caracteres invalidos vira um no
   assert.equal(sanitizeStorageName('***'), 'arquivo')
 })
 
-test('storagePathFor: monta o caminho motor/slot/nome-seguro', () => {
-  assert.equal(storagePathFor('clientes', 'portfolio', 'Carteira Clientes.xlsx'), 'clientes/portfolio/Carteira-Clientes.xlsx')
+test('sanitizeDatabaseKey: alem do que sanitizeStorageName ja faz, tira o ponto (proibido em chave do Realtime Database)', () => {
+  assert.equal(sanitizeDatabaseKey('Carteira Clientes.xlsx'), 'Carteira-Clientes-xlsx')
+  assert.doesNotMatch(sanitizeDatabaseKey('Relação (1).xlsx'), /[.$#[\]/]/)
+})
+
+test('databasePathFor: monta o caminho blue-jacket/arquivos/<motor>/<slot>/<nome-sem-ponto>', () => {
+  assert.equal(databasePathFor('clientes', 'portfolio', 'Carteira Clientes.xlsx'), 'blue-jacket/arquivos/clientes/portfolio/Carteira-Clientes-xlsx')
 })
 
 test('saveSlotFile + restoreMotorFiles: round-trip para clientes com SDK falso (sem rede)', async () => {
@@ -47,7 +52,7 @@ test('saveSlotFile: reenviar o mesmo slot substitui o conteudo anterior', async 
   const second = textFile('cadastro-clientes.csv', sampleCadastroContentV2)
   await saveSlotFile('clientes', 'internal', first, client)
   await saveSlotFile('clientes', 'internal', second, client)
-  assert.equal(client.store.size, 1, 'deve ocupar só um caminho no Storage, nao acumular versoes')
+  assert.equal(client.store.size, 1, 'deve ocupar só um caminho, nao acumular versoes')
   const restored = await restoreMotorFiles('clientes', client)
   const content = await restored.internal![0].file.text()
   assert.equal(content, sampleCadastroContentV2)
@@ -72,8 +77,22 @@ test('restoreMotorFiles: slots de lista guardam varios arquivos distintos', asyn
 
 test('degradacao sem Firebase configurado: nada quebra e nada e apagado', async () => {
   const file = textFile('qualquer.csv', 'x')
-  await assert.doesNotReject(saveSlotFile('clientes', 'internal', file))
+  const saveResult = await saveSlotFile('clientes', 'internal', file)
+  assert.equal(saveResult.ok, true)
   await assert.doesNotReject(removeSlotFile('clientes', 'internal', 'qualquer.csv'))
   const restored = await restoreMotorFiles('clientes')
   assert.deepEqual(restored, {})
+})
+
+test('saveSlotFile: arquivo acima do limite nao e salvo e devolve erro claro, mesmo com cliente falso', async () => {
+  const client = createFakeStorageClient()
+  const bigContent = 'a'.repeat(MAX_RAW_FILE_BYTES + 1024)
+  const file = textFile('planilha-grande.csv', bigContent)
+  const result = await saveSlotFile('produtos', 'internal', file, client)
+  assert.equal(result.ok, false)
+  if (!result.ok) {
+    assert.match(result.error, /acima do limite/)
+    assert.match(result.error, /planilha-grande\.csv/)
+  }
+  assert.equal(client.store.size, 0, 'nada deve ser salvo quando o arquivo passa do limite')
 })
