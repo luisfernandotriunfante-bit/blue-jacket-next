@@ -253,9 +253,9 @@ export function App() {
     setRawFiles(current => { const next = { ...current }; for (const id of idsToRemove) delete next[id]; return { ...next, ...newRaw } })
     if (Object.keys(toProducts).length) setProductSlots(current => ({ ...current, ...toProducts }))
     if (Object.keys(toClients).length) setClientSlots(current => ({ ...current, ...toClients }))
-    if (Object.keys(toHistory).length) setHistorySlots(current => { const next = { ...current }; for (const [k, v] of Object.entries(toHistory) as [typeof historySources[number]['id'], UploadedFile[]][]) next[k] = v; return next })
-    if (Object.keys(toMovements).length) setMovementSlots(current => { const next = { ...current }; for (const [k, v] of Object.entries(toMovements) as [typeof movementSources[number]['id'], UploadedFile[]][]) next[k] = v; return next })
-    if (Object.keys(toReceipts).length) setReceiptSlots(current => { const next = { ...current }; for (const [k, v] of Object.entries(toReceipts) as [typeof receiptSources[number]['id'], UploadedFile[]][]) next[k] = v; return next })
+    if (Object.keys(toHistory).length) setHistorySlots(current => { const next = { ...current }; for (const [k, v] of Object.entries(toHistory) as [typeof historySources[number]['id'], UploadedFile[]][]) next[k] = [...(current[k] ?? []), ...v]; return next })
+    if (Object.keys(toMovements).length) setMovementSlots(current => { const next = { ...current }; for (const [k, v] of Object.entries(toMovements) as [typeof movementSources[number]['id'], UploadedFile[]][]) next[k] = [...(current[k] ?? []), ...v]; return next })
+    if (Object.keys(toReceipts).length) setReceiptSlots(current => { const next = { ...current }; for (const [k, v] of Object.entries(toReceipts) as [typeof receiptSources[number]['id'], UploadedFile[]][]) next[k] = [...(current[k] ?? []), ...v]; return next })
   }
   function addFiles(area: SourceArea, incoming: FileList | File[]) {
     const next = Array.from(incoming).map(file => ({ id: `${file.name}-${file.size}-${crypto.randomUUID()}`, name: file.name, size: file.size, area, receivedAt: new Date().toLocaleString('pt-BR'), lastModified: file.lastModified }))
