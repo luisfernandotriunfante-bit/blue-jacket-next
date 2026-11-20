@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { processProductMotor } from '../../src/domain/productMotor'
 import { xlsxFile } from './helpers/files'
-import { internalRows, stockRows } from '../../fixtures/domain/productRows'
+import { internalRows, internalRowsShifted, stockRows } from '../../fixtures/domain/productRows'
 
 test('processProductMotor: normaliza preco em formato brasileiro (virgula decimal)', async () => {
   const file = xlsxFile('cadastro-produtos-teste.xlsx', { Produtos: internalRows })
@@ -11,6 +11,16 @@ test('processProductMotor: normaliza preco em formato brasileiro (virgula decima
   assert.ok(product)
   assert.equal(product?.realCost, 2.5)
   assert.equal(product?.financialCost, 3)
+})
+
+test('processProductMotor: le cadastro interno mesmo com CODIGO/DESCRICAO/COD.BARRAS/COD.FABRICANTE em outras colunas', async () => {
+  const file = xlsxFile('cadastro-produtos-teste.xlsx', { Produtos: internalRowsShifted })
+  const result = await processProductMotor([file])
+  const product = result.canonicalBase.find(p => p.internalCode === '100')
+  assert.ok(product, 'produto deve ser reconhecido mesmo com as colunas-ancora deslocadas')
+  assert.equal(product?.ean, '7891000000012')
+  assert.equal(product?.manufacturerCode, 'FAB-A')
+  assert.equal(product?.realCost, 2.5)
 })
 
 test('processProductMotor: estoque atual sobrescreve saldo do cadastro interno', async () => {

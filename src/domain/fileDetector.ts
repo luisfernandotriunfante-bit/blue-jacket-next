@@ -2,8 +2,17 @@ import * as XLSX from 'xlsx'
 
 type Row = unknown[]
 const norm = (value: unknown) => String(value ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
-const headerAt = (rows: Row[], expected: Record<number, string>) =>
-  rows.findIndex(row => Object.entries(expected).every(([index, label]) => norm(row[Number(index)]) === label))
+
+// Acha a linha de cabeçalho pela PRESENÇA dos rótulos em qualquer coluna da
+// linha, não por posição fixa. Isso é o que permite reconhecer um arquivo
+// mesmo quando as colunas foram reordenadas na fonte (Winthor, indústria etc.).
+const anchorsAt = (rows: Row[], labels: string[]) => {
+  const wanted = labels.map(norm)
+  return rows.findIndex(row => {
+    const cells = row.map(cell => norm(cell))
+    return wanted.every(label => cells.includes(label))
+  })
+}
 
 export type FileDetection =
   | { motor: 'produtos'; slot: 'internal' | 'industry' | 'stock' | 'price' | 'subbrands' | 'sortiment' }
@@ -31,35 +40,35 @@ export async function detectFile(file: File): Promise<FileDetection> {
     const book = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: 'array' })
     for (const sheetName of book.SheetNames) {
       const rows = XLSX.utils.sheet_to_json<Row>(book.Sheets[sheetName], { header: 1, defval: '', raw: false })
-      if (headerAt(rows, { 1: 'codigo', 2: 'descricao', 25: 'codbarras', 26: 'codfabricante' }) >= 0)
+      if (anchorsAt(rows, ['codigo', 'descricao', 'codbarras', 'codfabricante']) >= 0)
         return { motor: 'produtos', slot: 'internal' }
-      if (headerAt(rows, { 8: 'sku', 9: 'descricaopadrao', 10: 'ean', 17: 'uncx' }) >= 0)
+      if (anchorsAt(rows, ['sku', 'descricaopadrao', 'ean', 'uncx']) >= 0)
         return { motor: 'produtos', slot: 'industry' }
-      if (headerAt(rows, { 0: 'codigo', 1: 'descricao', 5: 'disponivel', 10: 'estoque', 16: 'codfabricante' }) >= 0)
+      if (anchorsAt(rows, ['codigo', 'descricao', 'disponivel', 'estoque', 'codfabricante']) >= 0)
         return { motor: 'produtos', slot: 'stock' }
-      if (headerAt(rows, { 2: 'codprod', 3: 'descricao', 6: 'ean', 10: 'preco' }) >= 0)
+      if (anchorsAt(rows, ['codprod', 'descricao', 'ean', 'preco']) >= 0)
         return { motor: 'produtos', slot: 'price' }
-      if (headerAt(rows, { 0: 'nomedistribuidor', 3: 'subbrands', 4: 'codigodoprodutoean13' }) >= 0)
+      if (anchorsAt(rows, ['nomedistribuidor', 'subbrands', 'codigodoprodutoean13']) >= 0)
         return { motor: 'produtos', slot: 'subbrands' }
-      if (headerAt(rows, { 0: 'materialsap', 16: 'st', 18: 'lifestage' }) >= 0)
+      if (anchorsAt(rows, ['materialsap', 'st', 'lifestage']) >= 0)
         return { motor: 'produtos', slot: 'sortiment' }
       if (rows.some(row => { const n = (row as unknown[]).map(c => norm(c)); return n.includes('categoriamaster') && n.some(v => v === 'hiper' || v === 'hipermercado') }))
         return { motor: 'produtos', slot: 'sortiment' }
-      if (rows.some(row => norm(row[2]) === 'datamovimento' && norm(row[3]) === 'codcliente' && norm(row[24]) === 'codprodwinthor'))
+      if (anchorsAt(rows, ['datamovimento', 'codcliente', 'codprodwinthor']) >= 0)
         return { motor: 'movimentacoes', slot: 'sales' }
-      if (rows.some(row => norm(row[0]).includes('consultarcortedemercadorias')))
+      if (rows.some(row => row.some(cell => norm(cell).includes('consultarcortedemercadorias'))))
         return { motor: 'movimentacoes', slot: 'cuts' }
-      if (rows.some(row => norm(row[0]).includes('relentradademercadoria')))
+      if (rows.some(row => row.some(cell => norm(cell).includes('relentradademercadoria'))))
         return { motor: 'recebimentos', slot: 'current' }
-      if (rows.some(row => norm(row[0]) === 'orderdate' && norm(row[4]) === 'material' && norm(row[6]) === 'orderqty'))
+      if (anchorsAt(rows, ['orderdate', 'material', 'orderqty']) >= 0)
         return { motor: 'recebimentos', slot: 'portfolio' }
-      if (headerAt(rows, { 0: 'codigo', 5: 'cpfcnpj', 10: 'codrca', 12: 'codsupervisor' }) >= 0)
+      if (anchorsAt(rows, ['codigo', 'cpfcnpj', 'codrca', 'codsupervisor']) >= 0)
         return { motor: 'clientes', slot: 'internal' }
-      if (headerAt(rows, { 2: 'codigocliente', 3: 'cnpj', 10: 'recorrencia', 13: 'diadasemana' }) >= 0)
+      if (anchorsAt(rows, ['codigocliente', 'cnpj', 'recorrencia', 'diadasemana']) >= 0)
         return { motor: 'clientes', slot: 'route' }
-      if (headerAt(rows, { 1: 'cnpj', 12: 'frequencia', 15: 'representante' }) >= 0)
+      if (anchorsAt(rows, ['cnpj', 'frequencia', 'representante']) >= 0)
         return { motor: 'clientes', slot: 'portfolio' }
-      if (headerAt(rows, { 0: 'semestrepremissa', 2: 'codcliente', 13: 'checkpdv' }) >= 0)
+      if (anchorsAt(rows, ['semestrepremissa', 'codcliente', 'checkpdv']) >= 0)
         return { motor: 'clientes', slot: 'premises' }
     }
   } catch { /* arquivo ilegível vai para não reconhecido */ }

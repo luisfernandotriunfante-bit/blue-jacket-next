@@ -67,7 +67,9 @@ export async function processMovementMotor(files: File[]): Promise<MovementMotor
   const audits: AuditItem[] = []; const movements: CanonicalMovement[] = []; const saleKeys = new Set<string>(); const cuts: CanonicalMovement[] = []
   let salesFound = 0, cutsFound = 0, entriesFound = 0
   for (const sheet of rows) {
-    const salesHeader = sheet.find(row => norm(row[2]) === 'datamovimento' && norm(row[3]) === 'codcliente' && norm(row[24]) === 'codprodwinthor')
+    // Âncoras buscadas em qualquer coluna, não em posição fixa: colunas do
+    // relatório de vendas podem ser reordenadas na fonte (Winthor).
+    const salesHeader = sheet.find(row => { const cells = row.map(cell => norm(cell)); return cells.includes('datamovimento') && cells.includes('codcliente') && cells.includes('codprodwinthor') })
     if (salesHeader) {
       const index = (label: string) => salesHeader.findIndex(value => norm(value) === norm(label))
       const needed = ['DATA MOVIMENTO', 'COD. CLIENTE', 'CODPROD. WINTHOR', 'STATUS PEDIDO', 'TIPO VENDA']
@@ -87,26 +89,35 @@ export async function processMovementMotor(files: File[]): Promise<MovementMotor
       }
       continue
     }
-    if (sheet.some(row => norm(row[0]).includes('consultarcortedemercadorias'))) {
+    if (sheet.some(row => row.some(cell => norm(cell).includes('consultarcortedemercadorias')))) {
       let customerCode: string | undefined; let customerName: string | undefined
       for (const row of sheet) {
-        if (norm(row[1]) === 'cliente') { customerCode = code(row[2]); customerName = text(row[4]); continue }
+        const clienteCol = row.findIndex(cell => norm(cell) === 'cliente')
+        if (clienteCol >= 0) { customerCode = code(row[clienteCol + 1]); customerName = text(row[clienteCol + 3]); continue }
         const movementDate = date(row[0]); const orderId = code(row[1]); const productCode = code(row[2]); if (!movementDate || !orderId || !productCode || !customerCode) continue
         const record: CanonicalMovement = { id: `ATUAL:CORTE:${movementDate}:${orderId}:${customerCode}:${productCode}`, movementDate, movementType: 'corte', orderId, customerCode, customerName, productCode, description: text(row[3]), quantity: number(row[10]), value: number(row[12]), unitPrice: number(row[11]), needsRetyping: !saleKeys.has(`${customerCode}|${productCode}`), sources: ['Cortes por cliente'] }
         cuts.push(record); movements.push(record); cutsFound++
       }
       continue
     }
-    if (sheet.some(row => norm(row[0]).includes('relentradademercadoria'))) {
+    if (sheet.some(row => row.some(cell => norm(cell).includes('relentradademercadoria')))) {
       let receipt: Partial<CanonicalMovement> = {}
       for (let position = 0; position < sheet.length; position++) {
         const row = sheet[position]
-        if (norm(row[0]) === 'dtentrada' && norm(row[4]) === 'notafiscal') { const head = sheet[position + 1] ?? []; receipt = { movementDate: date(head[0]), invoiceNumber: code(head[4]), supplierCode: code(head[11]), supplierName: text(head[12]), value: number(head[21]), sources: ['Entradas atuais'] }; continue }
-        if (norm(row[4]) !== 'codigo' || norm(row[5]) !== 'produto') continue
+        // Âncoras "dt entrada" e "nota fiscal" buscadas em qualquer coluna;
+        // os demais campos da nota (fornecedor, valor) são lidos na mesma
+        // linha de dados, deslocados a partir da coluna da nota fiscal —
+        // robusto a um bloco inteiro de colunas deslocado, não a reordenação
+        // interna arbitrária sem rótulo próprio.
+        const dtEntradaCol = row.findIndex(cell => norm(cell) === 'dtentrada')
+        const notaFiscalCol = row.findIndex(cell => norm(cell) === 'notafiscal')
+        if (dtEntradaCol >= 0 && notaFiscalCol >= 0) { const head = sheet[position + 1] ?? []; receipt = { movementDate: date(head[dtEntradaCol]), invoiceNumber: code(head[notaFiscalCol]), supplierCode: code(head[notaFiscalCol + 7]), supplierName: text(head[notaFiscalCol + 8]), value: number(head[notaFiscalCol + 17]), sources: ['Entradas atuais'] }; continue }
+        const codigoCol = row.findIndex(cell => norm(cell) === 'codigo')
+        if (codigoCol < 0 || norm(row[codigoCol + 1]) !== 'produto') continue
         for (position++; position < sheet.length; position++) {
-          const item = sheet[position]; if (norm(item[0]) === 'dtentrada' || norm(item[4]) === 'cpagar') { position--; break }
-          const productCode = code(item[4]); if (!productCode || !receipt.movementDate) continue
-          movements.push({ id: `ATUAL:ENTRADA:${receipt.invoiceNumber ?? ''}:${productCode}:${movements.length}`, movementDate: receipt.movementDate, movementType: 'entrada', invoiceNumber: receipt.invoiceNumber, productCode, description: text(item[5]), quantity: number(item[15]), unitPrice: number(item[17]), currentFinancialCost: number(item[20]), supplierCode: receipt.supplierCode, supplierName: receipt.supplierName, value: receipt.value, sources: ['Entradas atuais'] }); entriesFound++
+          const item = sheet[position]; if (norm(item[0]) === 'dtentrada' || norm(item[codigoCol]) === 'cpagar') { position--; break }
+          const productCode = code(item[codigoCol]); if (!productCode || !receipt.movementDate) continue
+          movements.push({ id: `ATUAL:ENTRADA:${receipt.invoiceNumber ?? ''}:${productCode}:${movements.length}`, movementDate: receipt.movementDate, movementType: 'entrada', invoiceNumber: receipt.invoiceNumber, productCode, description: text(item[codigoCol + 1]), quantity: number(item[codigoCol + 11]), unitPrice: number(item[codigoCol + 13]), currentFinancialCost: number(item[codigoCol + 16]), supplierCode: receipt.supplierCode, supplierName: receipt.supplierName, value: receipt.value, sources: ['Entradas atuais'] }); entriesFound++
         }
       }
       continue

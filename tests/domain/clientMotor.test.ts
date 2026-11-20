@@ -4,6 +4,7 @@ import { processClientMotor } from '../../src/domain/clientMotor'
 import { xlsxFile } from './helpers/files'
 import {
   internalRows,
+  internalRowsShifted,
   portfolioRows,
   portfolioRowsCodeMoved,
   portfolioRowsNoCode,
@@ -16,6 +17,16 @@ test('processClientMotor: reconhece cadastro interno e preserva zeros do CNPJ', 
   const client = result.canonicalBase.find(c => c.document === '00011122233344')
   assert.ok(client, 'documento deve manter os 14 digitos, incluindo zeros a esquerda')
   assert.equal(client?.sources.includes('Cadastro interno'), true)
+})
+
+test('processClientMotor: le cadastro interno mesmo com CODIGO/CPF-CNPJ/COD.RCA/COD.SUPERVISOR em outras colunas', async () => {
+  const original = await processClientMotor([xlsxFile('cadastro-interno-teste.xlsx', { Clientes: internalRows })])
+  const shifted = await processClientMotor([xlsxFile('cadastro-interno-teste.xlsx', { Clientes: internalRowsShifted })])
+  const originalClient = original.canonicalBase.find(c => c.document === '00011122233344')
+  const shiftedClient = shifted.canonicalBase.find(c => c.document === '00011122233344')
+  assert.equal(shiftedClient?.winthorCode, originalClient?.winthorCode)
+  assert.equal(shiftedClient?.rcaCode, originalClient?.rcaCode)
+  assert.equal(shiftedClient?.supervisor, originalClient?.supervisor)
 })
 
 test('processClientMotor: junta carteira e cadastro interno pelo mesmo documento', async () => {

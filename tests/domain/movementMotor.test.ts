@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { computeAbcMap, processMovementMotor } from '../../src/domain/movementMotor'
 import type { CanonicalMovement } from '../../src/domain/movementMotor'
 import { xlsxFile } from './helpers/files'
-import { salesRows, cutsRows } from '../../fixtures/domain/movementRows'
+import { salesRows, salesRowsShifted, cutsRows } from '../../fixtures/domain/movementRows'
 
 function movement(partial: Partial<CanonicalMovement>): CanonicalMovement {
   return { id: 'x', movementType: 'venda_faturada', sources: [], ...partial }
@@ -36,6 +36,12 @@ test('processMovementMotor: separa vendas faturadas e a faturar pelo status', as
   const result = await processMovementMotor([file])
   assert.equal(result.indicators.sales, 2)
   assert.equal(result.indicators.toBill, 1)
+})
+
+test('processMovementMotor: le vendas mesmo com as colunas-ancora em posicoes diferentes', async () => {
+  const original = await processMovementMotor([xlsxFile('vendas-atuais-teste.xlsx', { Vendas: salesRows })])
+  const shifted = await processMovementMotor([xlsxFile('vendas-atuais-teste.xlsx', { Vendas: salesRowsShifted })])
+  assert.deepEqual(shifted.indicators, original.indicators)
 })
 
 test('processMovementMotor: corte sem venda correspondente lista cliente e produto na auditoria, sem texto generico', async () => {

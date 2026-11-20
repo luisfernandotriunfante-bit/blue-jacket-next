@@ -9,6 +9,15 @@ export const internalRows = [
   sparseRow({ 0: '002', 1: 'Empresa Teste Dois LTDA', 2: 'Loja Dois', 5: '00099988877766', 6: 'Cidade Teste', 10: '0008', 11: 'Vendedor Dois', 13: 'Supervisor Um' }, WIDTH),
 ]
 
+// Mesmo cadastro interno, com CODIGO/CPF-CNPJ/COD.RCA/COD.SUPERVISOR em
+// colunas diferentes das originais, para provar que a leitura é por
+// rótulo e não por posição fixa.
+export const internalHeaderShifted = sparseRow({ 14: 'CODIGO', 16: 'CPF/CNPJ', 18: 'COD.RCA', 19: 'COD.SUPERVISOR' }, WIDTH)
+export const internalRowsShifted = [
+  internalHeaderShifted,
+  sparseRow({ 14: '001', 1: 'Empresa Teste Um LTDA', 2: 'Loja Um', 16: '00011122233344', 6: 'Cidade Teste', 18: '0007', 19: 'Vendedor Um', 20: 'Supervisor Um' }, WIDTH),
+]
+
 export const portfolioHeader = sparseRow({ 0: 'CODIGO CLIENTE', 1: 'CNPJ', 12: 'FREQUENCIA', 15: 'REPRESENTANTE' }, WIDTH)
 export const portfolioRows = [
   portfolioHeader,
