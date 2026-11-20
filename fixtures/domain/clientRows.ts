@@ -15,8 +15,8 @@ export const portfolioRows = [
   sparseRow({ 0: '001', 1: '00011122233344', 2: 'Empresa Teste Um LTDA', 5: 'Cidade Teste', 12: 'Semanal', 15: 'Rep Um' }, WIDTH),
 ]
 
-// codigocliente fora da posicao 0, nas demais colunas-ancora (cnpj, frequencia,
-// representante) sem mudanca, para provar que a leitura passou a ser por cabecalho.
+// codigocliente fora da posicao 0, com as colunas-ancora (cnpj, frequencia,
+// representante) intactas nas mesmas posicoes de sempre.
 export const portfolioHeaderCodeMoved = sparseRow({ 16: 'CODIGO CLIENTE', 1: 'CNPJ', 12: 'FREQUENCIA', 15: 'REPRESENTANTE' }, WIDTH)
 export const portfolioRowsCodeMoved = [
   portfolioHeaderCodeMoved,
@@ -28,4 +28,13 @@ export const portfolioHeaderNoCode = sparseRow({ 1: 'CNPJ', 12: 'FREQUENCIA', 15
 export const portfolioRowsNoCode = [
   portfolioHeaderNoCode,
   sparseRow({ 1: '00011122233344', 2: 'Empresa Teste Um LTDA', 5: 'Cidade Teste', 12: 'Semanal', 15: 'Rep Um' }, WIDTH),
+]
+
+// Piramide ativa: nao tem as colunas-ancora da carteira (cnpj/frequencia/
+// representante nas posicoes 1/12/15), para garantir que nao vira falso
+// positivo de carteira depois que a ancora da carteira ficou mais solta.
+export const premisesHeader = sparseRow({ 0: 'SEMESTRE PREMISSA', 2: 'COD CLIENTE', 13: 'CHECK PDV' }, WIDTH)
+export const premisesRows = [
+  premisesHeader,
+  sparseRow({ 0: '2026-1', 2: '001', 3: 'Empresa Teste Um LTDA', 5: 'SP', 6: 'Cidade Teste', 8: 'Cluster A', 11: 'Perfil A', 14: 'Rede Teste' }, WIDTH),
 ]
