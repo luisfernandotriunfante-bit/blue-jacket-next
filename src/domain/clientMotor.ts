@@ -60,6 +60,10 @@ function headerAt(rows: Row[], labels: Record<number, string>) {
   return rows.findIndex(row => Object.entries(labels).every(([index, label]) => norm(at(row, Number(index))) === label))
 }
 
+function columnOf(row: Row, label: string): number {
+  return row.findIndex(cell => norm(cell) === label)
+}
+
 function nearbyLayoutWarning(rows: Row[], expected: Record<number, string>, title: string): AuditItem | null {
   const expectedLabels = new Set(Object.values(expected))
   const row = rows.slice(0, 12).find(candidate => candidate.some(cell => expectedLabels.has(norm(cell))))
@@ -80,7 +84,7 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
     const hasPyramidSheet = sheets.some(({ rows }) => headerAt(rows, { 0: 'semestrepremissa', 2: 'codcliente', 13: 'checkpdv' }) >= 0)
     for (const { rows } of sheets) {
       const internalHeader = headerAt(rows, { 0: 'codigo', 5: 'cpfcnpj', 10: 'codrca', 12: 'codsupervisor' })
-      const portfolioHeader = headerAt(rows, { 0: 'codigocliente', 1: 'cnpj', 12: 'frequencia', 15: 'representante' })
+      const portfolioHeader = headerAt(rows, { 1: 'cnpj', 12: 'frequencia', 15: 'representante' })
       const routeHeader = headerAt(rows, { 2: 'codigocliente', 3: 'cnpj', 10: 'recorrencia', 13: 'diadasemana' })
       const pyramidHeader = headerAt(rows, { 0: 'semestrepremissa', 2: 'codcliente', 13: 'checkpdv' })
       const fallbackPortfolio = rows.findIndex(row => hasDocument(at(row, 1)) && text(at(row, 12)) && text(at(row, 13)) && text(at(row, 15)))
@@ -97,11 +101,19 @@ export async function processClientMotor(files: File[]): Promise<ClientMotorResu
       if (portfolioHeader >= 0 || fallbackPortfolio >= 0) {
         const start = portfolioHeader >= 0 ? portfolioHeader + 1 : fallbackPortfolio
         if (hasPyramidSheet) { audit.push({ id: `portfolio-ignored-${audit.length}`, level: 'ok', title: 'Aba auxiliar ignorada', instruction: 'Nada precisa ser feito.', detail: 'A carteira dentro da Pirâmide não alterou a base de clientes.', area: 'clientes' }); continue }
+        let codigoClienteCol = 0
+        if (portfolioHeader >= 0) {
+          codigoClienteCol = columnOf(rows[portfolioHeader], 'codigocliente')
+          if (codigoClienteCol < 0) {
+            audit.push({ id: `portfolio-missing-codigocliente-${audit.length}`, level: 'action', title: 'Coluna "codigocliente" não encontrada na carteira', instruction: 'Adicione uma coluna com o cabeçalho "codigocliente" na planilha e envie novamente.', detail: 'A carteira foi reconhecida pelas colunas de CNPJ, frequência e representante, mas nenhuma coluna tem o cabeçalho "codigocliente". Nenhum cliente desta aba foi usado.', area: 'clientes' })
+            continue
+          }
+        }
         let accepted = 0
         for (const row of rows.slice(start)) {
           const key = documentKey(at(row, 1)); if (!hasDocument(key)) continue
           if (portfolio.has(key)) continue
-          portfolio.set(key, { document: key, winthorCode: text(at(row, 0)), legalName: text(at(row, 2)), tradeName: text(at(row, 3)), city: text(at(row, 5)), district: text(at(row, 6)), address: text(at(row, 7)), latitude: text(at(row, 8)), longitude: text(at(row, 9)), visitFrequency: text(at(row, 12)), visitDay: text(at(row, 13)), daysWithoutPurchase: text(at(row, 14)), representative: text(at(row, 15)), sources: ['Carteira'] }); accepted++
+          portfolio.set(key, { document: key, winthorCode: text(at(row, codigoClienteCol)), legalName: text(at(row, 2)), tradeName: text(at(row, 3)), city: text(at(row, 5)), district: text(at(row, 6)), address: text(at(row, 7)), latitude: text(at(row, 8)), longitude: text(at(row, 9)), visitFrequency: text(at(row, 12)), visitDay: text(at(row, 13)), daysWithoutPurchase: text(at(row, 14)), representative: text(at(row, 15)), sources: ['Carteira'] }); accepted++
         }
         audit.push({ id: `portfolio-ok-${audit.length}`, level: 'ok', title: 'Carteira de clientes reconhecida', instruction: `${accepted.toLocaleString('pt-BR')} clientes prontos para juntar.`, detail: 'Os dados de endereço, frequência de visita e representante foram lidos.', area: 'clientes' }); continue
       }
