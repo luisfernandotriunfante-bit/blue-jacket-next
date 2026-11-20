@@ -10,6 +10,7 @@ import { processReceiptMotor, type CanonicalReceipt, type ReceiptIndicators } fr
 import { classifyProduct } from './domain/productGrouping'
 import { loadPersisted, savePersisted, saveChunked, loadChunked, setOnSaveHook } from './domain/persistence'
 import { detectFile } from './domain/fileDetector'
+import { saveSlotFile, removeSlotFile, restoreMotorFiles } from './domain/fileStorage'
 import { StockTab } from './StockTab'
 import { SellOutTab } from './SellOutTab'
 import { GerencialTab } from './GerencialTab'
@@ -199,6 +200,35 @@ export function App() {
   useEffect(()=>{let active=true;void loadPersisted<SavedReceiptMotor>('recebimentos').then(saved=>{if(!active||!saved)return;setReceiptBase(saved.base);setReceiptAudit(saved.audit);setReceiptIndicators(saved.indicators);setReceiptSlots(Object.fromEntries(Object.entries(saved.slots).map(([k,v])=>[k,dedupeList(v as UploadedFile[])])) as typeof saved.slots)}).finally(()=>{if(active)setReceiptStateLoaded(true)});return()=>{active=false}},[syncKey])
   useEffect(()=>{if(receiptStateLoaded)void savePersisted<SavedReceiptMotor>('recebimentos',{base:receiptBase,audit:receiptAudit,indicators:receiptIndicators,slots:receiptSlots})},[receiptStateLoaded,receiptBase,receiptAudit,receiptIndicators,receiptSlots])
 
+  useEffect(() => {
+    if (!clientStateLoaded || !productStateLoaded || !historyStateLoaded || !movementStateLoaded || !receiptStateLoaded) return
+    let active = true
+    void (async () => {
+      const motorsToRestore = ['clientes', 'produtos', 'historico', 'movimentacoes', 'recebimentos'] as const
+      const restored = await Promise.all(motorsToRestore.map(async motor => [motor, await restoreMotorFiles(motor)] as const))
+      if (!active) return
+      const savedSlots: Record<string, Record<string, UploadedFile[]>> = {
+        clientes: Object.fromEntries(Object.entries(clientSlots).map(([slot, file]) => [slot, file ? [file] : []])),
+        produtos: Object.fromEntries(Object.entries(productSlots).map(([slot, file]) => [slot, file ? [file] : []])),
+        historico: historySlots,
+        movimentacoes: movementSlots,
+        recebimentos: receiptSlots,
+      }
+      const restoredRaw: Record<string, File> = {}
+      for (const [motor, bySlot] of restored) {
+        for (const [slot, items] of Object.entries(bySlot)) {
+          const metadata = savedSlots[motor][slot] ?? []
+          for (const item of items) {
+            const match = metadata.find(file => file.name === item.name && file.size === item.file.size && !restoredRaw[file.id])
+            if (match) restoredRaw[match.id] = item.file
+          }
+        }
+      }
+      if (Object.keys(restoredRaw).length) setRawFiles(current => ({ ...current, ...restoredRaw }))
+    })()
+    return () => { active = false }
+  }, [clientStateLoaded, productStateLoaded, historyStateLoaded, movementStateLoaded, receiptStateLoaded, clientSlots, productSlots, historySlots, movementSlots, receiptSlots])
+
   const findInSlot = (list: UploadedFile[] | undefined, file: File) => (list ?? []).find(e => e.name === file.name && e.size === file.size)
   async function distributeFiles(incoming: File[]) {
     const detections = await Promise.all(incoming.map(file => detectFile(file).then(detection => ({ file, detection }))))
@@ -223,29 +253,34 @@ export function App() {
         const existing = productSlots[slotId]; if (existing) idsToRemove.push(existing.id)
         const uploaded: UploadedFile = { id, name: file.name, size: file.size, area: 'produtos', receivedAt: now, lastModified: file.lastModified }
         toProducts[slotId] = uploaded; newUploaded.push(uploaded); newRaw[id] = file
+        void saveSlotFile('produtos', slotId, file)
       } else if (motor === 'clientes') {
         const slotId = slot as (typeof clientSources)[number]['id']
         const existing = clientSlots[slotId]; if (existing) idsToRemove.push(existing.id)
         const uploaded: UploadedFile = { id, name: file.name, size: file.size, area: 'clientes', receivedAt: now, lastModified: file.lastModified }
         toClients[slotId] = uploaded; newUploaded.push(uploaded); newRaw[id] = file
+        void saveSlotFile('clientes', slotId, file)
       } else if (motor === 'historico') {
         const slotId = slot as (typeof historySources)[number]['id']
         const dupe = findInSlot(historySlots[slotId], file) ?? findInSlot(toHistory[slotId], file)
         if (dupe) { newRaw[dupe.id] = file; continue } // re-envio: restaura rawFile sem duplicar metadado
         const uploaded: UploadedFile = { id, name: file.name, size: file.size, area: 'historico', receivedAt: now, lastModified: file.lastModified }
         if (!toHistory[slotId]) toHistory[slotId] = []; toHistory[slotId]!.push(uploaded); newUploaded.push(uploaded); newRaw[id] = file
+        void saveSlotFile('historico', slotId, file)
       } else if (motor === 'movimentacoes') {
         const slotId = slot as (typeof movementSources)[number]['id']
         const dupe = findInSlot(movementSlots[slotId], file) ?? findInSlot(toMovements[slotId], file)
         if (dupe) { newRaw[dupe.id] = file; continue }
         const uploaded: UploadedFile = { id, name: file.name, size: file.size, area: 'movimentacoes', receivedAt: now, lastModified: file.lastModified }
         if (!toMovements[slotId]) toMovements[slotId] = []; toMovements[slotId]!.push(uploaded); newUploaded.push(uploaded); newRaw[id] = file
+        void saveSlotFile('movimentacoes', slotId, file)
       } else if (motor === 'recebimentos') {
         const slotId = slot as (typeof receiptSources)[number]['id']
         const dupe = findInSlot(receiptSlots[slotId], file) ?? findInSlot(toReceipts[slotId], file)
         if (dupe) { newRaw[dupe.id] = file; continue }
         const uploaded: UploadedFile = { id, name: file.name, size: file.size, area: 'recebimentos', receivedAt: now, lastModified: file.lastModified }
         if (!toReceipts[slotId]) toReceipts[slotId] = []; toReceipts[slotId]!.push(uploaded); newUploaded.push(uploaded); newRaw[id] = file
+        void saveSlotFile('recebimentos', slotId, file)
       }
     }
     if (!newUploaded.length && !idsToRemove.length && !Object.keys(newRaw).length) return
@@ -270,11 +305,13 @@ export function App() {
     setFiles(current => [...current.filter(item => item.id !== clientSlots[source]?.id), uploaded])
     setRawFiles(current => ({ ...current, [uploaded.id]: file }))
     setClientSlots(current => ({ ...current, [source]: uploaded }))
+    void saveSlotFile('clientes', source, file)
   }
   function productSourceChange(source: (typeof productSources)[number]['id'], event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]; event.target.value = ''; if (!file) return
     const uploaded: UploadedFile = { id: `${file.name}-${file.size}-${crypto.randomUUID()}`, name: file.name, size: file.size, area: 'produtos', receivedAt: new Date().toLocaleString('pt-BR'), lastModified: file.lastModified }
     setFiles(current => [...current.filter(item => item.id !== productSlots[source]?.id), uploaded]); setRawFiles(current => ({ ...current, [uploaded.id]: file })); setProductSlots(current => ({ ...current, [source]: uploaded }))
+    void saveSlotFile('produtos', source, file)
   }
   function historySourceChange(source: (typeof historySources)[number]['id'], event: ChangeEvent<HTMLInputElement>) {
     const all = Array.from(event.target.files ?? []); event.target.value = ''
@@ -297,11 +334,11 @@ export function App() {
   function receiptSourceChange(source: (typeof receiptSources)[number]['id'], event: ChangeEvent<HTMLInputElement>) { const all=Array.from(event.target.files??[]);event.target.value='';if(!all.length)return;const incoming=all;const uploaded=incoming.map(file=>({id:`${file.name}-${file.size}-${crypto.randomUUID()}`,name:file.name,size:file.size,area:'recebimentos' as const,receivedAt:new Date().toLocaleString('pt-BR'),lastModified:file.lastModified}));setFiles(current=>[...current,...uploaded]);setRawFiles(current=>({...current,...Object.fromEntries(uploaded.map((item,index)=>[item.id,incoming[index]]))}));setReceiptSlots(current=>({...current,[source]:uploaded})) }
   function drop(area: SourceArea, event: DragEvent<HTMLDivElement>) { event.preventDefault(); addFiles(area, event.dataTransfer.files) }
   function removeFile(id: string) { setFiles(current => current.filter(file => file.id !== id)); setRawFiles(current => { const next = { ...current }; delete next[id]; return next }) }
-  function removeHistoryFile(id: string) { removeFile(id); setHistorySlots(current => Object.fromEntries(Object.entries(current).map(([source, files]) => [source, files?.filter(file => file.id !== id)]))) }
-  function removeMovementFile(id: string) { removeFile(id); setMovementSlots(current => Object.fromEntries(Object.entries(current).map(([source, files]) => [source, files?.filter(file => file.id !== id)]))) }
-  function removeReceiptFile(id:string){removeFile(id);setReceiptSlots(current=>Object.fromEntries(Object.entries(current).map(([source,files])=>[source,files?.filter(file=>file.id!==id)])))}
-  function removeProductSlotFile(slotId: (typeof productSources)[number]['id'], fileId: string) { removeFile(fileId); setProductSlots(current => { const next = {...current}; delete next[slotId]; return next }) }
-  function removeClientSlotFile(slotId: (typeof clientSources)[number]['id'], fileId: string) { removeFile(fileId); setClientSlots(current => { const next = {...current}; delete next[slotId]; return next }) }
+  function removeHistoryFile(id: string) { const file = (Object.values(historySlots).flat()).find(item => item.id === id); if (file) void removeSlotFile('historico', historySources.find(source => historySlots[source.id]?.some(item => item.id === id))?.id ?? '', file.name); removeFile(id); setHistorySlots(current => Object.fromEntries(Object.entries(current).map(([source, files]) => [source, files?.filter(file => file.id !== id)]))) }
+  function removeMovementFile(id: string) { const file = (Object.values(movementSlots).flat()).find(item => item.id === id); if (file) void removeSlotFile('movimentacoes', movementSources.find(source => movementSlots[source.id]?.some(item => item.id === id))?.id ?? '', file.name); removeFile(id); setMovementSlots(current => Object.fromEntries(Object.entries(current).map(([source, files]) => [source, files?.filter(file => file.id !== id)]))) }
+  function removeReceiptFile(id:string){const file=Object.values(receiptSlots).flat().find(item=>item.id===id);if(file)void removeSlotFile('recebimentos',receiptSources.find(source=>receiptSlots[source.id]?.some(item=>item.id===id))?.id??'',file.name);removeFile(id);setReceiptSlots(current=>Object.fromEntries(Object.entries(current).map(([source,files])=>[source,files?.filter(file=>file.id!==id)])))}
+  function removeProductSlotFile(slotId: (typeof productSources)[number]['id'], fileId: string) { const file = productSlots[slotId]; if (file) void removeSlotFile('produtos', slotId, file.name); removeFile(fileId); setProductSlots(current => { const next = {...current}; delete next[slotId]; return next }) }
+  function removeClientSlotFile(slotId: (typeof clientSources)[number]['id'], fileId: string) { const file = clientSlots[slotId]; if (file) void removeSlotFile('clientes', slotId, file.name); removeFile(fileId); setClientSlots(current => { const next = {...current}; delete next[slotId]; return next }) }
   async function processClients() {
     const selected = Object.values(clientSlots).map(file => file && rawFiles[file.id]).filter((file): file is File => Boolean(file))
     if (!selected.length) return
