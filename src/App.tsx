@@ -321,22 +321,36 @@ export function App() {
   function historySourceChange(source: (typeof historySources)[number]['id'], event: ChangeEvent<HTMLInputElement>) {
     const all = Array.from(event.target.files ?? []); event.target.value = ''
     if (!all.length) return
-    const incoming = all
+    const incoming = all.filter((file, index) => !findInSlot(historySlots[source], file) && !all.slice(0, index).some(previous => previous.name === file.name && previous.size === file.size))
     const uploaded = incoming.map(file => ({ id: `${file.name}-${file.size}-${crypto.randomUUID()}`, name: file.name, size: file.size, area: 'historico' as const, receivedAt: new Date().toLocaleString('pt-BR'), lastModified: file.lastModified }))
+    if (!uploaded.length) return
     setFiles(current => [...current, ...uploaded])
     setRawFiles(current => ({ ...current, ...Object.fromEntries(uploaded.map((item, index) => [item.id, incoming[index]])) }))
-    setHistorySlots(current => ({ ...current, [source]: uploaded }))
+    setHistorySlots(current => ({ ...current, [source]: [...(current[source] ?? []), ...uploaded] }))
+    incoming.forEach(file => { void saveSlotFile('historico', source, file) })
   }
   function movementSourceChange(source: (typeof movementSources)[number]['id'], event: ChangeEvent<HTMLInputElement>) {
     const all = Array.from(event.target.files ?? []); event.target.value = ''
     if (!all.length) return
-    const incoming = all
+    const incoming = all.filter((file, index) => !findInSlot(movementSlots[source], file) && !all.slice(0, index).some(previous => previous.name === file.name && previous.size === file.size))
     const uploaded = incoming.map(file => ({ id: `${file.name}-${file.size}-${crypto.randomUUID()}`, name: file.name, size: file.size, area: 'movimentacoes' as const, receivedAt: new Date().toLocaleString('pt-BR'), lastModified: file.lastModified }))
+    if (!uploaded.length) return
     setFiles(current => [...current, ...uploaded])
     setRawFiles(current => ({ ...current, ...Object.fromEntries(uploaded.map((item, index) => [item.id, incoming[index]])) }))
-    setMovementSlots(current => ({ ...current, [source]: uploaded }))
+    setMovementSlots(current => ({ ...current, [source]: [...(current[source] ?? []), ...uploaded] }))
+    incoming.forEach(file => { void saveSlotFile('movimentacoes', source, file) })
   }
-  function receiptSourceChange(source: (typeof receiptSources)[number]['id'], event: ChangeEvent<HTMLInputElement>) { const all=Array.from(event.target.files??[]);event.target.value='';if(!all.length)return;const incoming=all;const uploaded=incoming.map(file=>({id:`${file.name}-${file.size}-${crypto.randomUUID()}`,name:file.name,size:file.size,area:'recebimentos' as const,receivedAt:new Date().toLocaleString('pt-BR'),lastModified:file.lastModified}));setFiles(current=>[...current,...uploaded]);setRawFiles(current=>({...current,...Object.fromEntries(uploaded.map((item,index)=>[item.id,incoming[index]]))}));setReceiptSlots(current=>({...current,[source]:uploaded})) }
+  function receiptSourceChange(source: (typeof receiptSources)[number]['id'], event: ChangeEvent<HTMLInputElement>) {
+    const all = Array.from(event.target.files ?? []); event.target.value = ''
+    if (!all.length) return
+    const incoming = all.filter((file, index) => !findInSlot(receiptSlots[source], file) && !all.slice(0, index).some(previous => previous.name === file.name && previous.size === file.size))
+    const uploaded = incoming.map(file => ({ id: `${file.name}-${file.size}-${crypto.randomUUID()}`, name: file.name, size: file.size, area: 'recebimentos' as const, receivedAt: new Date().toLocaleString('pt-BR'), lastModified: file.lastModified }))
+    if (!uploaded.length) return
+    setFiles(current => [...current, ...uploaded])
+    setRawFiles(current => ({ ...current, ...Object.fromEntries(uploaded.map((item, index) => [item.id, incoming[index]])) }))
+    setReceiptSlots(current => ({ ...current, [source]: [...(current[source] ?? []), ...uploaded] }))
+    incoming.forEach(file => { void saveSlotFile('recebimentos', source, file) })
+  }
   function drop(area: SourceArea, event: DragEvent<HTMLDivElement>) { event.preventDefault(); addFiles(area, event.dataTransfer.files) }
   function removeFile(id: string) { setFiles(current => current.filter(file => file.id !== id)); setRawFiles(current => { const next = { ...current }; delete next[id]; return next }) }
   function removeHistoryFile(id: string) { const file = (Object.values(historySlots).flat()).find(item => item.id === id); if (file) void removeSlotFile('historico', historySources.find(source => historySlots[source.id]?.some(item => item.id === id))?.id ?? '', file.name); removeFile(id); setHistorySlots(current => Object.fromEntries(Object.entries(current).map(([source, files]) => [source, files?.filter(file => file.id !== id)]))) }
