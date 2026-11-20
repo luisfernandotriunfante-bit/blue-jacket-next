@@ -2,8 +2,9 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { normNfKey, groupReceiptsByInvoice, computeDailyReceiptRate, processReceiptMotor } from '../../src/domain/receiptMotor'
 import type { CanonicalReceipt } from '../../src/domain/receiptMotor'
-import { textFile } from './helpers/files'
+import { textFile, xlsxFile } from './helpers/files'
 import { legacyReceiptContent } from '../../fixtures/domain/receiptText'
+import { transitRowsValueFound, transitRowsNoValueColumn, transitRowsValueZeroed } from '../../fixtures/domain/receiptTransitRows'
 
 test('normNfKey: remove zeros a esquerda, asteriscos e sufixo apos o hifen', () => {
   assert.equal(normNfKey('*000123-A'), '123')
@@ -40,4 +41,36 @@ test('processReceiptMotor: reconhece a relacao de notas do legado e preserva o C
   const note = result.canonicalBase.find(r => r.invoice === '123')
   assert.equal(note?.supplierDocument, '00011122233344')
   assert.equal(note?.value, 1000)
+})
+
+test('processReceiptMotor: carteira com coluna de valor em outra posicao (cabecalho Valor) le o valor certo, sem aviso', async () => {
+  const file = xlsxFile('carteira-teste.xlsx', { Carteira: transitRowsValueFound })
+  const result = await processReceiptMotor([file])
+  const item = result.canonicalBase.find(r => r.status === 'em_transito')
+  assert.equal(item?.value, 250.5)
+  assert.equal(item?.quantity, 5)
+  assert.ok(!result.audit.some(a => a.id === 'receipt-transit-value-missing'))
+})
+
+test('processReceiptMotor: carteira sem coluna de valor gera aviso action, quantidade continua', async () => {
+  const file = xlsxFile('carteira-teste.xlsx', { Carteira: transitRowsNoValueColumn })
+  const result = await processReceiptMotor([file])
+  const item = result.canonicalBase.find(r => r.status === 'em_transito')
+  assert.equal(item?.quantity, 5)
+  assert.equal(item?.value, 0)
+  const warning = result.audit.find(a => a.id === 'receipt-transit-value-missing')
+  assert.ok(warning, 'deve avisar que a coluna de valor nao foi encontrada')
+  assert.equal(warning!.level, 'action')
+  assert.match(warning!.detail, /carteira-teste\.xlsx/)
+})
+
+test('processReceiptMotor: carteira com valores zerados (coluna encontrada) gera o mesmo aviso', async () => {
+  const file = xlsxFile('carteira-teste.xlsx', { Carteira: transitRowsValueZeroed })
+  const result = await processReceiptMotor([file])
+  const item = result.canonicalBase.find(r => r.status === 'em_transito')
+  assert.equal(item?.quantity, 5)
+  assert.equal(item?.value, 0)
+  const warning = result.audit.find(a => a.id === 'receipt-transit-value-missing')
+  assert.ok(warning, 'deve avisar mesmo com a coluna encontrada, pois os valores vieram zerados')
+  assert.equal(warning!.level, 'action')
 })
