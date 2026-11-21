@@ -1,15 +1,7 @@
-# Red Jacket
+# Blue Jacket
 
-Base limpa do painel Red Jacket.
+Painel comercial em React + TypeScript + Vite. Publicado no GitHub Pages.
 
-## Primeiro ciclo
-
-- Administração com Uploads e Auditoria;
-- tema claro e escuro;
-- coleta de arquivos diários e por motor;
-- resumo auditável para IA;
-- sem dados de demonstração.
-
-## Decisão de dados
-
-A base canônica será armazenada em JSON. Cada motor poderá gerar uma planilha Excel para conferência e entrega humana.
+- Padrão visual do sistema: `PADRAO-VISUAL.md`. Todo elemento novo segue esse documento.
+- Motores de dados (cálculos e leitura de planilhas): `src/domain/`.
+- Interface: casca com abas vazias em `src/App.tsx`, em construção.
