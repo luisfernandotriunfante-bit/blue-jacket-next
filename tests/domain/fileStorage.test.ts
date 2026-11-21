@@ -1,9 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { sanitizeStorageName, sanitizeDatabaseKey, databasePathFor, saveSlotFile, removeSlotFile, restoreMotorFiles, MAX_RAW_FILE_BYTES } from '../../src/domain/fileStorage'
+import { sanitizeStorageName, sanitizeDatabaseKey, databasePathFor, saveSlotFile, removeSlotFile, restoreMotorFiles, parseStoredRecord, MAX_RAW_FILE_BYTES } from '../../src/domain/fileStorage'
 import { textFile } from './helpers/files'
 import { createFakeStorageClient } from './helpers/fakeStorageClient'
-import { sampleCadastroContent, sampleCadastroContentV2, sampleCarteiraContent } from '../../fixtures/domain/storageFiles'
+import { sampleCadastroContent, sampleCadastroContentV2, sampleCarteiraContent, sampleComplexFileName, sampleSortimentoContent } from '../../fixtures/domain/storageFiles'
 
 test('sanitizeStorageName: remove acentos, espacos e caracteres invalidos de caminho', () => {
   const result = sanitizeStorageName('Relação Carteira clientes (1).xlsx')
@@ -82,6 +82,29 @@ test('degradacao sem Firebase configurado: nada quebra e nada e apagado', async 
   await assert.doesNotReject(removeSlotFile('clientes', 'internal', 'qualquer.csv'))
   const restored = await restoreMotorFiles('clientes')
   assert.deepEqual(restored, {})
+})
+
+test('saveSlotFile + restoreMotorFiles: nome com espaco, parenteses, acento e apostrofo volta igual ao original', async () => {
+  const client = createFakeStorageClient()
+  const file = textFile(sampleComplexFileName, sampleSortimentoContent)
+  await saveSlotFile('produtos', 'sortiment', file, client)
+  const restored = await restoreMotorFiles('produtos', client)
+  assert.equal(restored.sortiment?.length, 1)
+  assert.equal(restored.sortiment?.[0].name, sampleComplexFileName)
+  const content = await restored.sortiment![0].file.text()
+  assert.equal(content, sampleSortimentoContent)
+})
+
+test('parseStoredRecord: com name guardado, devolve o nome original (nao o do caminho)', () => {
+  const content = btoa('conteudo')
+  const result = parseStoredRecord('blue-jacket/arquivos/produtos/sortiment/Sortimento-Q4-26', { name: sampleComplexFileName, size: 8, content })
+  assert.equal(result.name, sampleComplexFileName)
+})
+
+test('parseStoredRecord: registro antigo sem name cai para o nome do caminho, sem quebrar', () => {
+  const content = btoa('conteudo')
+  const result = parseStoredRecord('blue-jacket/arquivos/produtos/sortiment/Sortimento-Q4-26', { size: 8, content })
+  assert.equal(result.name, 'Sortimento-Q4-26')
 })
 
 test('saveSlotFile: arquivo acima do limite nao e salvo e devolve erro claro, mesmo com cliente falso', async () => {
