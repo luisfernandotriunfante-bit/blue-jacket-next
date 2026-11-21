@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx'
 import type { AuditItem } from './types'
 
 export type CanonicalReceipt = { id: string; status: 'recebida' | 'em_transito'; system: 'legado' | 'atual' | 'industria'; entryDate?: string; issueDate?: string; invoice?: string; supplierDocument?: string; supplierName?: string; operation?: string; productCode?: string; description?: string; quantity?: number; unitPrice?: number; financialCost?: number; value?: number; sources: string[] }
-export type ReceiptIndicators = { received: number; inTransit: number; currentItems: number; legacyNotes: number }
+export type ReceiptIndicators = { received: number; inTransit: number; currentItems: number; legacyNotes: number; transitBalance: number }
 export type ReceiptMotorResult = { canonicalBase: CanonicalReceipt[]; audit: AuditItem[]; indicators: ReceiptIndicators }
 
 export type InvoiceGroup = {
@@ -49,6 +49,35 @@ export function groupReceiptsByInvoice(base: CanonicalReceipt[]): {
   return { receivedGroups, openTransitGroups }
 }
 
+// Regra do Luis: a carteira em trânsito é o total de TODAS as linhas da
+// carteira (M), menos o Vl. Total (da 218) de cada nota que casa com uma
+// nota da carteira. Linha da carteira sem nota não tem chave para casar —
+// seu valor continua no total, sem nenhum abatimento. Nota da carteira sem
+// entrada correspondente na 218 também não abate (fica como aviso).
+export function computeTransitBalance(base: CanonicalReceipt[]): { total: number; matchedInvoices: string[]; unmatchedInvoices: string[] } {
+  const transitTotal = base.filter(r => r.status === 'em_transito').reduce((sum, r) => sum + (r.value ?? 0), 0)
+  const transitInvoiceKeys = new Set<string>()
+  for (const r of base) {
+    if (r.status === 'em_transito' && r.invoice) { const key = normNfKey(r.invoice); if (key) transitInvoiceKeys.add(key) }
+  }
+  // Vl. Total é por nota (repetido em cada item da 218 daquela nota); pega só uma vez por nota.
+  const vlTotalByInvoice = new Map<string, number>()
+  for (const r of base) {
+    if (r.status !== 'recebida' || r.system !== 'atual' || !r.invoice) continue
+    const key = normNfKey(r.invoice)
+    if (key && !vlTotalByInvoice.has(key)) vlTotalByInvoice.set(key, r.value ?? 0)
+  }
+  let matchedTotal = 0
+  const matchedInvoices: string[] = []
+  const unmatchedInvoices: string[] = []
+  for (const key of transitInvoiceKeys) {
+    const vlTotal = vlTotalByInvoice.get(key)
+    if (vlTotal !== undefined) { matchedTotal += vlTotal; matchedInvoices.push(key) }
+    else unmatchedInvoices.push(key)
+  }
+  return { total: transitTotal - matchedTotal, matchedInvoices, unmatchedInvoices }
+}
+
 export function computeDailyReceiptRate(base: CanonicalReceipt[]): Map<string, number> {
   const cutoff12m = Date.now() - 365 * 86_400_000
   const qty12m = new Map<string, number>()
@@ -83,7 +112,7 @@ export async function processReceiptMotor(files: File[]):Promise<ReceiptMotorRes
  for(const file of files){
   const isText=file.name.toLowerCase().endsWith('.txt')
   if(isText){const s=(await file.text()).replace(/\u0000/g,'');if(!/relacao\s+de\s+notas\s+fiscais/i.test(s)){audits.push(audit(`receipt-layout-${crypto.randomUUID()}`,'Um arquivo não foi reconhecido','Envie a relação de notas do legado.','O conteúdo não corresponde ao formato esperado.','action',`O arquivo "${file.name}" não contém o texto "RELAÇÃO DE NOTAS FISCAIS" esperado para as notas do legado. Pedir ao usuário a relação de notas fiscais do sistema legado, sem edições.`));continue}const re=/^\s*(\d+)\s+(\d{2}\/\d{2}\/\d{2})\s+(\d{2}\/\d{2}\/\d{2})\s+(\d+)\s+(.+?)\s+(\d+\.\d+)\s+(\d+)\s+([\d.,-]+)\s+/;for(const line of s.split(/\r?\n/)){const m=line.match(re);if(!m)continue;const[,invoice,issue,entry,doc,name,operation,,value]=m;base.push({id:`LEGADO:${invoice}:${entry}`,status:'recebida',system:'legado',invoice,issueDate:date(issue),entryDate:date(entry),supplierDocument:doc,supplierName:name.trim(),operation,value:num(value),sources:['Notas do legado']});legacy++}continue}
-  const book=XLSX.read(new Uint8Array(await file.arrayBuffer()),{type:'array'});for(const sheetName of book.SheetNames){const rows=XLSX.utils.sheet_to_json<Row>(book.Sheets[sheetName],{header:1,defval:'',raw:false});if(rows.some(r=>r.some(cell=>norm(cell).includes('relentradademercadoria')))){let head:Row=[];let notaFiscalCol=4;for(let i=0;i<rows.length;i++){const r=rows[i];const dtEntradaCol=r.findIndex(cell=>norm(cell)==='dtentrada');const nfCol=r.findIndex(cell=>norm(cell)==='notafiscal');if(dtEntradaCol>=0&&nfCol>=0){head=rows[i+1]??[];notaFiscalCol=nfCol;continue}const codigoCol=r.findIndex(cell=>norm(cell)==='codigo');if(codigoCol<0||norm(r[codigoCol+1])!=='produto')continue;for(i++;i<rows.length;i++){const item=rows[i];if(norm(item[0])==='dtentrada'||norm(item[codigoCol])==='cpagar'){i--;break}const productCode=code(item[codigoCol]);if(!productCode||!date(head[0]))continue;base.push({id:`ATUAL:${code(head[notaFiscalCol])}:${productCode}:${current}`,status:'recebida',system:'atual',entryDate:date(head[0]),issueDate:date(head[notaFiscalCol+4]),invoice:code(head[notaFiscalCol]),supplierDocument:code(head[notaFiscalCol+14]),supplierName:text(head[notaFiscalCol+8]),productCode,description:text(item[codigoCol+1]),quantity:num(item[codigoCol+11]),unitPrice:num(item[codigoCol+13]),financialCost:num(item[codigoCol+16]),value:num(head[notaFiscalCol+17]),sources:['Entradas atuais']});current++}}continue}const header=rows.find(r=>{const cells=r.map(cell=>norm(cell));return cells.includes('orderdate')&&cells.includes('material')&&cells.includes('orderqty')});if(header){
+  const book=XLSX.read(new Uint8Array(await file.arrayBuffer()),{type:'array'});for(const sheetName of book.SheetNames){const rows=XLSX.utils.sheet_to_json<Row>(book.Sheets[sheetName],{header:1,defval:'',raw:false});if(rows.some(r=>r.some(cell=>norm(cell).includes('relentradademercadoria')))){let head:Row=[];let notaFiscalCol=4;let vlTotalCol=-1;for(let i=0;i<rows.length;i++){const r=rows[i];const dtEntradaCol=r.findIndex(cell=>norm(cell)==='dtentrada');const nfCol=r.findIndex(cell=>norm(cell)==='notafiscal');if(dtEntradaCol>=0&&nfCol>=0){head=rows[i+1]??[];notaFiscalCol=nfCol;vlTotalCol=r.findIndex(cell=>norm(cell)==='vltotal');continue}const codigoCol=r.findIndex(cell=>norm(cell)==='codigo');if(codigoCol<0||norm(r[codigoCol+1])!=='produto')continue;for(i++;i<rows.length;i++){const item=rows[i];if(norm(item[0])==='dtentrada'||norm(item[codigoCol])==='cpagar'){i--;break}const productCode=code(item[codigoCol]);if(!productCode||!date(head[0]))continue;base.push({id:`ATUAL:${code(head[notaFiscalCol])}:${productCode}:${current}`,status:'recebida',system:'atual',entryDate:date(head[0]),issueDate:date(head[notaFiscalCol+4]),invoice:code(head[notaFiscalCol]),supplierDocument:code(head[notaFiscalCol+14]),supplierName:text(head[notaFiscalCol+8]),productCode,description:text(item[codigoCol+1]),quantity:num(item[codigoCol+11]),unitPrice:num(item[codigoCol+13]),financialCost:num(item[codigoCol+16]),value:vlTotalCol>=0?num(head[vlTotalCol]):undefined,sources:['Entradas atuais']});current++}}continue}const header=rows.find(r=>{const cells=r.map(cell=>norm(cell));return cells.includes('orderdate')&&cells.includes('material')&&cells.includes('orderqty')});if(header){
    const orderDateCol=colByLabel(header,'orderdate')
    const materialCol=colByLabel(header,'material')
    const descCol=colByLabel(header,'description','descricao')
@@ -110,5 +139,7 @@ export async function processReceiptMotor(files: File[]):Promise<ReceiptMotorRes
  if(current)audits.push(audit('receipt-current','Entradas atuais organizadas',`${current.toLocaleString('pt-BR')} item(ns) de nota recebida(s).`,'Cada item mantém nota, fornecedor e custo financeiro atual.'))
  if(transit)audits.push(audit('receipt-transit','Carteira da Colgate organizada',`${transit.toLocaleString('pt-BR')} item(ns) aguardando chegada.`,'A carteira não altera estoque nem é tratada como nota recebida.'))
  if(!base.length)audits.push(audit('receipt-none','Nenhuma nota foi encontrada','Envie as notas do legado, entradas atuais ou carteira.','Nenhum dado foi usado.','action','Nenhum arquivo bateu com notas do legado, entradas atuais (218) ou carteira da indústria. Pedir ao usuário um desses 3 relatórios específicos, no formato original.'))
- return{canonicalBase:base.sort((a,b)=>(a.entryDate??'').localeCompare(b.entryDate??'')),audit:audits,indicators:{received:legacy+current,inTransit:transit,currentItems:current,legacyNotes:legacy}}
+ const transitBalance=computeTransitBalance(base)
+ if(transitBalance.unmatchedInvoices.length)audits.push(audit('receipt-transit-unmatched-invoice','Nota da carteira sem entrada correspondente na 218','Confira se a nota chegou e foi lançada na 218.',`${transitBalance.unmatchedInvoices.length} nota(s) da carteira não têm entrada correspondente na 218: ${transitBalance.unmatchedInvoices.join(', ')}.`,'attention',`O valor dessas notas continua no total da carteira em trânsito, sem abatimento, porque não há entrada correspondente na 218 (218-entrega de notas) para subtrair. Conferir se essas notas já chegaram e foram lançadas na 218.`))
+ return{canonicalBase:base.sort((a,b)=>(a.entryDate??'').localeCompare(b.entryDate??'')),audit:audits,indicators:{received:legacy+current,inTransit:transit,currentItems:current,legacyNotes:legacy,transitBalance:transitBalance.total}}
 }
