@@ -62,10 +62,19 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
   return bytes.buffer
 }
 
-type StoredFileRecord = { name: string; size: number; content: string }
+type StoredFileRecord = { name?: string; size: number; content: string }
 
 function isStoredFileRecord(value: unknown): value is StoredFileRecord {
   return !!value && typeof value === 'object' && typeof (value as StoredFileRecord).content === 'string'
+}
+
+// Registros gravados antes do campo "name" existir não o têm: nesse caso (só
+// nesse), cai para o nome derivado do caminho, como acontecia na versão
+// anterior (Storage). Não apaga nem corrige o registro antigo, só evita
+// devolver um nome vazio.
+export function parseStoredRecord(path: string, record: StoredFileRecord): { bytes: ArrayBuffer; name: string } {
+  const name = record.name || (path.split('/').pop() ?? path)
+  return { bytes: base64ToArrayBuffer(record.content), name }
 }
 
 function realtimeDatabaseClient(): StorageClient | null {
@@ -81,8 +90,7 @@ function realtimeDatabaseClient(): StorageClient | null {
       try {
         const snapshot = await get(ref(db, path))
         if (!snapshot.exists()) return null
-        const record = snapshot.val() as StoredFileRecord
-        return { bytes: base64ToArrayBuffer(record.content), name: record.name }
+        return parseStoredRecord(path, snapshot.val() as StoredFileRecord)
       } catch {
         return null
       }
