@@ -11,16 +11,27 @@ export type SaveResult = { ok: true } | { ok: false; error: string }
 // numa sub-árvore própria para não colidir com o que cloudSync.ts já guarda ali.
 const CLOUD_ROOT = 'blue-jacket'
 const FILES_ROOT = `${CLOUD_ROOT}/arquivos`
+// Partes ficam numa árvore IRMÃ da dos registros (não uma sub-árvore dela):
+// um set() no caminho do registro substitui o nó inteiro, então se as partes
+// fossem filhas do próprio caminho do registro, gravar o registro por último
+// apagaria as partes que acabamos de escrever.
+const PARTS_ROOT = `${CLOUD_ROOT}/arquivos-partes`
 
-// Limite documentado do Realtime Database para o valor de uma única string:
-// 10 MB (https://firebase.google.com/docs/database/usage/limits, "Maximum
-// size of a string"). Em base64 (~4/3 do tamanho cru), 5 MiB crus viram
-// ~6,67 MiB, com boa folga abaixo do limite de 10 MB por parte. Arquivos
-// maiores que uma parte são quebrados em pedaços desse tamanho.
+// Limites documentados do Realtime Database (https://firebase.google.com/docs/database/usage/limits):
+// "Maximum size of a string" = 10 MB; "Maximum write request size" = 16 MB
+// pelo SDK (256 MB só pela REST API). Um arquivo grande gravado como UM set()
+// só, com todas as partes dentro do mesmo registro, vira uma única escrita
+// que pode passar de 16 MB e ser recusada pelo banco — foi o que aconteceu
+// com os arquivos de Histórico de 67,5 MB e 42,6 MB (base64 de ~90 MB e
+// ~56,8 MB nessa única escrita). Por isso cada parte agora é um set()
+// separado, nunca passando de MAX_PART_BYTES em base64.
+// Em base64 (~4/3 do tamanho cru), 5 MiB crus viram ~6,67 MiB por escrita —
+// bem abaixo tanto do limite de 10 MB por string quanto do de 16 MB por
+// escrita do SDK.
 export const MAX_PART_BYTES = 5 * 1024 * 1024
 
-// Teto de segurança por arquivo (não é o limite por string: com partição,
-// o arquivo pode crescer sem esbarrar nesse limite). Ver o relato do PR
+// Teto de segurança por arquivo (independente do limite por escrita: com
+// partição, o arquivo pode crescer sem esbarrar nele). Ver o relato do PR
 // para a conta de quanto cabe no 1 GB grátis do Realtime Database.
 export const MAX_TOTAL_FILE_BYTES = 200 * 1024 * 1024
 
@@ -32,6 +43,15 @@ export interface StorageClient {
   download(path: string): Promise<{ bytes: ArrayBuffer; name: string } | null>
   remove(path: string): Promise<void>
   list(prefix: string): Promise<string[]>
+}
+
+// Abstração de mais baixo nível, uma escrita/leitura/remoção por vez — é o
+// que permite testar a orquestração de partes (uma escrita por parte, com
+// desfazimento se alguma falhar) sem precisar de rede nem do SDK do Firebase.
+export interface RawDbClient {
+  write(path: string, value: unknown): Promise<void>
+  read(path: string): Promise<unknown>
+  remove(path: string): Promise<void>
 }
 
 export function sanitizeStorageName(name: string): string {
@@ -52,6 +72,10 @@ export function databasePathFor(motor: StorageMotor, slot: string, fileName: str
   return `${FILES_ROOT}/${motor}/${slot}/${sanitizeDatabaseKey(fileName)}`
 }
 
+function partsRootFor(path: string): string {
+  return path.startsWith(`${FILES_ROOT}/`) ? `${PARTS_ROOT}/${path.slice(FILES_ROOT.length + 1)}` : `${PARTS_ROOT}/${path}`
+}
+
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer)
   let binary = ''
@@ -66,79 +90,156 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
   return bytes.buffer
 }
 
-type StoredFileRecord = { name?: string; size: number; parts?: number; content: string | Record<string, string> }
-
-function isStoredFileRecord(value: unknown): value is StoredFileRecord {
-  if (!value || typeof value !== 'object') return false
-  const content = (value as StoredFileRecord).content
-  return typeof content === 'string' || (!!content && typeof content === 'object')
-}
-
-// Arquivo acima de uma parte (MAX_PART_BYTES) é quebrado em pedaços; cada
-// pedaço vira uma string base64 independente, guardada em content["0"],
-// content["1"] etc. Arquivo de até uma parte mantém o formato simples
-// (content como string única), igual ao que já existia.
-export function encodeFileRecord(name: string, size: number, bytes: ArrayBuffer): StoredFileRecord {
-  if (size <= MAX_PART_BYTES) {
-    return { name, size, content: arrayBufferToBase64(bytes) }
-  }
+// Pedaços de até MAX_PART_BYTES crus (~6,67 MiB em base64 cada), para que
+// cada parte caiba com folga numa única escrita do Realtime Database.
+export function encodeFileParts(bytes: ArrayBuffer): string[] {
   const view = new Uint8Array(bytes)
-  const content: Record<string, string> = {}
-  let parts = 0
+  const parts: string[] = []
   for (let offset = 0; offset < view.length; offset += MAX_PART_BYTES) {
     const chunk = view.slice(offset, offset + MAX_PART_BYTES)
-    content[String(parts)] = arrayBufferToBase64(chunk.buffer)
-    parts++
+    parts.push(arrayBufferToBase64(chunk.buffer))
   }
-  return { name, size, parts, content }
+  return parts
 }
 
-// Registros gravados antes do campo "name" existir não o têm: nesse caso (só
-// nesse), cai para o nome derivado do caminho, como acontecia na versão
-// anterior (Storage). Registros gravados antes da partição existir têm
-// content como string única (igual encodeFileRecord ainda grava para
-// arquivos pequenos) — continuam restaurando do mesmo jeito, sem mudança.
-export function decodeFileRecord(path: string, record: StoredFileRecord): { bytes: ArrayBuffer; name: string } {
-  const name = record.name || (path.split('/').pop() ?? path)
-  if (typeof record.content === 'string') {
-    return { bytes: base64ToArrayBuffer(record.content), name }
-  }
-  const content = record.content
-  const parts = record.parts ?? Object.keys(content).length
-  const chunks: Uint8Array[] = []
-  for (let i = 0; i < parts; i++) chunks.push(new Uint8Array(base64ToArrayBuffer(content[String(i)])))
+// Junta os pedaços (já lidos, cada um uma string base64) na ordem em que
+// foram gravados e devolve os bytes originais, byte a byte.
+export function combineParts(parts: string[]): ArrayBuffer {
+  const chunks = parts.map(part => new Uint8Array(base64ToArrayBuffer(part)))
   const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0)
   const combined = new Uint8Array(total)
   let offset = 0
   for (const chunk of chunks) { combined.set(chunk, offset); offset += chunk.length }
-  return { bytes: combined.buffer, name }
+  return combined.buffer
 }
 
-function realtimeDatabaseClient(): StorageClient | null {
+type StoredFileRecord = { name?: string; size: number; parts?: number; content?: string | Record<string, string> }
+
+function isStoredFileRecord(value: unknown): value is StoredFileRecord {
+  return !!value && typeof value === 'object' && typeof (value as StoredFileRecord).size === 'number'
+}
+
+// Mantido para compatibilidade com registros antigos gravados com todas as
+// partes dentro do mesmo campo "content" (formato de uma única escrita, que
+// é exatamente o que causava o bug de escrita acima de 16 MB) e com arquivos
+// pequenos, que continuam nesse formato simples (uma string só).
+export function encodeFileRecord(name: string, size: number, bytes: ArrayBuffer): StoredFileRecord {
+  if (size <= MAX_PART_BYTES) {
+    return { name, size, content: arrayBufferToBase64(bytes) }
+  }
+  const parts = encodeFileParts(bytes)
+  const content: Record<string, string> = {}
+  parts.forEach((part, i) => { content[String(i)] = part })
+  return { name, size, parts: parts.length, content }
+}
+
+// Registros gravados antes do campo "name" existir não o têm: nesse caso (só
+// nesse), cai para o nome derivado do caminho, como acontecia na versão
+// anterior (Storage). Lida com os dois formatos de arquivo pequeno/antigo:
+// content como string única, ou (mais antigo ainda) todas as partes dentro
+// do mesmo registro.
+export function decodeFileRecord(path: string, record: StoredFileRecord): { bytes: ArrayBuffer; name: string } {
+  const name = record.name || (path.split('/').pop() ?? path)
+  if (typeof record.content === 'string') return { bytes: base64ToArrayBuffer(record.content), name }
+  const content = record.content ?? {}
+  const parts = record.parts ?? Object.keys(content).length
+  const ordered: string[] = []
+  for (let i = 0; i < parts; i++) ordered.push(content[String(i)])
+  return { bytes: combineParts(ordered), name }
+}
+
+// Orquestra a gravação em várias escritas pequenas (uma por parte, nunca
+// acima de MAX_PART_BYTES em base64) e só grava o registro pequeno (sem o
+// conteúdo) depois que todas as partes foram confirmadas. Se alguma parte
+// falhar no meio, apaga as partes já gravadas desta tentativa e relança o
+// erro — nunca deixa um registro apontando para partes faltando.
+export async function writeFileRecord(client: RawDbClient, path: string, name: string, size: number, bytes: ArrayBuffer): Promise<void> {
+  const oldRecord = await readRawRecord(client, path)
+  if (oldRecord && typeof oldRecord.content !== 'string' && oldRecord.parts) {
+    await client.remove(partsRootFor(path)).catch(() => {})
+  }
+  if (size <= MAX_PART_BYTES) {
+    await client.write(path, { name, size, content: arrayBufferToBase64(bytes) })
+    return
+  }
+  const parts = encodeFileParts(bytes)
+  const written: number[] = []
+  try {
+    for (let i = 0; i < parts.length; i++) {
+      await client.write(`${partsRootFor(path)}/${i}`, parts[i])
+      written.push(i)
+    }
+    await client.write(path, { name, size, parts: parts.length })
+  } catch (error) {
+    for (const i of written) await client.remove(`${partsRootFor(path)}/${i}`).catch(() => {})
+    throw error
+  }
+}
+
+async function readRawRecord(client: RawDbClient, path: string): Promise<StoredFileRecord | null> {
+  const value = await client.read(path)
+  return isStoredFileRecord(value) ? value : null
+}
+
+// Lê o registro; se tiver "content" (arquivo pequeno ou registro antigo de
+// uma escrita só), decodifica direto. Se tiver "parts" sem "content"
+// (formato de várias escritas), lê cada parte separadamente e junta.
+export async function readFileRecord(client: RawDbClient, path: string): Promise<{ bytes: ArrayBuffer; name: string } | null> {
+  const record = await readRawRecord(client, path)
+  if (!record) return null
+  if (record.content !== undefined) return decodeFileRecord(path, record)
+  const parts = record.parts ?? 0
+  const ordered: string[] = []
+  for (let i = 0; i < parts; i++) {
+    const value = await client.read(`${partsRootFor(path)}/${i}`)
+    if (typeof value !== 'string') return null
+    ordered.push(value)
+  }
+  const name = record.name || (path.split('/').pop() ?? path)
+  return { bytes: combineParts(ordered), name }
+}
+
+// Remove o registro e, se ele apontava para partes (gravação em várias
+// escritas), remove as partes também — não deixa partes órfãs.
+export async function removeFileRecord(client: RawDbClient, path: string): Promise<void> {
+  const record = await readRawRecord(client, path)
+  if (record && typeof record.content !== 'string' && record.parts) {
+    await client.remove(partsRootFor(path)).catch(() => {})
+  }
+  await client.remove(path).catch(() => {})
+}
+
+function firebaseRawClient(): RawDbClient | null {
   const db = getDb()
   if (!db) return null
   return {
+    async write(path, value) { await set(ref(db, path), value) },
+    async read(path) {
+      const snapshot = await get(ref(db, path))
+      return snapshot.exists() ? snapshot.val() : null
+    },
+    async remove(path) { await removeRef(ref(db, path)) },
+  }
+}
+
+function realtimeDatabaseClient(): StorageClient | null {
+  const raw = firebaseRawClient()
+  if (!raw) return null
+  return {
     async upload(path, file) {
       const bytes = await file.arrayBuffer()
-      const record = encodeFileRecord(file.name, file.size, bytes)
-      await set(ref(db, path), record)
+      await writeFileRecord(raw, path, file.name, file.size, bytes)
     },
     async download(path) {
-      try {
-        const snapshot = await get(ref(db, path))
-        if (!snapshot.exists()) return null
-        return decodeFileRecord(path, snapshot.val() as StoredFileRecord)
-      } catch {
-        return null
-      }
+      try { return await readFileRecord(raw, path) } catch { return null }
     },
     async remove(path) {
-      try { await removeRef(ref(db, path)) } catch { /* pode já não existir */ }
+      try { await removeFileRecord(raw, path) } catch { /* degrada sem quebrar a tela */ }
     },
     async list(prefix) {
       try {
-        const snapshot = await get(ref(db, prefix))
-        if (!snapshot.exists()) return []
+        const root = await raw.read(prefix)
+        if (root === null) return []
         const paths: string[] = []
         const walk = (value: unknown, path: string) => {
           if (isStoredFileRecord(value)) { paths.push(path); return }
@@ -146,7 +247,7 @@ function realtimeDatabaseClient(): StorageClient | null {
             for (const [key, child] of Object.entries(value as Record<string, unknown>)) walk(child, `${path}/${key}`)
           }
         }
-        walk(snapshot.val(), prefix)
+        walk(root, prefix)
         return paths
       } catch {
         return []

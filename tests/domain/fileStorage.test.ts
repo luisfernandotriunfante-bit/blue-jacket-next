@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { sanitizeStorageName, sanitizeDatabaseKey, databasePathFor, saveSlotFile, removeSlotFile, restoreMotorFiles, encodeFileRecord, decodeFileRecord, MAX_PART_BYTES, MAX_TOTAL_FILE_BYTES } from '../../src/domain/fileStorage'
+import { sanitizeStorageName, sanitizeDatabaseKey, databasePathFor, saveSlotFile, removeSlotFile, restoreMotorFiles, encodeFileRecord, decodeFileRecord, writeFileRecord, readFileRecord, removeFileRecord, MAX_PART_BYTES, MAX_TOTAL_FILE_BYTES } from '../../src/domain/fileStorage'
+import type { RawDbClient } from '../../src/domain/fileStorage'
 import { textFile } from './helpers/files'
 import { createFakeStorageClient } from './helpers/fakeStorageClient'
 import { sampleCadastroContent, sampleCadastroContentV2, sampleCarteiraContent, sampleComplexFileName, sampleSortimentoContent } from '../../fixtures/domain/storageFiles'
@@ -131,6 +132,90 @@ test('encodeFileRecord: arquivo de ate uma parte mantem o formato simples (conte
   const record = encodeFileRecord('pequeno.csv', 3, original.buffer)
   assert.equal(typeof record.content, 'string')
   assert.equal(record.parts, undefined)
+})
+
+// Cliente "cru" falso: uma escrita/leitura/remocao por vez, sem rede, para
+// testar a orquestracao de partes (writeFileRecord/readFileRecord/removeFileRecord)
+// diretamente, inclusive o desfazimento quando uma escrita falha no meio.
+function createFakeRawClient(options?: { failAfterWrites?: number }): RawDbClient & { store: Map<string, unknown>; writeSizes: number[] } {
+  const store = new Map<string, unknown>()
+  const writeSizes: number[] = []
+  let writeCount = 0
+  return {
+    store,
+    writeSizes,
+    async write(path, value) {
+      writeCount++
+      if (options?.failAfterWrites && writeCount === options.failAfterWrites) throw new Error('falha simulada de escrita')
+      writeSizes.push(typeof value === 'string' ? value.length : JSON.stringify(value).length)
+      store.set(path, value)
+    },
+    async read(path) {
+      return store.has(path) ? store.get(path) : null
+    },
+    async remove(path) {
+      store.delete(path)
+      for (const key of [...store.keys()]) if (key.startsWith(`${path}/`)) store.delete(key)
+    },
+  }
+}
+
+test('writeFileRecord + readFileRecord: arquivo grande e gravado em varias escritas, nenhuma acima do limite do SDK, e volta identico', async () => {
+  const raw = createFakeRawClient()
+  const path = 'blue-jacket/arquivos/historico/sales/arquivo-grande-txt'
+  const size = MAX_PART_BYTES * 2 + 2 * 1024 * 1024 // ~12 MiB, 3 partes
+  const original = new Uint8Array(size)
+  for (let i = 0; i < size; i++) original[i] = i % 256
+  await writeFileRecord(raw, path, 'arquivo-grande.txt', size, original.buffer)
+
+  const SDK_WRITE_LIMIT_BYTES = 16 * 1024 * 1024
+  assert.ok(raw.writeSizes.length >= 3, 'deve ter mais de uma escrita (uma por parte, mais o registro)')
+  for (const writeSize of raw.writeSizes) assert.ok(writeSize < SDK_WRITE_LIMIT_BYTES, `uma escrita de ${writeSize} bytes passou do limite de 16 MB do SDK`)
+
+  const restored = await readFileRecord(raw, path)
+  assert.ok(restored)
+  assert.equal(restored!.name, 'arquivo-grande.txt')
+  assert.equal(restored!.bytes.byteLength, size)
+  assert.deepEqual([...new Uint8Array(restored!.bytes)], [...original])
+})
+
+test('writeFileRecord: falha no meio das partes apaga o que ja foi gravado e nao deixa registro parcial', async () => {
+  const path = 'blue-jacket/arquivos/historico/sales/arquivo-com-falha-txt'
+  const raw = createFakeRawClient({ failAfterWrites: 2 }) // falha na 2a parte
+  const size = MAX_PART_BYTES * 2 + 2 * 1024 * 1024
+  const original = new Uint8Array(size)
+
+  await assert.rejects(writeFileRecord(raw, path, 'arquivo-com-falha.txt', size, original.buffer))
+  assert.equal(await raw.read(path), null, 'nao deve existir registro, nem parcial, apos a falha')
+  const leftoverParts = [...raw.store.keys()].filter(key => key.includes('arquivos-partes'))
+  assert.equal(leftoverParts.length, 0, 'nenhuma parte desta tentativa deve sobrar apos o desfazimento')
+})
+
+test('writeFileRecord: substituir um arquivo grande por um pequeno remove as partes antigas', async () => {
+  const path = 'blue-jacket/arquivos/historico/sales/arquivo-grande-txt'
+  const raw = createFakeRawClient()
+  const bigSize = MAX_PART_BYTES * 2 + 1024
+  await writeFileRecord(raw, path, 'grande.txt', bigSize, new Uint8Array(bigSize).buffer)
+  const partsBefore = [...raw.store.keys()].filter(key => key.includes('arquivos-partes'))
+  assert.ok(partsBefore.length >= 2, 'arquivo grande deve ter gravado mais de uma parte')
+
+  await writeFileRecord(raw, path, 'pequeno.txt', 3, new Uint8Array([1, 2, 3]).buffer)
+  const partsAfter = [...raw.store.keys()].filter(key => key.includes('arquivos-partes'))
+  assert.equal(partsAfter.length, 0, 'partes antigas devem ser removidas ao substituir por um arquivo pequeno')
+  const restored = await readFileRecord(raw, path)
+  assert.deepEqual([...new Uint8Array(restored!.bytes)], [1, 2, 3])
+})
+
+test('removeFileRecord: remove o registro e as partes de um arquivo gravado em varias escritas', async () => {
+  const path = 'blue-jacket/arquivos/historico/sales/arquivo-grande-txt'
+  const raw = createFakeRawClient()
+  const bigSize = MAX_PART_BYTES * 2 + 1024
+  await writeFileRecord(raw, path, 'grande.txt', bigSize, new Uint8Array(bigSize).buffer)
+
+  await removeFileRecord(raw, path)
+  assert.equal(await raw.read(path), null)
+  const leftoverParts = [...raw.store.keys()].filter(key => key.includes('arquivos-partes'))
+  assert.equal(leftoverParts.length, 0, 'remover um arquivo grande deve remover as partes tambem')
 })
 
 test('saveSlotFile: arquivo acima do teto de seguranca nao e salvo e devolve erro claro, mesmo com cliente falso', async () => {
