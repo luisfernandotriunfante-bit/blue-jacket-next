@@ -14,11 +14,15 @@ const FILES_ROOT = `${CLOUD_ROOT}/arquivos`
 
 // Limite documentado do Realtime Database para o valor de uma única string:
 // 10 MB (https://firebase.google.com/docs/database/usage/limits, "Maximum
-// size of a string"). O conteúdo é guardado em base64, que infla o tamanho
-// em ~4/3. Uso 7 MiB de arquivo cru como limite: em base64 vira ~9,33 MiB,
-// com folga de ~700 KB abaixo do limite de 10 MB antes de qualquer outro
-// campo (name/size) do mesmo registro.
-export const MAX_RAW_FILE_BYTES = 7 * 1024 * 1024
+// size of a string"). Em base64 (~4/3 do tamanho cru), 5 MiB crus viram
+// ~6,67 MiB, com boa folga abaixo do limite de 10 MB por parte. Arquivos
+// maiores que uma parte são quebrados em pedaços desse tamanho.
+export const MAX_PART_BYTES = 5 * 1024 * 1024
+
+// Teto de segurança por arquivo (não é o limite por string: com partição,
+// o arquivo pode crescer sem esbarrar nesse limite). Ver o relato do PR
+// para a conta de quanto cabe no 1 GB grátis do Realtime Database.
+export const MAX_TOTAL_FILE_BYTES = 200 * 1024 * 1024
 
 // Abstração mínima sobre o acesso ao banco: permite trocar por um cliente
 // falso nos testes (sem rede) e mantém a lógica de caminho/degradação igual
@@ -62,19 +66,52 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
   return bytes.buffer
 }
 
-type StoredFileRecord = { name?: string; size: number; content: string }
+type StoredFileRecord = { name?: string; size: number; parts?: number; content: string | Record<string, string> }
 
 function isStoredFileRecord(value: unknown): value is StoredFileRecord {
-  return !!value && typeof value === 'object' && typeof (value as StoredFileRecord).content === 'string'
+  if (!value || typeof value !== 'object') return false
+  const content = (value as StoredFileRecord).content
+  return typeof content === 'string' || (!!content && typeof content === 'object')
+}
+
+// Arquivo acima de uma parte (MAX_PART_BYTES) é quebrado em pedaços; cada
+// pedaço vira uma string base64 independente, guardada em content["0"],
+// content["1"] etc. Arquivo de até uma parte mantém o formato simples
+// (content como string única), igual ao que já existia.
+export function encodeFileRecord(name: string, size: number, bytes: ArrayBuffer): StoredFileRecord {
+  if (size <= MAX_PART_BYTES) {
+    return { name, size, content: arrayBufferToBase64(bytes) }
+  }
+  const view = new Uint8Array(bytes)
+  const content: Record<string, string> = {}
+  let parts = 0
+  for (let offset = 0; offset < view.length; offset += MAX_PART_BYTES) {
+    const chunk = view.slice(offset, offset + MAX_PART_BYTES)
+    content[String(parts)] = arrayBufferToBase64(chunk.buffer)
+    parts++
+  }
+  return { name, size, parts, content }
 }
 
 // Registros gravados antes do campo "name" existir não o têm: nesse caso (só
 // nesse), cai para o nome derivado do caminho, como acontecia na versão
-// anterior (Storage). Não apaga nem corrige o registro antigo, só evita
-// devolver um nome vazio.
-export function parseStoredRecord(path: string, record: StoredFileRecord): { bytes: ArrayBuffer; name: string } {
+// anterior (Storage). Registros gravados antes da partição existir têm
+// content como string única (igual encodeFileRecord ainda grava para
+// arquivos pequenos) — continuam restaurando do mesmo jeito, sem mudança.
+export function decodeFileRecord(path: string, record: StoredFileRecord): { bytes: ArrayBuffer; name: string } {
   const name = record.name || (path.split('/').pop() ?? path)
-  return { bytes: base64ToArrayBuffer(record.content), name }
+  if (typeof record.content === 'string') {
+    return { bytes: base64ToArrayBuffer(record.content), name }
+  }
+  const content = record.content
+  const parts = record.parts ?? Object.keys(content).length
+  const chunks: Uint8Array[] = []
+  for (let i = 0; i < parts; i++) chunks.push(new Uint8Array(base64ToArrayBuffer(content[String(i)])))
+  const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0)
+  const combined = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) { combined.set(chunk, offset); offset += chunk.length }
+  return { bytes: combined.buffer, name }
 }
 
 function realtimeDatabaseClient(): StorageClient | null {
@@ -83,14 +120,14 @@ function realtimeDatabaseClient(): StorageClient | null {
   return {
     async upload(path, file) {
       const bytes = await file.arrayBuffer()
-      const record: StoredFileRecord = { name: file.name, size: file.size, content: arrayBufferToBase64(bytes) }
+      const record = encodeFileRecord(file.name, file.size, bytes)
       await set(ref(db, path), record)
     },
     async download(path) {
       try {
         const snapshot = await get(ref(db, path))
         if (!snapshot.exists()) return null
-        return parseStoredRecord(path, snapshot.val() as StoredFileRecord)
+        return decodeFileRecord(path, snapshot.val() as StoredFileRecord)
       } catch {
         return null
       }
@@ -122,10 +159,10 @@ function realtimeDatabaseClient(): StorageClient | null {
 // degradam para no-op: não lançam exceção, não quebram a tela e não apagam
 // nada local.
 export async function saveSlotFile(motor: StorageMotor, slot: string, file: File, client: StorageClient | null = realtimeDatabaseClient()): Promise<SaveResult> {
-  if (file.size > MAX_RAW_FILE_BYTES) {
-    const limitMb = (MAX_RAW_FILE_BYTES / (1024 * 1024)).toFixed(0)
+  if (file.size > MAX_TOTAL_FILE_BYTES) {
+    const limitMb = (MAX_TOTAL_FILE_BYTES / (1024 * 1024)).toFixed(0)
     const fileMb = (file.size / (1024 * 1024)).toFixed(1)
-    return { ok: false, error: `O arquivo "${file.name}" tem ${fileMb} MB, acima do limite de ${limitMb} MB por arquivo guardado no Realtime Database. Ele não foi salvo; nada foi apagado.` }
+    return { ok: false, error: `O arquivo "${file.name}" tem ${fileMb} MB, acima do teto de segurança de ${limitMb} MB por arquivo guardado no Realtime Database. Ele não foi salvo; nada foi apagado.` }
   }
   if (!client) return { ok: true }
   const path = databasePathFor(motor, slot, file.name)
