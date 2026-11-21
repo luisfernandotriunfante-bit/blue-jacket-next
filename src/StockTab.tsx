@@ -183,15 +183,24 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
       ? productIndicators.stockAtSalePrice
       : productBase.reduce((s, p) => { const a = p.availableStock ?? 0; return a > 0 && p.sellerPrice != null ? s + a * p.sellerPrice : s }, 0)
     const resolvedCarteira = receiptGroups.openTransitGroups.reduce((s, g) => s + g.totalValue, 0)
+    const transitByCode = new Map(productBase.filter(p => p.manufacturerCode).map(p => [p.manufacturerCode!, p]))
+    let carteiraMarkupFallbackItems = 0
+    const carteiraVenda = receiptGroups.openTransitGroups.reduce((total, group) => total + group.items.reduce((sum, item) => {
+      const quantity = item.quantity ?? 0
+      const product = transitByCode.get(item.productCode ?? '')
+      if (product?.sellerPrice != null) return sum + quantity * product.sellerPrice
+      carteiraMarkupFallbackItems++
+      return sum + (item.value ?? item.financialCost ?? 0) * (1 + markup / 100)
+    }, 0), 0)
     const resolvedEmTransito = (productIndicators?.inTransit != null && productIndicators.inTransit > 0)
       ? productIndicators.inTransit
       : emTransito
     const projetadoCusto = custoCusto + resolvedCarteira
-    const projetadoVenda = markup > 0 ? projetadoCusto * (1 + markup / 100) : null
+    const projetadoVenda = custoVenda + carteiraVenda
     const pricedCoverage = comEstoque > 0 ? comPreco / comEstoque : null
     const marginRatio = custoVenda > 0 ? custoCusto / custoVenda : null
     const transitRatio = projetadoCusto > 0 ? resolvedCarteira / projetadoCusto : null
-    return { comEstoque, semEstoque, emTransito: resolvedEmTransito, comPreco, total: productBase.length, custoCusto, custoVenda, carteiraCusto: resolvedCarteira, projetadoCusto, projetadoVenda, pricedCoverage, marginRatio, transitRatio }
+    return { comEstoque, semEstoque, emTransito: resolvedEmTransito, comPreco, total: productBase.length, custoCusto, custoVenda, carteiraCusto: resolvedCarteira, carteiraMarkupFallbackItems, projetadoCusto, projetadoVenda, pricedCoverage, marginRatio, transitRatio }
   }, [productBase, receiptBase, receiptGroups, markup, productIndicators])
 
   const coverageStats = useMemo(() => {
@@ -634,7 +643,7 @@ export function StockTab({ productBase, receiptBase, movementBase, productIndica
                 value={kpis.projetadoVenda !== null ? kpiCurrency(kpis.projetadoVenda) : '—'}
                 accent={kpis.projetadoVenda !== null ? 'blue' : undefined}
                 percent={markup > 0 ? Math.min(markup, 100) : undefined}
-                pctLabel={markup === 0 ? 'Configure markup em Administração' : `markup ${markup.toLocaleString('pt-BR')}%`}
+                pctLabel={`${kpis.carteiraMarkupFallbackItems.toLocaleString('pt-BR')} itens sem preço de venda; ${markup === 0 ? 'configure markup em Administração' : `fallback markup ${markup.toLocaleString('pt-BR')}%`}`}
               />
             </div>
 

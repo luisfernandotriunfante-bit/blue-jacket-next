@@ -219,7 +219,7 @@ export function App() {
   }, [clientStateLoaded, clientBase, clientAudit, clientIndicators, clientSlots])
   useEffect(() => { let active = true; void loadPersisted<SavedProductMotor>('produtos').then(saved => { if (!active || !saved) return; const base = saved.base.map(product => { const grouping = classifyProduct(product); return { ...product, groupCode: grouping.group?.code, groupName: grouping.group?.name, groupFamily: grouping.group?.family, groupStatus: grouping.status } }); setProductBase(base); setProductAudit(saved.audit); setProductIndicators(saved.indicators); setProductSlots(saved.slots) }).finally(() => { if (active) setProductStateLoaded(true) }); return () => { active = false } }, [syncKey])
   useEffect(() => { if (productStateLoaded) void savePersisted<SavedProductMotor>('produtos', { base: productBase, audit: productAudit, indicators: productIndicators, slots: productSlots }) }, [productStateLoaded, productBase, productAudit, productIndicators, productSlots])
-  useEffect(() => { let active = true; void (async () => { try { const meta = await loadPersisted<Omit<SavedHistoryMotor, 'base'>>('historico:meta'); const base = await loadChunked<CanonicalHistory>('historico:base'); if (!active) return; if (meta && base) { setHistoryBase(base); setHistoryAudit(meta.audit); setHistoryIndicators(meta.indicators); setHistorySlots(Object.fromEntries(Object.entries(meta.slots).map(([k, v]) => [k, dedupeList(v as UploadedFile[])])) as typeof meta.slots); return } const saved = await loadPersisted<SavedHistoryMotor>('historico'); if (!active || !saved) return; setHistoryBase(saved.base); setHistoryAudit(saved.audit); setHistoryIndicators(saved.indicators); setHistorySlots(Object.fromEntries(Object.entries(saved.slots).map(([k, v]) => [k, dedupeList(v as UploadedFile[])])) as typeof saved.slots) } catch {} })().finally(() => { if (active) setHistoryStateLoaded(true) }); return () => { active = false } }, [syncKey])
+  useEffect(() => { let active = true; void (async () => { try { const meta = await loadPersisted<Omit<SavedHistoryMotor, 'base'>>('historico:meta'); const base = await loadChunked<CanonicalHistory>('historico:base'); if (!active) return; if (meta && base) { setHistoryBase(base); setHistoryAudit(meta.audit); setHistoryIndicators(meta.indicators); const legacy = meta.slots as Record<string, UploadedFile[]>; const slots: SavedHistoryMotor['slots'] = Object.fromEntries(Object.entries(legacy).filter(([k]) => k !== 'sales').map(([k, v]) => [k, dedupeList(v)])) as SavedHistoryMotor['slots']; if (legacy.sales?.length) { for (const file of legacy.sales) { const slot = await historySalesSlot(new File([], file.name)); if (!slot) { console.warn(`[Histórico] Não foi possível classificar o arquivo legado "${file.name}"; preservado em sales.`); continue } slots[slot] = dedupeList([...(slots[slot] ?? []), file]) } void savePersisted<Omit<SavedHistoryMotor, 'base'>>('historico:meta', { audit: meta.audit, indicators: meta.indicators, slots }).catch(() => {}) } setHistorySlots(slots); return } const saved = await loadPersisted<SavedHistoryMotor>('historico'); if (!active || !saved) return; setHistoryBase(saved.base); setHistoryAudit(saved.audit); setHistoryIndicators(saved.indicators); const legacy = saved.slots as Record<string, UploadedFile[]>; const slots: SavedHistoryMotor['slots'] = Object.fromEntries(Object.entries(legacy).filter(([k]) => k !== 'sales').map(([k, v]) => [k, dedupeList(v)])) as SavedHistoryMotor['slots']; if (legacy.sales?.length) { for (const file of legacy.sales) { const slot = await historySalesSlot(new File([], file.name)); if (!slot) { console.warn(`[Histórico] Não foi possível classificar o arquivo legado "${file.name}"; preservado em sales.`); continue } slots[slot] = dedupeList([...(slots[slot] ?? []), file]) } void savePersisted('historico', { ...saved, slots }).catch(() => {}) } setHistorySlots(slots) } catch {} })().finally(() => { if (active) setHistoryStateLoaded(true) }); return () => { active = false } }, [syncKey])
   useEffect(() => { if (!historyStateLoaded) return; void saveChunked('historico:base', historyBase).catch(() => {}); void savePersisted<Omit<SavedHistoryMotor, 'base'>>('historico:meta', { audit: historyAudit, indicators: historyIndicators, slots: historySlots }).catch(() => {}) }, [historyStateLoaded, historyBase, historyAudit, historyIndicators, historySlots])
   useEffect(() => { let active = true; void loadPersisted<SavedMovementMotor>('movimentacoes').then(saved => { if (!active || !saved) return; setMovementBase(saved.base); setMovementAudit(saved.audit); setMovementIndicators(saved.indicators); setMovementSlots(Object.fromEntries(Object.entries(saved.slots).map(([k, v]) => [k, dedupeList(v as UploadedFile[])])) as typeof saved.slots) }).finally(() => { if (active) setMovementStateLoaded(true) }); return () => { active = false } }, [syncKey])
   useEffect(() => { if (movementStateLoaded) void savePersisted<SavedMovementMotor>('movimentacoes', { base: movementBase, audit: movementAudit, indicators: movementIndicators, slots: movementSlots }) }, [movementStateLoaded, movementBase, movementAudit, movementIndicators, movementSlots])
@@ -233,6 +233,24 @@ export function App() {
     void (async () => {
       const motorsToRestore = ['clientes', 'produtos', 'historico', 'movimentacoes', 'recebimentos'] as const
       const restored = await Promise.all(motorsToRestore.map(async motor => [motor, await restoreMotorFiles(motor)] as const))
+      const restoredHistory = restored.find(([motor]) => motor === 'historico')?.[1] ?? {}
+      const legacySales = restoredHistory.sales ?? []
+      if (legacySales.length) {
+        const migrated: Record<string, UploadedFile[]> = { ...historySlotsRef.current }
+        delete migrated.sales
+        const metadata = Object.values(historySlotsRef.current).flat()
+        for (const item of legacySales) {
+          const match = metadata.find(file => file.name === item.name && file.size === item.file.size)
+          if (!match) { console.warn(`[Histórico] Arquivo legado restaurado sem metadado correspondente: "${item.name}".`); continue }
+          const slot = await historySalesSlot(item.file)
+          if (!slot) { console.warn(`[Histórico] Não foi possível classificar o arquivo legado "${item.name}".`); continue }
+          migrated[slot] = dedupeList([...(migrated[slot] ?? []), match])
+          void saveSlotFile('historico', slot, item.file).catch(() => {})
+          void removeSlotFile('historico', 'sales', item.name).catch(() => {})
+        }
+        setHistorySlots(migrated)
+        void savePersisted<Omit<SavedHistoryMotor, 'base'>>('historico:meta', { audit: historyAudit, indicators: historyIndicators, slots: migrated }).catch(() => {})
+      }
       const savedSlots: Record<string, Record<string, UploadedFile[]>> = {
         clientes: Object.fromEntries(Object.entries(clientSlotsRef.current).map(([slot, file]) => [slot, file ? [file] : []])),
         produtos: Object.fromEntries(Object.entries(productSlotsRef.current).map(([slot, file]) => [slot, file ? [file] : []])),
@@ -243,6 +261,13 @@ export function App() {
       const restoredRaw: Record<string, File> = {}
       for (const [motor, bySlot] of restored) {
         for (const [slot, items] of Object.entries(bySlot)) {
+          if (motor === 'historico' && slot === 'sales') {
+            for (const item of items) {
+              const metadata = Object.values(historySlotsRef.current).flat().find(file => file.name === item.name && file.size === item.file.size)
+              if (metadata) restoredRaw[metadata.id] = item.file
+            }
+            continue
+          }
           const metadata = savedSlots[motor][slot] ?? []
           for (const item of items) {
             const match = metadata.find(file => file.name === item.name && file.size === item.file.size && !restoredRaw[file.id])

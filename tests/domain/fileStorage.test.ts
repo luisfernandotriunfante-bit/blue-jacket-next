@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { sanitizeStorageName, sanitizeDatabaseKey, databasePathFor, saveSlotFile, removeSlotFile, restoreMotorFiles, parseStoredRecord, MAX_RAW_FILE_BYTES } from '../../src/domain/fileStorage'
+import { sanitizeStorageName, sanitizeDatabaseKey, databasePathFor, saveSlotFile, removeSlotFile, restoreMotorFiles, encodeFileRecord, decodeFileRecord, writeFileRecord, readFileRecord, removeFileRecord, MAX_PART_BYTES, MAX_TOTAL_FILE_BYTES } from '../../src/domain/fileStorage'
+import type { RawDbClient } from '../../src/domain/fileStorage'
 import { textFile } from './helpers/files'
 import { createFakeStorageClient } from './helpers/fakeStorageClient'
 import { sampleCadastroContent, sampleCadastroContentV2, sampleCarteiraContent, sampleComplexFileName, sampleSortimentoContent } from '../../fixtures/domain/storageFiles'
@@ -95,27 +96,136 @@ test('saveSlotFile + restoreMotorFiles: nome com espaco, parenteses, acento e ap
   assert.equal(content, sampleSortimentoContent)
 })
 
-test('parseStoredRecord: com name guardado, devolve o nome original (nao o do caminho)', () => {
+test('decodeFileRecord: com name guardado, devolve o nome original (nao o do caminho)', () => {
   const content = btoa('conteudo')
-  const result = parseStoredRecord('blue-jacket/arquivos/produtos/sortiment/Sortimento-Q4-26', { name: sampleComplexFileName, size: 8, content })
+  const result = decodeFileRecord('blue-jacket/arquivos/produtos/sortiment/Sortimento-Q4-26', { name: sampleComplexFileName, size: 8, content })
   assert.equal(result.name, sampleComplexFileName)
 })
 
-test('parseStoredRecord: registro antigo sem name cai para o nome do caminho, sem quebrar', () => {
+test('decodeFileRecord: registro antigo sem name cai para o nome do caminho, sem quebrar', () => {
   const content = btoa('conteudo')
-  const result = parseStoredRecord('blue-jacket/arquivos/produtos/sortiment/Sortimento-Q4-26', { size: 8, content })
+  const result = decodeFileRecord('blue-jacket/arquivos/produtos/sortiment/Sortimento-Q4-26', { size: 8, content })
   assert.equal(result.name, 'Sortimento-Q4-26')
 })
 
-test('saveSlotFile: arquivo acima do limite nao e salvo e devolve erro claro, mesmo com cliente falso', async () => {
+test('decodeFileRecord: registro antigo com content string (sem particao) continua restaurando', () => {
+  const original = new Uint8Array([10, 20, 30, 40, 250])
+  const content = btoa(String.fromCharCode(...original))
+  const result = decodeFileRecord('blue-jacket/arquivos/produtos/internal/antigo-csv', { name: 'antigo.csv', size: original.length, content })
+  assert.deepEqual([...new Uint8Array(result.bytes)], [...original])
+})
+
+test('encodeFileRecord + decodeFileRecord: arquivo maior que uma parte e quebrado e volta identico', () => {
+  const size = MAX_PART_BYTES * 2 + 1024 * 1024 // um pouco mais de 2 partes
+  const original = new Uint8Array(size)
+  for (let i = 0; i < size; i++) original[i] = i % 256
+  const record = encodeFileRecord('planilha-grande.xlsx', size, original.buffer)
+  assert.equal(record.parts, 3)
+  assert.equal(typeof record.content, 'object')
+  const restored = decodeFileRecord('blue-jacket/arquivos/produtos/internal/planilha-grande-xlsx', record)
+  assert.equal(restored.bytes.byteLength, size)
+  assert.deepEqual([...new Uint8Array(restored.bytes)], [...original])
+})
+
+test('encodeFileRecord: arquivo de ate uma parte mantem o formato simples (content como string)', () => {
+  const original = new Uint8Array([1, 2, 3])
+  const record = encodeFileRecord('pequeno.csv', 3, original.buffer)
+  assert.equal(typeof record.content, 'string')
+  assert.equal(record.parts, undefined)
+})
+
+// Cliente "cru" falso: uma escrita/leitura/remocao por vez, sem rede, para
+// testar a orquestracao de partes (writeFileRecord/readFileRecord/removeFileRecord)
+// diretamente, inclusive o desfazimento quando uma escrita falha no meio.
+function createFakeRawClient(options?: { failAfterWrites?: number }): RawDbClient & { store: Map<string, unknown>; writeSizes: number[] } {
+  const store = new Map<string, unknown>()
+  const writeSizes: number[] = []
+  let writeCount = 0
+  return {
+    store,
+    writeSizes,
+    async write(path, value) {
+      writeCount++
+      if (options?.failAfterWrites && writeCount === options.failAfterWrites) throw new Error('falha simulada de escrita')
+      writeSizes.push(typeof value === 'string' ? value.length : JSON.stringify(value).length)
+      store.set(path, value)
+    },
+    async read(path) {
+      return store.has(path) ? store.get(path) : null
+    },
+    async remove(path) {
+      store.delete(path)
+      for (const key of [...store.keys()]) if (key.startsWith(`${path}/`)) store.delete(key)
+    },
+  }
+}
+
+test('writeFileRecord + readFileRecord: arquivo grande e gravado em varias escritas, nenhuma acima do limite do SDK, e volta identico', async () => {
+  const raw = createFakeRawClient()
+  const path = 'blue-jacket/arquivos/historico/sales/arquivo-grande-txt'
+  const size = MAX_PART_BYTES * 2 + 2 * 1024 * 1024 // ~12 MiB, 3 partes
+  const original = new Uint8Array(size)
+  for (let i = 0; i < size; i++) original[i] = i % 256
+  await writeFileRecord(raw, path, 'arquivo-grande.txt', size, original.buffer)
+
+  const SDK_WRITE_LIMIT_BYTES = 16 * 1024 * 1024
+  assert.ok(raw.writeSizes.length >= 3, 'deve ter mais de uma escrita (uma por parte, mais o registro)')
+  for (const writeSize of raw.writeSizes) assert.ok(writeSize < SDK_WRITE_LIMIT_BYTES, `uma escrita de ${writeSize} bytes passou do limite de 16 MB do SDK`)
+
+  const restored = await readFileRecord(raw, path)
+  assert.ok(restored)
+  assert.equal(restored!.name, 'arquivo-grande.txt')
+  assert.equal(restored!.bytes.byteLength, size)
+  assert.deepEqual([...new Uint8Array(restored!.bytes)], [...original])
+})
+
+test('writeFileRecord: falha no meio das partes apaga o que ja foi gravado e nao deixa registro parcial', async () => {
+  const path = 'blue-jacket/arquivos/historico/sales/arquivo-com-falha-txt'
+  const raw = createFakeRawClient({ failAfterWrites: 2 }) // falha na 2a parte
+  const size = MAX_PART_BYTES * 2 + 2 * 1024 * 1024
+  const original = new Uint8Array(size)
+
+  await assert.rejects(writeFileRecord(raw, path, 'arquivo-com-falha.txt', size, original.buffer))
+  assert.equal(await raw.read(path), null, 'nao deve existir registro, nem parcial, apos a falha')
+  const leftoverParts = [...raw.store.keys()].filter(key => key.includes('arquivos-partes'))
+  assert.equal(leftoverParts.length, 0, 'nenhuma parte desta tentativa deve sobrar apos o desfazimento')
+})
+
+test('writeFileRecord: substituir um arquivo grande por um pequeno remove as partes antigas', async () => {
+  const path = 'blue-jacket/arquivos/historico/sales/arquivo-grande-txt'
+  const raw = createFakeRawClient()
+  const bigSize = MAX_PART_BYTES * 2 + 1024
+  await writeFileRecord(raw, path, 'grande.txt', bigSize, new Uint8Array(bigSize).buffer)
+  const partsBefore = [...raw.store.keys()].filter(key => key.includes('arquivos-partes'))
+  assert.ok(partsBefore.length >= 2, 'arquivo grande deve ter gravado mais de uma parte')
+
+  await writeFileRecord(raw, path, 'pequeno.txt', 3, new Uint8Array([1, 2, 3]).buffer)
+  const partsAfter = [...raw.store.keys()].filter(key => key.includes('arquivos-partes'))
+  assert.equal(partsAfter.length, 0, 'partes antigas devem ser removidas ao substituir por um arquivo pequeno')
+  const restored = await readFileRecord(raw, path)
+  assert.deepEqual([...new Uint8Array(restored!.bytes)], [1, 2, 3])
+})
+
+test('removeFileRecord: remove o registro e as partes de um arquivo gravado em varias escritas', async () => {
+  const path = 'blue-jacket/arquivos/historico/sales/arquivo-grande-txt'
+  const raw = createFakeRawClient()
+  const bigSize = MAX_PART_BYTES * 2 + 1024
+  await writeFileRecord(raw, path, 'grande.txt', bigSize, new Uint8Array(bigSize).buffer)
+
+  await removeFileRecord(raw, path)
+  assert.equal(await raw.read(path), null)
+  const leftoverParts = [...raw.store.keys()].filter(key => key.includes('arquivos-partes'))
+  assert.equal(leftoverParts.length, 0, 'remover um arquivo grande deve remover as partes tambem')
+})
+
+test('saveSlotFile: arquivo acima do teto de seguranca nao e salvo e devolve erro claro, mesmo com cliente falso', async () => {
   const client = createFakeStorageClient()
-  const bigContent = 'a'.repeat(MAX_RAW_FILE_BYTES + 1024)
-  const file = textFile('planilha-grande.csv', bigContent)
-  const result = await saveSlotFile('produtos', 'internal', file, client)
+  const bigFile = new File([new Uint8Array(MAX_TOTAL_FILE_BYTES + 1024)], 'planilha-enorme.xlsx')
+  const result = await saveSlotFile('produtos', 'internal', bigFile, client)
   assert.equal(result.ok, false)
   if (!result.ok) {
-    assert.match(result.error, /acima do limite/)
-    assert.match(result.error, /planilha-grande\.csv/)
+    assert.match(result.error, /acima do teto de segurança/)
+    assert.match(result.error, /planilha-enorme\.xlsx/)
   }
-  assert.equal(client.store.size, 0, 'nada deve ser salvo quando o arquivo passa do limite')
+  assert.equal(client.store.size, 0, 'nada deve ser salvo quando o arquivo passa do teto')
 })
