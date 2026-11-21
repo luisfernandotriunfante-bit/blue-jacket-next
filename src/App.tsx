@@ -26,6 +26,15 @@ import { exportBundle, importBundle, downloadBundle, validateBundle } from './do
 import { pushToCloud, pullFromCloud, listenForChanges, schedulePush, forcePush, onSyncStatus, getSyncDetail } from './domain/cloudSync'
 import { isFirebaseConfigured } from './firebaseConfig'
 
+// TEMPORÁRIO: todos os motores desligados a pedido do usuário (21/11/2026)
+// até a conferência manual dos dados (ver documento de flags por campo).
+// Nenhum arquivo é processado enquanto isso for true — as telas ficam sem
+// dado calculado. Os motores em si (src/domain/*.ts) e seus testes não são
+// afetados; isso só impede o App de chamá-los. Reverter apagando esta
+// constante e os blocos "if (MOTORS_DISABLED) { ... }" nas funções
+// processClients/processProducts/processHistory/processMovements/processReceipts.
+const MOTORS_DISABLED = true
+
 const motors: Array<{ id: Exclude<SourceArea, 'diario'>; name: string }> = [
   { id: 'produtos', name: 'Produtos' },
   { id: 'clientes', name: 'Clientes' },
@@ -193,7 +202,8 @@ export function App() {
   const receiptSlotsRef = useRef(receiptSlots); receiptSlotsRef.current = receiptSlots
   const dailyInput = useRef<HTMLInputElement>(null)
   const motorInputs = useRef<Record<string, HTMLInputElement | null>>({})
-  const audit = useMemo(() => [...buildAudit(files).filter(item => (item.area !== 'clientes' || clientBase.length === 0) && (item.area !== 'produtos' || productBase.length === 0) && (item.area !== 'historico' || historyBase.length === 0) && (item.area !== 'movimentacoes' || movementBase.length === 0) && (item.area !== 'recebimentos' || receiptBase.length === 0)), ...clientAudit, ...productAudit, ...historyAudit, ...movementAudit, ...receiptAudit], [files, clientAudit, clientBase.length, productAudit, productBase.length, historyAudit, historyBase.length, movementAudit, movementBase.length, receiptAudit, receiptBase.length])
+  const motorDisabledAudit: AuditItem[] = [{ id: 'all-motors-disabled', level: 'action', title: 'Todos os motores estão desligados para conferência', instruction: 'Aguarde a liberação. Nenhum arquivo está sendo processado em nenhuma área.', detail: 'Desligado temporariamente a pedido do usuário, até a conferência manual dos dados.', area: 'diario' }]
+  const audit = useMemo(() => MOTORS_DISABLED ? motorDisabledAudit : [...buildAudit(files).filter(item => (item.area !== 'clientes' || clientBase.length === 0) && (item.area !== 'produtos' || productBase.length === 0) && (item.area !== 'historico' || historyBase.length === 0) && (item.area !== 'movimentacoes' || movementBase.length === 0) && (item.area !== 'recebimentos' || receiptBase.length === 0)), ...clientAudit, ...productAudit, ...historyAudit, ...movementAudit, ...receiptAudit], [files, clientAudit, clientBase.length, productAudit, productBase.length, historyAudit, historyBase.length, movementAudit, movementBase.length, receiptAudit, receiptBase.length])
 
   useEffect(() => {
     let active = true
@@ -414,6 +424,7 @@ export function App() {
   async function processClients() {
     const selected = Object.values(clientSlots).map(file => file && rawFiles[file.id]).filter((file): file is File => Boolean(file))
     if (!selected.length) return
+    if (MOTORS_DISABLED) { setClientAudit([{ id: 'client-motor-disabled', level: 'action', title: 'Motor desligado para conferência', instruction: 'Aguarde a liberação. Nenhum arquivo está sendo processado.', detail: 'Este motor foi desligado temporariamente, a pedido do usuário, para conferência manual dos dados.', area: 'clientes' }]); setClientBase([]); setClientIndicators(null); return }
     const missing = Object.entries(clientSlots).flatMap(([id, file]) => file && !rawFiles[file.id] ? [{ id: `client-missing-${id}`, level: 'action' as const, title: `Reenvie ${clientSources.find(source => source.id === id)?.label ?? 'o relatório'}`, instruction: `O arquivo ${file.name} não está disponível na memória. Reenvie este relatório para incluí-lo na base.`, detail: 'A base será gerada com os arquivos disponíveis.', area: 'clientes' as const }] : [])
     setClientProcessing(true); setClientAudit(missing)
     try { const result = await processClientMotor(selected); setClientAudit([...missing, ...result.audit]); setClientBase(result.canonicalBase); setClientIndicators(result.indicators); if (result.pyramidDocuments.length > 0) setPexSet(new Set(result.pyramidDocuments)) }
@@ -421,6 +432,7 @@ export function App() {
     finally { setClientProcessing(false); forcePush() }
   }
   async function processProducts() {
+    if (MOTORS_DISABLED) { setProductAudit([{ id: 'product-motor-disabled', level: 'action', title: 'Motor desligado para conferência', instruction: 'Aguarde a liberação. Nenhum arquivo está sendo processado.', detail: 'Este motor foi desligado temporariamente, a pedido do usuário, para conferência manual dos dados.', area: 'produtos' }]); setProductBase([]); setProductIndicators(null); return }
     const missing = Object.entries(productSlots).flatMap(([id, file]) => file && !rawFiles[file.id] ? [{ id: `product-missing-${id}`, level: 'action' as const, title: `Reenvie ${productSources.find(source => source.id === id)?.label ?? 'o relatório'}`, instruction: `O arquivo ${file.name} não está disponível na memória. Reenvie este relatório para incluí-lo na base.`, detail: 'A base será gerada com os arquivos disponíveis.', area: 'produtos' as const }] : [])
     const selected = Object.values(productSlots).map(file => file && rawFiles[file.id]).filter((file): file is File => Boolean(file)); if (!selected.length) { setProductAudit(missing); return }
     setProductProcessing(true); setProductAudit(missing)
@@ -429,6 +441,7 @@ export function App() {
     finally { setProductProcessing(false); forcePush() }
   }
   async function processHistory() {
+    if (MOTORS_DISABLED) { setHistoryAudit([{ id: 'history-motor-disabled', level: 'action', title: 'Motor desligado para conferência', instruction: 'Aguarde a liberação. Nenhum arquivo está sendo processado.', detail: 'Este motor foi desligado temporariamente, a pedido do usuário, para conferência manual dos dados.', area: 'historico' }]); setHistoryBase([]); setHistoryIndicators(null); return }
     const salesFiles = [...(historySlots.sales_atual ?? []), ...(historySlots.sales_anteriores ?? [])].map(f => rawFiles[f.id]).filter((f): f is File => Boolean(f)); if (!salesFiles.length) return
     const catalogRaw = historySlots.catalog?.[0] ? rawFiles[historySlots.catalog[0].id] : undefined
     setHistoryProcessing(true); setHistoryAudit([])
@@ -437,13 +450,14 @@ export function App() {
     finally { setHistoryProcessing(false); forcePush() }
   }
   async function processMovements() {
+    if (MOTORS_DISABLED) { setMovementAudit([{ id: 'movement-motor-disabled', level: 'action', title: 'Motor desligado para conferência', instruction: 'Aguarde a liberação. Nenhum arquivo está sendo processado.', detail: 'Este motor foi desligado temporariamente, a pedido do usuário, para conferência manual dos dados.', area: 'movimentacoes' }]); setMovementBase([]); setMovementIndicators(null); return }
     const selected = Object.values(movementSlots).flat().map(file => rawFiles[file.id]).filter((file): file is File => Boolean(file)); if (!selected.length) return
     setMovementProcessing(true); setMovementAudit([])
     try { const result = await processMovementMotor(selected); setMovementBase(result.canonicalBase); setMovementAudit(result.audit); setMovementIndicators(result.indicators) }
     catch { setMovementAudit([{ id: 'movement-read-error', level: 'action', title: 'Não foi possível ler os arquivos', instruction: 'Confira os arquivos e tente novamente.', detail: 'A base de movimentações não foi alterada.', area: 'movimentacoes' }]); setMovementBase([]); setMovementIndicators(null) }
     finally { setMovementProcessing(false); forcePush() }
   }
-  async function processReceipts(){const selected=Object.values(receiptSlots).flat().map(file=>rawFiles[file.id]).filter((file):file is File=>Boolean(file));if(!selected.length)return;setReceiptProcessing(true);setReceiptAudit([]);try{const result=await processReceiptMotor(selected);setReceiptBase(result.canonicalBase);setReceiptAudit(result.audit);setReceiptIndicators(result.indicators)}catch{setReceiptAudit([{id:'receipt-read-error',level:'action',title:'Não foi possível ler os arquivos',instruction:'Confira os arquivos e tente novamente.',detail:'A base de chegada de notas não foi alterada.',area:'recebimentos'}]);setReceiptBase([]);setReceiptIndicators(null)}finally{setReceiptProcessing(false);forcePush()}}
+  async function processReceipts(){if(MOTORS_DISABLED){setReceiptAudit([{id:'receipt-motor-disabled',level:'action',title:'Motor desligado para conferência',instruction:'Aguarde a liberação. Nenhum arquivo está sendo processado.',detail:'Este motor foi desligado temporariamente, a pedido do usuário, para conferência manual dos dados.',area:'recebimentos'}]);setReceiptBase([]);setReceiptIndicators(null);return}const selected=Object.values(receiptSlots).flat().map(file=>rawFiles[file.id]).filter((file):file is File=>Boolean(file));if(!selected.length)return;setReceiptProcessing(true);setReceiptAudit([]);try{const result=await processReceiptMotor(selected);setReceiptBase(result.canonicalBase);setReceiptAudit(result.audit);setReceiptIndicators(result.indicators)}catch{setReceiptAudit([{id:'receipt-read-error',level:'action',title:'Não foi possível ler os arquivos',instruction:'Confira os arquivos e tente novamente.',detail:'A base de chegada de notas não foi alterada.',area:'recebimentos'}]);setReceiptBase([]);setReceiptIndicators(null)}finally{setReceiptProcessing(false);forcePush()}}
   async function processAll() {
     setProcessingAll(true)
     const toRun: Promise<void>[] = []
@@ -517,10 +531,13 @@ export function App() {
     }))
     return [...snap.movements, ...histAsMovs]
   }, [snap])
-  const effectiveMovements = snapCombined ?? combinedMovements
-  const effectiveProducts = snap ? snap.products : productBase
-  const effectiveClients = snap ? snap.clients : clientBase
-  const effectiveReceipts = snap ? snap.receipts : receiptBase
+  // Motores desligados: nenhuma base calculada chega às telas, mesmo que
+  // ainda exista um resultado salvo de antes do desligamento (não apagamos
+  // o que está salvo — só não mostramos enquanto MOTORS_DISABLED for true).
+  const effectiveMovements = MOTORS_DISABLED ? [] : (snapCombined ?? combinedMovements)
+  const effectiveProducts = MOTORS_DISABLED ? [] : (snap ? snap.products : productBase)
+  const effectiveClients = MOTORS_DISABLED ? [] : (snap ? snap.clients : clientBase)
+  const effectiveReceipts = MOTORS_DISABLED ? [] : (snap ? snap.receipts : receiptBase)
   const effectiveRcas = snap ? snap.rcas : rcas
   function downloadClientBase() { const url = URL.createObjectURL(new Blob([JSON.stringify(clientBase, null, 2)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = 'base-canonica-clientes.json'; link.click(); URL.revokeObjectURL(url) }
   function downloadClientExcel() {
@@ -692,7 +709,7 @@ export function App() {
         {selloutTab === 'gerencial' && <GerencialTab movementBase={effectiveMovements} monthLabel={monthLabel} activeComp={displayComp} />}
         {selloutTab === 'clientes' && <ClientesTab movementBase={effectiveMovements} clientBase={effectiveClients} monthLabel={monthLabel} activeComp={displayComp} />}
       </>) : section === 'estoque' ? <>
-        <StockTab productBase={effectiveProducts} receiptBase={effectiveReceipts} movementBase={effectiveMovements} productIndicators={snap ? null : productIndicators} activeComp={displayComp} />
+        <StockTab productBase={effectiveProducts} receiptBase={effectiveReceipts} movementBase={effectiveMovements} productIndicators={MOTORS_DISABLED || snap ? null : productIndicators} activeComp={displayComp} />
       </> : section === 'clientes' ? (<>
         <header className="topbar" style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'stretch', borderBottom: '1px solid var(--border)' }}>
           <div />
@@ -707,7 +724,7 @@ export function App() {
           </div>
         </header>
         {clientesTab === 'carteira' && <CarteiraTab clientBase={effectiveClients} movementBase={effectiveMovements} activeComp={displayComp} pexSet={pexSet} />}
-        {clientesTab === 'cadastro' && <CadastroClienteTab clientBase={effectiveClients} movementBase={effectiveMovements} activeComp={displayComp} pexSet={pexSet} onPexChange={setPexSet} historyCount={historyBase.length} historySample={historyBase.length > 0 ? historyBase[0].customerCode : undefined} />}
+        {clientesTab === 'cadastro' && <CadastroClienteTab clientBase={effectiveClients} movementBase={effectiveMovements} activeComp={displayComp} pexSet={pexSet} onPexChange={setPexSet} historyCount={MOTORS_DISABLED ? 0 : historyBase.length} historySample={MOTORS_DISABLED || historyBase.length === 0 ? undefined : historyBase[0].customerCode} />}
         {clientesTab === 'piramide' && <PiramideTab clientBase={effectiveClients} movementBase={effectiveMovements} activeComp={displayComp} pexSet={pexSet} onPexChange={setPexSet} />}
         {clientesTab === 'sortimento' && <SortimentoTab clientBase={effectiveClients} productBase={effectiveProducts} movementBase={effectiveMovements} activeComp={displayComp} pexSet={pexSet} />}
       </>) : section === 'campanhas' ? <>
