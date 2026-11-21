@@ -223,6 +223,24 @@ export function App() {
     void (async () => {
       const motorsToRestore = ['clientes', 'produtos', 'historico', 'movimentacoes', 'recebimentos'] as const
       const restored = await Promise.all(motorsToRestore.map(async motor => [motor, await restoreMotorFiles(motor)] as const))
+      const restoredHistory = restored.find(([motor]) => motor === 'historico')?.[1] ?? {}
+      const legacySales = restoredHistory.sales ?? []
+      if (legacySales.length) {
+        const migrated: Record<string, UploadedFile[]> = { ...historySlotsRef.current }
+        delete migrated.sales
+        const metadata = Object.values(historySlotsRef.current).flat()
+        for (const item of legacySales) {
+          const match = metadata.find(file => file.name === item.name && file.size === item.file.size)
+          if (!match) { console.warn(`[Histórico] Arquivo legado restaurado sem metadado correspondente: "${item.name}".`); continue }
+          const slot = await historySalesSlot(item.file)
+          if (!slot) { console.warn(`[Histórico] Não foi possível classificar o arquivo legado "${item.name}".`); continue }
+          migrated[slot] = dedupeList([...(migrated[slot] ?? []), match])
+          void saveSlotFile('historico', slot, item.file).catch(() => {})
+          void removeSlotFile('historico', 'sales', item.name).catch(() => {})
+        }
+        setHistorySlots(migrated)
+        void savePersisted<Omit<SavedHistoryMotor, 'base'>>('historico:meta', { audit: historyAudit, indicators: historyIndicators, slots: migrated }).catch(() => {})
+      }
       const savedSlots: Record<string, Record<string, UploadedFile[]>> = {
         clientes: Object.fromEntries(Object.entries(clientSlotsRef.current).map(([slot, file]) => [slot, file ? [file] : []])),
         produtos: Object.fromEntries(Object.entries(productSlotsRef.current).map(([slot, file]) => [slot, file ? [file] : []])),
@@ -233,6 +251,13 @@ export function App() {
       const restoredRaw: Record<string, File> = {}
       for (const [motor, bySlot] of restored) {
         for (const [slot, items] of Object.entries(bySlot)) {
+          if (motor === 'historico' && slot === 'sales') {
+            for (const item of items) {
+              const metadata = Object.values(historySlotsRef.current).flat().find(file => file.name === item.name && file.size === item.file.size)
+              if (metadata) restoredRaw[metadata.id] = item.file
+            }
+            continue
+          }
           const metadata = savedSlots[motor][slot] ?? []
           for (const item of items) {
             const match = metadata.find(file => file.name === item.name && file.size === item.file.size && !restoredRaw[file.id])
