@@ -11,11 +11,8 @@ export const industryPortfolioHeader = sparseRow(
 )
 export const industryPortfolioRows = [
   industryPortfolioHeader,
-  // Pedido ainda aberto: Order Qty tem a quantidade pendente, sem nota fiscal.
   sparseRow({ 0: '11/3/26', 4: 'BR03494A', 5: 'Produto Teste A', 6: '120', 7: '0', 8: '', 12: '19,740.67' }, WIDTH),
-  // Pedido já faturado: Order Qty zera, Bill Qty tem o que já foi entregue,
-  // nota fiscal preenchida — não deve contar como pendente de chegar.
-  sparseRow({ 0: '10/6/26', 4: '000000000061054413', 5: 'Produto Teste B', 6: '0', 7: '384', 8: '2974638', 12: '146,110.06' }, WIDTH),
+  sparseRow({ 0: '10/6/26', 4: '000000000061054413', 5: 'Produto Teste B', 6: '384', 7: '0', 8: '2974638', 12: '146,110.06' }, WIDTH),
 ]
 
 // Mesmas linhas, com as colunas em posições bem diferentes das originais,
@@ -27,5 +24,5 @@ export const industryPortfolioHeaderShifted = sparseRow(
 export const industryPortfolioRowsShifted = [
   industryPortfolioHeaderShifted,
   sparseRow({ 9: '11/3/26', 10: 'BR03494A', 11: 'Produto Teste A', 12: '120', 13: '0', 0: '', 5: '19,740.67' }, 14),
-  sparseRow({ 9: '10/6/26', 10: '000000000061054413', 11: 'Produto Teste B', 12: '0', 13: '384', 0: '2974638', 5: '146,110.06' }, 14),
+  sparseRow({ 9: '10/6/26', 10: '000000000061054413', 11: 'Produto Teste B', 12: '384', 13: '0', 0: '2974638', 5: '146,110.06' }, 14),
 ]

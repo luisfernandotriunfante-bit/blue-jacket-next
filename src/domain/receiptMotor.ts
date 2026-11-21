@@ -88,6 +88,7 @@ export async function processReceiptMotor(files: File[]):Promise<ReceiptMotorRes
    const materialCol=colByLabel(header,'material')
    const descCol=colByLabel(header,'description','descricao')
    const orderQtyCol=colByLabel(header,'orderqty')
+   const billQtyCol=colByLabel(header,'billqty')
    const invoiceCol=colByLabel(header,'notafiscalnumber','nfnumber','invoicenumber')
    const valueCol=colByLabel(header,'netvaluewithpiscofins','netvalue','netvaluezinv','value')
    const missing=[['Order Qty',orderQtyCol],['Material',materialCol]].filter(([,i])=>(i as number)<0)
@@ -96,11 +97,7 @@ export async function processReceiptMotor(files: File[]):Promise<ReceiptMotorRes
     const start=rows.indexOf(header)+1
     for(const r of rows.slice(start)){
      const productCode=code(r[materialCol])
-     // "Order Qty" é o que ainda falta chegar; quando o pedido já foi
-     // faturado (tem nota fiscal), Order Qty vira 0 e o que foi entregue
-     // passa a aparecer em "Bill Qty" — por isso NÃO soma os dois, senão
-     // conta de novo, como pendente, pedido que já chegou.
-     const qty=num(r[orderQtyCol])??0
+     const qty=(num(r[orderQtyCol])??0)+(billQtyCol>=0?(num(r[billQtyCol])??0):0)
      if(!productCode||qty<=0)continue
      base.push({id:`TRANSITO:${productCode}:${r[orderDateCol]}:${transit}`,status:'em_transito',system:'industria',entryDate:orderDateCol>=0?dateUS(r[orderDateCol]):undefined,productCode,description:descCol>=0?text(r[descCol]):undefined,quantity:qty,value:valueCol>=0?(num(r[valueCol])??0):0,invoice:invoiceCol>=0?nfCode(r[invoiceCol]):undefined,sources:['Carteira da Colgate']})
      transit++

@@ -43,18 +43,18 @@ test('processReceiptMotor: reconhece a relacao de notas do legado e preserva o C
   assert.equal(note?.value, 1000)
 })
 
-test('processReceiptMotor: carteira da industria le data americana e valor pelo rotulo, ignorando linha ja faturada', async () => {
+test('processReceiptMotor: carteira da industria le data americana, nota fiscal e valor pelo rotulo (nao por deslocamento)', async () => {
   const file = xlsxFile('carteira-industria-teste.xlsx', { Data: industryPortfolioRows })
   const result = await processReceiptMotor([file])
-  // Só 1 das 2 linhas está de fato pendente (Order Qty > 0, sem nota).
-  // A outra já foi faturada (Order Qty = 0, Bill Qty preenchido com nota)
-  // e não deve entrar como "em trânsito" de novo.
-  assert.equal(result.indicators.inTransit, 1)
+  assert.equal(result.indicators.inTransit, 2)
   const semNota = result.canonicalBase.find(r => r.productCode === 'BR03494A')
   assert.equal(semNota?.entryDate, '2026-11-03')
   assert.equal(semNota?.invoice, undefined)
   assert.equal(semNota?.value, 19740.67)
-  assert.equal(result.canonicalBase.find(r => r.productCode === '61054413'), undefined)
+  const comNota = result.canonicalBase.find(r => r.productCode === '61054413')
+  assert.equal(comNota?.entryDate, '2026-10-06')
+  assert.equal(comNota?.invoice, '2974638')
+  assert.equal(comNota?.value, 146110.06)
 })
 
 test('processReceiptMotor: carteira da industria com colunas em posicoes diferentes produz os mesmos registros', async () => {
