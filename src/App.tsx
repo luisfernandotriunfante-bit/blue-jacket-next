@@ -26,14 +26,11 @@ import { exportBundle, importBundle, downloadBundle, validateBundle } from './do
 import { pushToCloud, pullFromCloud, listenForChanges, schedulePush, forcePush, onSyncStatus, getSyncDetail } from './domain/cloudSync'
 import { isFirebaseConfigured } from './firebaseConfig'
 
-// TEMPORÁRIO: todos os motores desligados a pedido do usuário (21/11/2026)
-// até a conferência manual dos dados (ver documento de flags por campo).
-// Nenhum arquivo é processado enquanto isso for true — as telas ficam sem
-// dado calculado. Os motores em si (src/domain/*.ts) e seus testes não são
-// afetados; isso só impede o App de chamá-los. Reverter apagando esta
-// constante e os blocos "if (MOTORS_DISABLED) { ... }" nas funções
-// processClients/processProducts/processHistory/processMovements/processReceipts.
-const MOTORS_DISABLED = true
+// Religado pelo usuário em 24/11/2026, após a conferência manual dos dados.
+// Os guards "if (MOTORS_DISABLED) { ... }" continuam no código, desativados
+// por esta flag — não precisam ser removidos, só reativados aqui se for
+// necessário desligar tudo de novo no futuro.
+const MOTORS_DISABLED = false
 
 const motors: Array<{ id: Exclude<SourceArea, 'diario'>; name: string }> = [
   { id: 'produtos', name: 'Produtos' },
